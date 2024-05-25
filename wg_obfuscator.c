@@ -6,8 +6,10 @@
 #include <sys/select.h>
 #include <netdb.h>
 #include <signal.h>
+#include <time.h>
 
 #define BUFFER_SIZE 2048
+#define HANDSHAKE_TIMEOUT 5
 
 #ifdef DEBUG
 #define debug_print(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
@@ -19,14 +21,14 @@
 static const uint8_t wg_signature[] = {0x01, 0x00, 0x00, 0x00};
 static const uint8_t wg_signature_resp[] = {0x02, 0x00, 0x00, 0x00};
 
+static int listen_sock = 0, forward_sock = 0;
+
 // XOR the data with the key
 static void xor_data(uint8_t *data, size_t length, char *key, size_t key_length) {
     for (size_t i = 0; i < length; ++i) {
         data[i] ^= key[i % key_length];
     }
 }
-
-static int listen_sock = 0, forward_sock = 0;
 
 // Handle signals
 static void signal_handler(int signal) {
@@ -53,9 +55,9 @@ static void signal_handler(int signal) {
 int main(int argc, char *argv[]) {
     debug_print("DEBUG mode enabled\n");
 
-    int listen_port = 0;
+    int listen_port = 1;
     char forward_host[256] = {0};
-    int forward_port = 0;    
+    int forward_port = -1;
     char xor_key[256] = {0};
     size_t key_length = 0;
 
@@ -69,7 +71,6 @@ int main(int argc, char *argv[]) {
         strncat(forward_host, argv[2], sizeof(forward_host)-1);
         forward_port = atoi(argv[3]);
         strncat(xor_key, argv[4], sizeof(xor_key)-1);
-        key_length = strlen(xor_key);
     } else if (argc == 3 && strcmp(argv[1], "-c") == 0) {
         // Read configuration from file
         char line[256];
@@ -81,7 +82,7 @@ int main(int argc, char *argv[]) {
         int listen_port_set = 0;
         int forward_host_set = 0;
         int forward_port_set = 0;
-        int xor_key_set = 0;        
+        int xor_key_set = 0;   
         while (fgets(line, sizeof(line), config_file)) {
             // Remove trailing newlines, carriage returns, spaces and tabs
             while (strlen(line) && (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r' 
@@ -140,7 +141,7 @@ int main(int argc, char *argv[]) {
             } else {
                 fprintf(stderr, "Unknown configuration key: %s\n", key);
                 exit(EXIT_FAILURE);
-            }            
+            }
         }
         fclose(config_file);
         if (!listen_port_set) {
@@ -163,6 +164,24 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <listen_port> <forward_host> <forward_port> <key>\n", argv[0]);
         fprintf(stderr, "Usage: %s -c <config_file>\n", argv[0]);
         exit(EXIT_FAILURE);
+    }    
+    key_length = strlen(xor_key);
+
+    if (listen_port < 0) {
+        fprintf(stderr, "Source port is not set\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!forward_host[0]) {
+        fprintf(stderr, "Forward host is not set\n");
+        exit(EXIT_FAILURE);
+    }
+    if (forward_port < 0) {
+        fprintf(stderr, "Forward port is not set\n");
+        exit(EXIT_FAILURE);
+    }
+    if (key_length == 0) {
+        fprintf(stderr, "Key is not set\n");
+        exit(EXIT_FAILURE);
     }
 
     // Set up signal handlers
@@ -172,13 +191,13 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr, // Address for forwarding socket, for sending data to the server
-        client_addr, // Address of the client to which we will send the response
+        last_sender_addr_temp, // Address of the client to which we will send the response (temporary)
+        last_sender_addr, // Address of the client to which we will send the response
         forward_client_addr, // Address of the forward socket, for receiving data from the server
         forward_server_addr; // Address of the server, from which we will receive the response
-    socklen_t client_addr_len = sizeof(client_addr);
-    socklen_t forward_client_len = sizeof(forward_client_addr);
-    socklen_t forward_server_len = sizeof(forward_server_addr);
     uint8_t buffer[BUFFER_SIZE];
+    int last_sender_set = 0;
+    time_t last_handshake_time = 0;
 
     fprintf(stderr, "Starting WireGuard obfuscator (c) 2024 by Alexey Cluster\n");
 
@@ -221,7 +240,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Get the assigned port number
-    if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_len) == -1) {
+    socklen_t forward_client_addr_len = sizeof(forward_client_addr);
+    if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
         perror("getsockname");
         close(listen_sock);
         close(forward_sock);
@@ -241,10 +261,6 @@ int main(int argc, char *argv[]) {
     }
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
     forward_addr.sin_port = htons(forward_port);
-
-    struct sockaddr_in last_sender_addr;
-    socklen_t last_sender_len = sizeof(last_sender_addr);
-    int last_sender_set = 0;
 
     while (1) {
         fd_set read_fds;
@@ -266,7 +282,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (FD_ISSET(listen_sock, &read_fds)) {
-            ssize_t received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+            socklen_t last_sender_addr_temp_len = sizeof(last_sender_addr_temp);
+            ssize_t received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
             if (received < 0) {
                 perror("recvfrom");
                 continue;
@@ -274,12 +291,11 @@ int main(int argc, char *argv[]) {
 
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                memcpy(&last_sender_addr, &client_addr, client_addr_len);
-                last_sender_set = 1;
-                fprintf(stderr, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+                fprintf(stderr, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+                last_handshake_time = time(NULL);
             }
 
-            debug_print("Received %ld bytes from %s:%d\n", received, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+            debug_print("Received %ld bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
             debug_print("O->: ");
             for (int i = 0; i < received; ++i) {
                 debug_print("%02X ", buffer[i]);
@@ -296,9 +312,8 @@ int main(int argc, char *argv[]) {
 
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                memcpy(&last_sender_addr, &client_addr, client_addr_len);
-                last_sender_set = 1;
-                fprintf(stderr, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+                fprintf(stderr, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+                last_handshake_time = time(NULL);
             }
 
             // Send the data to the forward port
@@ -306,7 +321,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (FD_ISSET(forward_sock, &read_fds)) {
-            ssize_t received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_len);
+            socklen_t forward_server_addr_len = sizeof(forward_server_addr);
+            ssize_t received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_addr_len);
             if (received < 0) {
                 perror("recvfrom");
                 continue;
@@ -324,9 +340,11 @@ int main(int argc, char *argv[]) {
             }
             debug_print("\n");
 
+            int need_to_set_clietn_addr = 0;
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
                 fprintf(stderr, "Received WireGuard handshake response (non-obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+                need_to_set_clietn_addr = 1;
             }
 
             // XOR the data
@@ -340,11 +358,23 @@ int main(int argc, char *argv[]) {
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
                 fprintf(stderr, "Received WireGuard handshake response (obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+                need_to_set_clietn_addr = 1;
+            }
+
+            // Store the last sender address
+            if (need_to_set_clietn_addr) {
+                if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
+                    memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
+                    last_sender_set = 1;
+                    fprintf(stderr, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                } else {
+                    fprintf(stderr, "Ignoring WireGuard handshake response, handshake timeout\n");
+                }
             }
 
             // Send the response back to the original client
             if (last_sender_set) {
-                sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, last_sender_len);
+                sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, sizeof(last_sender_addr));
             }
         }
     }
