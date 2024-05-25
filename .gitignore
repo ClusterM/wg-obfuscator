@@ -2,3 +2,4 @@
 wg_obfuscator
 *.o
 *.dll
+*.stackdump

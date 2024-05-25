@@ -2,8 +2,8 @@ PROG_NAME= wg_obfuscator
 CONFIG=wg_obfuscator.conf
 SERVICE_FILE=wg_obfuscator.service
 
-RM       = rm -f
-CC       = gcc
+RM    = rm -f
+CC    = gcc
 ifdef DEBUG
   CFLAGS   = -g -O0 -Wall -Wno-format-truncation -DDEBUG
 else
@@ -18,6 +18,34 @@ ifeq ($(OS),Windows_NT)
   TARGET = $(EXEDIR)/$(PROG_NAME).exe
 else
   TARGET = $(EXEDIR)/$(PROG_NAME)
+endif
+
+# build on macos(arm) support
+IS_MACARM := 0
+ifneq ($(OS),Windows_NT)
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Darwin)
+    UNAME_P := $(shell uname -p)
+    ifneq ($(filter arm%,$(UNAME_P)),)
+       EXTRA_CFLAGS += -I$(shell brew --prefix)/include
+       IS_MACARM = 1
+    endif
+  endif
+endif
+
+ifeq ($(OS),Windows_NT)
+  LDFLAGS += -largp
+  TARGET = $(EXEDIR)/$(PROG_NAME).exe
+else
+  TARGET = $(EXEDIR)/$(PROG_NAME)
+  # build on macos(arm) support
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Darwin)
+    LDFLAGS += -largp
+    ifeq ($(IS_MACARM), 1)
+      LDFLAGS += -L$(shell brew --prefix)/lib
+    endif
+  endif
 endif
 
 all: $(TARGET)

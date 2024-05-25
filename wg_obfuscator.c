@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <signal.h>
 #include <time.h>
+#include <argp.h>
 
 #define BUFFER_SIZE 2048
 #define HANDSHAKE_TIMEOUT 5
@@ -22,6 +23,182 @@ static const uint8_t wg_signature[] = {0x01, 0x00, 0x00, 0x00};
 static const uint8_t wg_signature_resp[] = {0x02, 0x00, 0x00, 0x00};
 
 static int listen_sock = 0, forward_sock = 0;
+
+// main parameters (TODO: IPv6?)
+static int listen_port = 1;
+static char forward_host[256] = {0};
+static int forward_port = -1;
+static char xor_key[256] = {0};
+static size_t key_length = 0;
+// optional parameters: client and forward interfaces
+static char client_interface[256] = {0};
+static char forward_interface[256] = {0};
+// optional parameters: fixed client address
+static char client_fixed_addr_port[256] = {0};
+
+static void read_config_file(char *filename)
+{
+    // Read configuration from file
+    char line[256];
+    FILE *config_file = fopen(filename, "r");
+    if (config_file == NULL) {
+        perror("config file");
+        exit(EXIT_FAILURE);
+    }
+    int listen_port_set = 0;
+    int forward_host_set = 0;
+    int forward_port_set = 0;
+    int xor_key_set = 0;   
+    while (fgets(line, sizeof(line), config_file)) {
+        // Remove trailing newlines, carriage returns, spaces and tabs
+        while (strlen(line) && (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r' 
+            || line[strlen(line) - 1] == ' ' || line[strlen(line) - 1] == '\t')) {
+            line[strlen(line) - 1] = 0;
+        }
+        // Remove leading spaces and tabs
+        while (strlen(line) && (line[0] == ' ' || line[0] == '\t')) {
+            memmove(line, line + 1, strlen(line));
+        }
+        // Ignore comments
+        char *comment_index = strstr(line, "#");
+        if (comment_index != NULL) {
+            *comment_index = 0;
+        }
+        // Skip empty lines or with spaces only
+        if (strspn(line, " \t\n") == strlen(line)) {
+            continue;
+        }
+
+        // debug_print("Read line: '%s'\n", line);
+
+        // Parse key-value pairs
+        char *key = strtok(line, "=");
+        // Trim leading and trailing spaces
+        while (strlen(key) && (key[0] == ' ' || key[0] == '\t')) {
+            key++;
+        }
+        while (strlen(key) && (key[strlen(key) - 1] == ' ' || key[strlen(key) - 1] == '\t')) {
+            key[strlen(key) - 1] = 0;
+        }
+        // debug_print("Key: '%s'\n", key);
+        char *value = strtok(NULL, "=");
+        if (value == NULL) {
+            fprintf(stderr, "Invalid configuration line: %s\n", line);
+            exit(EXIT_FAILURE);
+        }
+        // Trim leading and trailing spaces
+        while (strlen(value) && (value[0] == ' ' || value[0] == '\t')) {
+            value++;
+        }
+        while (strlen(value) && (value[strlen(value) - 1] == ' ' || value[strlen(value) - 1] == '\t')) {
+            value[strlen(value) - 1] = 0;
+        }
+        if (value == NULL) {
+            fprintf(stderr, "Invalid configuration line: %s\n", line);
+            exit(EXIT_FAILURE);
+        }
+        // debug_print("Value: '%s'\n", value);
+
+        if (strcmp(key, "listen_port") == 0) {
+            listen_port = atoi(value);
+            listen_port_set = 1;
+        } else if (strcmp(key, "forward_host") == 0) {
+            strncat(forward_host, value, sizeof(forward_host)-1);
+            forward_host_set = 1;
+        } else if (strcmp(key, "forward_port") == 0) {
+            forward_port = atoi(value);
+            forward_port_set = 1;
+        } else if (strcmp(key, "key") == 0) {
+            strncat(xor_key, value, sizeof(xor_key)-1);
+            key_length = strlen(xor_key);
+            xor_key_set = 1;
+        } else if (strcmp(key, "client_interface") == 0) {
+            strncat(client_interface, value, sizeof(client_interface)-1);
+        } else if (strcmp(key, "forward_interface") == 0) {
+            strncat(forward_interface, value, sizeof(forward_interface)-1);
+        } else if (strcmp(key, "client_fixed_addr") == 0) {
+            strncat(client_fixed_addr_port, value, sizeof(client_fixed_addr_port)-1);
+        } else {
+            fprintf(stderr, "Unknown configuration key: %s\n", key);
+            exit(EXIT_FAILURE);
+        }
+    }
+    fclose(config_file);
+    if (!listen_port_set) {
+        fprintf(stderr, "listen_port is not set in the configuration file\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!forward_host_set) {
+        fprintf(stderr, "forward_host is not set in the configuration file\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!forward_port_set) {
+        fprintf(stderr, "forward_port is not set in the configuration file\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!xor_key_set) {
+        fprintf(stderr, "key is not set in the configuration file\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/* Parse a single option. */
+static error_t
+parse_opt (int key, char *arg, struct argp_state *state)
+{
+    switch (key)
+    {
+        case 'c':
+            read_config_file(arg);
+            break;
+        case 'l':
+            listen_port = atoi(arg);
+            break;
+        case 'h':
+            strncat(forward_host, arg, sizeof(forward_host)-1);
+            break;
+        case 'p':
+            forward_port = atoi(arg);
+            break;
+        case 'k':
+            strncat(xor_key, arg, sizeof(xor_key)-1);
+            key_length = strlen(xor_key);
+            break;
+        case 's':
+            strncat(client_interface, arg, sizeof(client_interface)-1);
+            break;
+        case 'f':
+            strncat(forward_interface, arg, sizeof(forward_interface)-1);
+            break;
+        case 'a':
+            strncat(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port)-1);
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
+
+/* The options we understand. */
+static const struct argp_option options[] = {
+    { "config", 'c', "<config_file>", 0, "read configuration from file (can be used instead of the rest arguments)", .group = 0 },
+    { "listen-port", 'l', "<port>", 0, "port to listen for the client", .group = 1 },
+    { "fw-host", 'h', "<host>", 0, "host to forward the data", .group = 2 },
+    { "fw-port", 'p', "<port>", 0, "port to forward the data", .group = 2 },
+    { "key", 'k', "<key>", 0, "key to XOR the data", .group = 3 },
+    { "listen-int", 's', "<ip>", 0, "client interface to listen on (optional, default - 0.0.0.0)", .group = 4 },
+    { "fw-int", 'f', "<ip>", 0, "forward interface to listen on (optional - 0.0.0.0)", .group = 4 },
+    { "source", 'a', "<ip>:<port>", 0, "fixed client address and port (optional, default - auto)", .group = 5 },
+    { 0 }
+};
+/* Our argp parser. */
+static struct argp argp = {
+    .options = options,
+    .parser = parse_opt,
+    .args_doc = NULL,
+    .doc = "WireGuard obfuscator (c) 2024 by Alexey Cluster"
+};
 
 // XOR the data with the key
 static void xor_data(uint8_t *data, size_t length, char *key, size_t key_length) {
@@ -55,120 +232,48 @@ static void signal_handler(int signal) {
 int main(int argc, char *argv[]) {
     debug_print("DEBUG mode enabled\n");
 
-    int listen_port = 1;
-    char forward_host[256] = {0};
-    int forward_port = -1;
-    char xor_key[256] = {0};
-    size_t key_length = 0;
+    struct sockaddr_in 
+        listen_addr, // Address for listening socket, for receiving data from the client
+        forward_addr, // Address for forwarding socket, for sending data to the server
+        last_sender_addr_temp, // Address of the client to which we will send the response (temporary)
+        last_sender_addr, // Address of the client to which we will send the response
+        forward_client_addr, // Address of the forward socket, for receiving data from the server
+        forward_server_addr; // Address of the server, from which we will receive the response
+    uint8_t buffer[BUFFER_SIZE];
+    int last_sender_set = 0;
+    time_t last_handshake_time = 0;
 
-    // optional parameters
-    unsigned long s_addr_client = INADDR_ANY;
-    unsigned long s_addr_forward = INADDR_ANY;
-
-    if (argc == 5) {
-        // Read configuration from command line arguments
-        listen_port = atoi(argv[1]);
-        strncat(forward_host, argv[2], sizeof(forward_host)-1);
-        forward_port = atoi(argv[3]);
-        strncat(xor_key, argv[4], sizeof(xor_key)-1);
-    } else if (argc == 3 && strcmp(argv[1], "-c") == 0) {
-        // Read configuration from file
-        char line[256];
-        FILE *config_file = fopen(argv[2], "r");
-        if (config_file == NULL) {
-            perror("fopen");
-            exit(EXIT_FAILURE);
-        }
-        int listen_port_set = 0;
-        int forward_host_set = 0;
-        int forward_port_set = 0;
-        int xor_key_set = 0;   
-        while (fgets(line, sizeof(line), config_file)) {
-            // Remove trailing newlines, carriage returns, spaces and tabs
-            while (strlen(line) && (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r' 
-                || line[strlen(line) - 1] == ' ' || line[strlen(line) - 1] == '\t')) {
-                line[strlen(line) - 1] = 0;
-            }
-            // Ignore comments
-            int comment_index = strcspn(line, "#");
-            if (comment_index > 0) {
-                line[comment_index] = 0;
-            }
-            // Skip empty lines or with spaces only
-            if (strspn(line, " \t\n") == strlen(line)) {
-                continue;
-            }
-            
-            // Parse key-value pairs
-            char *key = strtok(line, "=");
-            // Trim leading and trailing spaces
-            while (strlen(key) && (key[0] == ' ' || key[0] == '\t')) {
-                key++;
-            }
-            while (strlen(key) && (key[strlen(key) - 1] == ' ' || key[strlen(key) - 1] == '\t')) {
-                key[strlen(key) - 1] = 0;
-            }
-            char *value = strtok(NULL, "=");
-            // Trim leading and trailing spaces
-            while (strlen(value) && (value[0] == ' ' || value[0] == '\t')) {
-                value++;
-            }
-            while (strlen(value) && (value[strlen(value) - 1] == ' ' || value[strlen(value) - 1] == '\t')) {
-                value[strlen(value) - 1] = 0;
-            }
-            if (value == NULL) {
-                fprintf(stderr, "Invalid configuration line: %s\n", line);
-                exit(EXIT_FAILURE);
-            }
-
-            if (strcmp(key, "listen_port") == 0) {
-                listen_port = atoi(value);
-                listen_port_set = 1;
-            } else if (strcmp(key, "forward_host") == 0) {
-                strncat(forward_host, value, sizeof(forward_host)-1);
-                forward_host_set = 1;
-            } else if (strcmp(key, "forward_port") == 0) {
-                forward_port = atoi(value);
-                forward_port_set = 1;
-            } else if (strcmp(key, "key") == 0) {
-                strncat(xor_key, value, sizeof(xor_key)-1);
-                key_length = strlen(xor_key);
-                xor_key_set = 1;
-            } else if (strcmp(key, "client_interface") == 0) {
-                s_addr_client = inet_addr(value);
-            } else if (strcmp(key, "forward_interface") == 0) {
-                s_addr_forward = inet_addr(value);
-            } else {
-                fprintf(stderr, "Unknown configuration key: %s\n", key);
-                exit(EXIT_FAILURE);
-            }
-        }
-        fclose(config_file);
-        if (!listen_port_set) {
-            fprintf(stderr, "listen_port is not set in the configuration file\n");
-            exit(EXIT_FAILURE);
-        }
-        if (!forward_host_set) {
-            fprintf(stderr, "forward_host is not set in the configuration file\n");
-            exit(EXIT_FAILURE);
-        }
-        if (!forward_port_set) {
-            fprintf(stderr, "forward_port is not set in the configuration file\n");
-            exit(EXIT_FAILURE);
-        }
-        if (!xor_key_set) {
-            fprintf(stderr, "key is not set in the configuration file\n");
-            exit(EXIT_FAILURE);
-        }
-    } else {
-        fprintf(stderr, "Usage: %s <listen_port> <forward_host> <forward_port> <key>\n", argv[0]);
-        fprintf(stderr, "Usage: %s -c <config_file>\n", argv[0]);
+    // Parse command line arguments
+    if (argc == 1) {
+        fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
         exit(EXIT_FAILURE);
-    }    
+    }
+    if (argp_parse(&argp, argc, argv, 0, 0, 0) != 0) {
+        fprintf(stderr, "Failed to parse command line arguments\n");
+        exit(EXIT_FAILURE);
+    }
+  
+    // Check the parameters
     key_length = strlen(xor_key);
-
+    if (client_fixed_addr_port[0]) {
+        char *port_delimiter = strchr(client_fixed_addr_port, ':');
+        if (port_delimiter == NULL) {
+            fprintf(stderr, "Invalid fixed client address format\n");
+            exit(EXIT_FAILURE);
+        }
+        *port_delimiter = 0;
+        last_sender_addr.sin_addr.s_addr = inet_addr(client_fixed_addr_port);
+        if (last_sender_addr.sin_addr.s_addr == INADDR_NONE) {
+            fprintf(stderr, "Invalid fixed client addres: %s\n", client_fixed_addr_port);
+            exit(EXIT_FAILURE);
+        }
+        last_sender_addr.sin_port = htons(atoi(port_delimiter + 1));
+        last_sender_addr.sin_family = AF_INET;
+        last_sender_set = 1;
+        fprintf(stderr, "Fixed client address: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+    }
     if (listen_port < 0) {
-        fprintf(stderr, "Source port is not set\n");
+        fprintf(stderr, "Source port to listen is not set\n");
         exit(EXIT_FAILURE);
     }
     if (!forward_host[0]) {
@@ -183,37 +288,40 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Key is not set\n");
         exit(EXIT_FAILURE);
     }
+    static unsigned long s_listen_addr_client = INADDR_ANY;
+    static unsigned long s_listen_addr_forward = INADDR_ANY;
+    if (client_interface[0]) {
+        s_listen_addr_client = inet_addr(client_interface);
+    }
+    if (forward_interface[0]) {
+        s_listen_addr_forward = inet_addr(forward_interface);
+    }
+    if (s_listen_addr_client == INADDR_NONE) {
+        fprintf(stderr, "Invalid client interface: %s\n", client_interface);
+        exit(EXIT_FAILURE);
+    }
+    if (s_listen_addr_forward == INADDR_NONE) {
+        fprintf(stderr, "Invalid forward interface: %s\n", forward_interface);
+        exit(EXIT_FAILURE);
+    }
 
     // Set up signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    struct sockaddr_in 
-        listen_addr, // Address for listening socket, for receiving data from the client
-        forward_addr, // Address for forwarding socket, for sending data to the server
-        last_sender_addr_temp, // Address of the client to which we will send the response (temporary)
-        last_sender_addr, // Address of the client to which we will send the response
-        forward_client_addr, // Address of the forward socket, for receiving data from the server
-        forward_server_addr; // Address of the server, from which we will receive the response
-    uint8_t buffer[BUFFER_SIZE];
-    int last_sender_set = 0;
-    time_t last_handshake_time = 0;
-
-    fprintf(stderr, "Starting WireGuard obfuscator (c) 2024 by Alexey Cluster\n");
-
     // Create listening socket
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket");
+        perror("client socket");
         exit(EXIT_FAILURE);
     }
 
     memset(&listen_addr, 0, sizeof(listen_addr));
     listen_addr.sin_family = AF_INET;
-    listen_addr.sin_addr.s_addr = s_addr_client;
+    listen_addr.sin_addr.s_addr = s_listen_addr_client;
     listen_addr.sin_port = htons(listen_port);
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        perror("bind");
+        perror("client socket bind");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
@@ -221,7 +329,7 @@ int main(int argc, char *argv[]) {
 
     // Create forwarding socket and bind it to the same port
     if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket");
+        perror("forward socket");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
@@ -229,11 +337,11 @@ int main(int argc, char *argv[]) {
     // Create a client address for the forward socket
     memset(&forward_client_addr, 0, sizeof(forward_client_addr));
     forward_client_addr.sin_family = AF_INET;
-    forward_client_addr.sin_addr.s_addr = s_addr_forward;
+    forward_client_addr.sin_addr.s_addr = s_listen_addr_forward;
     forward_client_addr.sin_port = 0; // Let the system assign an available port
 
     if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
-        perror("bind");
+        perror("forward socket bind");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -242,7 +350,7 @@ int main(int argc, char *argv[]) {
     // Get the assigned port number
     socklen_t forward_client_addr_len = sizeof(forward_client_addr);
     if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
-        perror("getsockname");
+        perror("failed to get socket port number");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -254,13 +362,15 @@ int main(int argc, char *argv[]) {
     forward_addr.sin_family = AF_INET;
     struct hostent *host = gethostbyname(forward_host);
     if (host == NULL) {
-        perror("gethostbyname");
+        perror("can't resolve hostname");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
     }
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
     forward_addr.sin_port = htons(forward_port);
+
+    fprintf(stderr, "WireGuard obfuscator successfully started\n");
 
     while (1) {
         fd_set read_fds;
@@ -340,11 +450,11 @@ int main(int argc, char *argv[]) {
             }
             debug_print("\n");
 
-            int need_to_set_clietn_addr = 0;
+            int need_to_set_client_addr = 0;
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
                 fprintf(stderr, "Received WireGuard handshake response (non-obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
-                need_to_set_clietn_addr = 1;
+                need_to_set_client_addr = 1;
             }
 
             // XOR the data
@@ -358,23 +468,32 @@ int main(int argc, char *argv[]) {
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
                 fprintf(stderr, "Received WireGuard handshake response (obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
-                need_to_set_clietn_addr = 1;
+                need_to_set_client_addr = 1;
             }
 
             // Store the last sender address
-            if (need_to_set_clietn_addr) {
-                if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
-                    memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
-                    last_sender_set = 1;
-                    fprintf(stderr, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+            if (need_to_set_client_addr) {
+                if (client_fixed_addr_port[0]) {
+                    if (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port) {
+                        fprintf(stderr, "Ignoring WireGuard handshake response, client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                        continue;
+                    }
                 } else {
-                    fprintf(stderr, "Ignoring WireGuard handshake response, handshake timeout\n");
+                    if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
+                        memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
+                        last_sender_set = 1;
+                        fprintf(stderr, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                    } else {
+                        fprintf(stderr, "Ignoring WireGuard handshake response, handshake timeout\n");
+                    }
                 }
             }
 
             // Send the response back to the original client
             if (last_sender_set) {
                 sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, sizeof(last_sender_addr));
+            } else {
+                debug_print("No client address set, ignoring the response\n");
             }
         }
     }
