@@ -14,8 +14,6 @@
 #define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, fmt, ##__VA_ARGS__); }
 #define debug_print(fmt, ...) print(4, fmt, ##__VA_ARGS__)
 
-
-
 static int listen_sock = 0, forward_sock = 0;
 
 // main parameters (TODO: IPv6?)
@@ -96,17 +94,17 @@ static void read_config_file(char *filename)
             listen_port = atoi(value);
             listen_port_set = 1;
         } else if (strcmp(key, "forward_to") == 0) {
-            strlcat(forward_host_port, value, sizeof(forward_host_port));
+            memcpy(forward_host_port, value, sizeof(forward_host_port));
             forward_host_port_set = 1;
         } else if (strcmp(key, "key") == 0) {
-            strlcat(xor_key, value, sizeof(xor_key));
+            memcpy(xor_key, value, sizeof(xor_key));
             xor_key_set = 1;
         } else if (strcmp(key, "client_interface") == 0) {
-            strlcat(client_interface, value, sizeof(client_interface));
+            memcpy(client_interface, value, sizeof(client_interface));
         } else if (strcmp(key, "forward_interface") == 0) {
-            strlcat(forward_interface, value, sizeof(forward_interface));
+            memcpy(forward_interface, value, sizeof(forward_interface));
         } else if (strcmp(key, "client_fixed_addr") == 0) {
-            strlcat(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
+            memcpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
         } else {
             fprintf(stderr, "Unknown configuration key: %s\n", key);
             exit(EXIT_FAILURE);
@@ -140,22 +138,22 @@ parse_opt (int key, char *arg, struct argp_state *state)
             listen_port = atoi(arg);
             break;
         case 'f':
-            strlcat(forward_host_port, arg, sizeof(forward_host_port));
+            memcpy(forward_host_port, arg, sizeof(forward_host_port));
             break;
         case 'k':
-            strlcat(xor_key, arg, sizeof(xor_key));
+            memcpy(xor_key, arg, sizeof(xor_key));
             break;
         case 's':
-            strlcat(client_interface, arg, sizeof(client_interface));
+            memcpy(client_interface, arg, sizeof(client_interface));
             break;
         case 't':
-            strlcat(forward_interface, arg, sizeof(forward_interface));
+            memcpy(forward_interface, arg, sizeof(forward_interface));
             break;
         case 'a':
-            strlcat(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port));
+            memcpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port));
             break;
         case 'v':
-            strlcat(verbose_str, arg, sizeof(verbose_str));
+            memcpy(verbose_str, arg, sizeof(verbose_str));
             break;
         default:
             return ARGP_ERR_UNKNOWN;
@@ -257,7 +255,7 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
-        strlcat(forward_host, forward_host_port, sizeof(forward_host));
+        memcpy(forward_host, forward_host_port, sizeof(forward_host));
         forward_port = atoi(port_delimiter + 1);
         if (forward_port <= 0) {
             fprintf(stderr, "Invalid forward port: %s\n", port_delimiter + 1);
