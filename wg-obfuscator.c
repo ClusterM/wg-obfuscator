@@ -511,7 +511,7 @@ int main(int argc, char *argv[]) {
             if (last_sender_set) {
                 sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, sizeof(last_sender_addr));
             } else {
-                debug_print("No client address set, ignoring the response\n");
+                print(3, "No client address set, ignoring the response\n");
             }
         }
     }
