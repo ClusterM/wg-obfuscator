@@ -83,5 +83,5 @@ else
 	install -m 644 $(SERVICE_FILE) $(DESTDIR)/etc/systemd/system
 	systemctl daemon-reload
 	systemctl enable $(SERVICE_FILE)
-	systemctl start $(SERVICE_FILE)
+	systemctl restart $(SERVICE_FILE)
 endif

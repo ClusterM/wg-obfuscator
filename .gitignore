@@ -4,3 +4,4 @@ wg_obfuscator
 *.dll
 *dump
 commit.h
+.vscode
