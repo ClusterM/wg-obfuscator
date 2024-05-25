@@ -17,7 +17,7 @@
 static int listen_sock = 0, forward_sock = 0;
 
 // main parameters (TODO: IPv6?)
-static int listen_port = 1;
+static int listen_port = -1;
 static char forward_host_port[256] = {0};
 static char xor_key[256] = {0};
 // optional parameters: client and forward interfaces
@@ -25,6 +25,7 @@ static char client_interface[256] = {0};
 static char forward_interface[256] = {0};
 // optional parameters: fixed client address
 static char client_fixed_addr_port[256] = {0};
+static int server_local_port = 0;
 // verbosity level
 static char verbose_str[256] = {0};
 static int verbose = 2;
@@ -105,6 +106,10 @@ static void read_config_file(char *filename)
             memcpy(forward_interface, value, sizeof(forward_interface));
         } else if (strcmp(key, "client_fixed_addr") == 0) {
             memcpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
+        } else if (strcmp(key, "forward_local_port") == 0) {
+            server_local_port = atoi(value);
+        } else if (strcmp(key, "verbose") == 0) {
+            memcpy(verbose_str, value, sizeof(verbose_str));
         } else {
             fprintf(stderr, "Unknown configuration key: %s\n", key);
             exit(EXIT_FAILURE);
@@ -151,6 +156,8 @@ parse_opt (int key, char *arg, struct argp_state *state)
             break;
         case 'a':
             memcpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port));
+        case 'p':
+            server_local_port = atoi(arg);
             break;
         case 'v':
             memcpy(verbose_str, arg, sizeof(verbose_str));
@@ -170,6 +177,7 @@ static const struct argp_option options[] = {
     { "listen-int", 's', "<ip>", 0, "client interface to listen on (optional, default - 0.0.0.0)", .group = 4 },
     { "forward-int", 't', "<ip>", 0, "forward interface to use (optional - 0.0.0.0)", .group = 4 },
     { "source", 'a', "<ip>:<port>", 0, "fixed client address and port (optional, default - auto)", .group = 5 },
+    { "forward-lport", 'p', "<port>", 0, "local port for the forward socket (optional, default - random)", .group = 5 },
     { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 6 },
     { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 6 },
     { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 6 },
@@ -338,7 +346,7 @@ int main(int argc, char *argv[]) {
     memset(&forward_client_addr, 0, sizeof(forward_client_addr));
     forward_client_addr.sin_family = AF_INET;
     forward_client_addr.sin_addr.s_addr = s_listen_addr_forward;
-    forward_client_addr.sin_port = 0; // Let the system assign an available port
+    forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
 
     if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
         perror("forward socket bind");
