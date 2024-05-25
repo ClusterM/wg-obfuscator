@@ -24,7 +24,7 @@ This is a simple obfuscator for WireGuard. It is designed to make it harder to d
         |
         v
 +----------------+
-|  Oobfuscator   |
+|   Obfuscator   |
 +----------------+
         ^
         |
@@ -44,6 +44,60 @@ Are are three possible configurations of a WireGuard peer:
 * **Client**: The peer is a client with a dynamic IP address or behind a NAT, it can only initiate connections to the fixed IP address of the server.
 * **Server**: The peer is a server with a static IP address, it listens for incoming connections but can't initiate outgoing connections.
 * **Hybrid**: The peer has a static IP address, listens for incoming connections but can also initiate outgoing connections to the fixed IP address of the server.
+
+
+### Settings diagram
+```
++------------------------------------------------------------------------------------------+
+|                                 Source WireGuard peer                                    |
+| ListenPort         = <from "client_fixed_addr" on the source obfuscator                  |
+|                      (required only for hybrid configuration)>                           |
++------------------------------------------------------------------------------------------+
+| Endpoint           = <source obfuscator's IP : source obfuscator's "listen_port">        |
++------------------------------------------------------------------------------------------+
+                                            ^
+                                            |
+                                            v
++------------------------------------------------------------------------------------------+
+|                                   Source obfuscator                                      |
+| client_fixed_addr  = <source WireGuard peer's IP : source WireGuard peer's "ListenPort"  |
+|                    = (required only for hybrid configuration)>                           |
+| listen_port        = <port from "Endpoint" on the source WireGuard peer>                 |
++------------------------------------------------------------------------------------------+
+| forward_local_port = <port from "forward_to" on the target obfuscator                    |
+|                    = (required only for hybrid configuration)>                           |
+| forward_to         = <target obfuscator's IP and target obfuscator's "listen_port">      |
++------------------------------------------------------------------------------------------+
+                                            ^
+                                            |
+                                            v
++------------------------------------------------------------------------------------------+
+|                                       Internet                                           |
++------------------------------------------------------------------------------------------+
+                                            ^
+                                            |
+                                            v
++------------------------------------------------------------------------------------------+
+|                                    Tartget obfuscator                                    |
+| client_fixed_addr  = <soucrce obfuscator's IP : source obfuscator's "forward_local_port" |
+|                    = (required only for hybrid configuration)>                           |
+| listen_port        = <port from "forward_local_port" on the source obfuscator>           |
++------------------------------------------------------------------------------------------+
+| forward_local_port = <port from target WireGuard peer's "Endpoint">                      |
+|                    = (required only for hybrid configuration)>                           |
+| forward_to         = <target WireGuard peer's IP : target WireGuard peer's "ListenPort"> |
++------------------------------------------------------------------------------------------+
+                                            ^
+                                            |
+                                            v
++------------------------------------------------------------------------------------------+
+|                                   Target WireGuard peer                                  |
+| ListenPort         = <from "forward_to" on the target obfuscator>                        |
++------------------------------------------------------------------------------------------+
+| Endpoint           = <target obfuscator's IP : target obfuscator's "forward_local_port"> |
+|                      (required only for hybrid configuration)>                           |
++------------------------------------------------------------------------------------------+
+```
 
 ### Client
 For example you have a simple configuration like this:
@@ -116,23 +170,6 @@ listen_port = 13300
 forward_to = 127.0.0.1:13333
 
 key = test
-```
-
-### Hybrid
-In such case you can specify IP address and port of the other side obfuscator, just add line:
-```
-client_fixed_addr = 1.2.3.4:31241
-```
-Where `1.2.3.4:31241` is IP address and port of the other side obfuscator. This option will disable automatic client address/port detection based on a handshake and will permanently use the specified address. In such case your server can initiate connections to the other side too.
-
-So, the configuration will be like this:
-```
-listen_port = 13300
-
-# Host and port of the real WireGuard server
-forward_to = 127.0.0.1:13333
-
-client_fixed_addr = 1.2.3.4:31241
 ```
 
 ## How to build and install
