@@ -27,7 +27,7 @@ ifneq ($(OS),Windows_NT)
   ifeq ($(UNAME_S),Darwin)
     UNAME_P := $(shell uname -p)
     ifneq ($(filter arm%,$(UNAME_P)),)
-       EXTRA_CFLAGS += -I$(shell brew --prefix)/include
+       CFLAGS += -I$(shell brew --prefix)/include
        IS_MACARM = 1
     endif
   endif
