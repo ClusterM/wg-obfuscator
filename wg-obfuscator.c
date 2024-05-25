@@ -438,10 +438,11 @@ int main(int argc, char *argv[]) {
             }
 
             // Send the data to the forward port if it's allowed client
-            if (client_fixed_addr_port[0] && memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0)
+            if (client_fixed_addr_port[0] && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
             {
                 print(3, "Fixed client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-            } else if (!client_fixed_addr_port[0] && !is_handshake && memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0) {
+            } else if (!client_fixed_addr_port[0] && !is_handshake && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
+            {
                 print(3, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
             } else {
                 sendto(forward_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
