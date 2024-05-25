@@ -12,11 +12,8 @@
 #define BUFFER_SIZE 2048
 #define HANDSHAKE_TIMEOUT 5
 
-#ifdef DEBUG
-#define debug_print(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#else
-#define debug_print(fmt, ...)
-#endif
+#define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, fmt, ##__VA_ARGS__); }
+#define debug_print(fmt, ...) print(4, fmt, ##__VA_ARGS__)
 
 // WireGuard handshake signature
 static const uint8_t wg_signature[] = {0x01, 0x00, 0x00, 0x00};
@@ -35,6 +32,9 @@ static char client_interface[256] = {0};
 static char forward_interface[256] = {0};
 // optional parameters: fixed client address
 static char client_fixed_addr_port[256] = {0};
+// verbosity level
+static char verbose_str[256] = {0};
+static int verbose = 2;
 
 static void read_config_file(char *filename)
 {
@@ -138,7 +138,7 @@ static void read_config_file(char *filename)
     if (!xor_key_set) {
         fprintf(stderr, "key is not set in the configuration file\n");
         exit(EXIT_FAILURE);
-    }
+    }    
 }
 
 /* Parse a single option. */
@@ -172,12 +172,14 @@ parse_opt (int key, char *arg, struct argp_state *state)
         case 'a':
             strncat(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port)-1);
             break;
+        case 'v':
+            strncat(verbose_str, arg, sizeof(verbose_str)-1);
+            break;
         default:
             return ARGP_ERR_UNKNOWN;
     }
     return 0;
 }
-
 
 /* The options we understand. */
 static const struct argp_option options[] = {
@@ -189,8 +191,15 @@ static const struct argp_option options[] = {
     { "listen-int", 's', "<ip>", 0, "client interface to listen on (optional, default - 0.0.0.0)", .group = 4 },
     { "fw-int", 'f', "<ip>", 0, "forward interface to listen on (optional - 0.0.0.0)", .group = 4 },
     { "source", 'a', "<ip>:<port>", 0, "fixed client address and port (optional, default - auto)", .group = 5 },
+    { "verbose", 'v', "<level 0-3>", 0, "verbosity level (optional, default - 2)", .group = 6 },
+    { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 6 },
+    { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 6 },
+    { " ", 0, 0, OPTION_DOC , "2 - status messages", .group = 6 },
+    { " ", 0, 0, OPTION_DOC , "3 - warnings", .group = 6 },
+    { " ", 0, 0, OPTION_DOC , "4 - debug mode, print out all transmitted data", .group = 6 },
     { 0 }
 };
+
 /* Our argp parser. */
 static struct argp argp = {
     .options = options,
@@ -218,19 +227,13 @@ static void signal_handler(int signal) {
             if (forward_sock) {
                 close(forward_sock);
             }
-            fprintf(stderr, "Stopped.\n");
+            print(1, "Stopped.\n");
             exit(EXIT_SUCCESS);
             break;
-        default:
-            debug_print("Received signal %d\n", signal);
-            break;
     }
-    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
-    debug_print("DEBUG mode enabled\n");
-
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr, // Address for forwarding socket, for sending data to the server
@@ -303,6 +306,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Invalid forward interface: %s\n", forward_interface);
         exit(EXIT_FAILURE);
     }
+    if (verbose_str[0]) {
+        verbose = atoi(verbose_str);
+        if (verbose < 0 || verbose > 4) {
+            fprintf(stderr, "Invalid verbosity level: %s\n", verbose_str);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Set up signal handlers
     signal(SIGINT, signal_handler);
@@ -324,7 +334,7 @@ int main(int argc, char *argv[]) {
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
-    fprintf(stderr, "Listening on port %s:%d for client\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
+    print(1, "Listening on port %s:%d for client\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
     // Create forwarding socket and bind it to the same port
     if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -354,7 +364,7 @@ int main(int argc, char *argv[]) {
         close(forward_sock);
         exit(EXIT_FAILURE);
     }
-    fprintf(stderr, "Listening on port %s:%d for server\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
+    print(1, "Listening on port %s:%d for server\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
 
     // Set up forward address
     memset(&forward_addr, 0, sizeof(forward_addr));
@@ -369,7 +379,7 @@ int main(int argc, char *argv[]) {
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
     forward_addr.sin_port = htons(forward_port);
 
-    fprintf(stderr, "WireGuard obfuscator successfully started\n");
+    print(1, "WireGuard obfuscator successfully started\n");
 
     while (1) {
         fd_set read_fds;
@@ -392,6 +402,7 @@ int main(int argc, char *argv[]) {
 
         if (FD_ISSET(listen_sock, &read_fds)) {
             socklen_t last_sender_addr_temp_len = sizeof(last_sender_addr_temp);
+            uint8_t is_handshake = 0;
             ssize_t received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
             if (received < 0) {
                 perror("recvfrom");
@@ -400,8 +411,9 @@ int main(int argc, char *argv[]) {
 
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                fprintf(stderr, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+                print(2, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
                 last_handshake_time = time(NULL);
+                is_handshake = 1;
             }
 
             debug_print("Received %ld bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
@@ -421,12 +433,20 @@ int main(int argc, char *argv[]) {
 
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                fprintf(stderr, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+                print(2, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
                 last_handshake_time = time(NULL);
+                is_handshake = 1;
             }
 
-            // Send the data to the forward port
-            sendto(forward_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+            // Send the data to the forward port if it's allowed client
+            if (client_fixed_addr_port[0] && memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0)
+            {
+                print(3, "Fixed client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+            } else if (!client_fixed_addr_port[0] && !is_handshake && memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0) {
+                print(3, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+            } else {
+                sendto(forward_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+            }
         }
 
         if (FD_ISSET(forward_sock, &read_fds)) {
@@ -452,7 +472,7 @@ int main(int argc, char *argv[]) {
             int need_to_set_client_addr = 0;
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
-                fprintf(stderr, "Received WireGuard handshake response (non-obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+                print(2, "Received WireGuard handshake response (non-obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
                 need_to_set_client_addr = 1;
             }
 
@@ -466,24 +486,26 @@ int main(int argc, char *argv[]) {
 
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
-                fprintf(stderr, "Received WireGuard handshake response (obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+                print(2, "Received WireGuard handshake response (obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
                 need_to_set_client_addr = 1;
             }
 
             // Store the last sender address
             if (need_to_set_client_addr) {
                 if (client_fixed_addr_port[0]) {
-                    if (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port) {
-                        fprintf(stderr, "Ignoring WireGuard handshake response, client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                    if (memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0) {
+                        print(3, "Ignoring WireGuard handshake response, client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
                         continue;
                     }
                 } else {
                     if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
-                        memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
-                        last_sender_set = 1;
-                        fprintf(stderr, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                        if (memcmp(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr)) != 0) {
+                            memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
+                            last_sender_set = 1;
+                            print(2, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                        }
                     } else {
-                        fprintf(stderr, "Ignoring WireGuard handshake response, handshake timeout\n");
+                        print(3, "Ignoring WireGuard handshake response, handshake timeout\n");
                     }
                 }
             }
@@ -500,7 +522,7 @@ int main(int argc, char *argv[]) {
     close(listen_sock);
     close(forward_sock);
 
-    fprintf(stderr, "Stopped.\n");
+    print(1, "Stopped.\n");
 
     return 0;
 }
