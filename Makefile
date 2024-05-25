@@ -1,6 +1,9 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
+COMMIT		   :=
+COMMIT_INFO	 = commit.h
+HEADERS      = wg-obfuscator.h
 
 RM    = rm -f
 CC    = gcc
@@ -49,12 +52,12 @@ else
 endif
 
 all: $(TARGET)
-default: $(TARGET)
-run:  $(TARGET)
-	$(TARGET)
+
+commit_file: 
+	@printf "#define COMMIT \"$(COMMIT)\"\\n" > $(COMMIT_INFO)
 
 clean:
-	$(RM) *.o 
+	$(RM) *.o $(COMMIT_INFO)
 ifeq ($(OS),Windows_NT)
 	@if [ -f "$(TARGET)" ]; then for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do rm -f $(EXEDIR)/`basename "$$f"` ; done fi
 endif
@@ -65,7 +68,7 @@ $(OBJS):
 %.o : %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(TARGET): $(OBJS)
+$(TARGET): commit_file $(OBJS) $(HEADERS)
 	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
 ifeq ($(OS),Windows_NT)
 	@for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do if [ ! -f "$(EXEDIR)/`basename $$f`" ] ; then cp -vf `cygpath "$$f"` $(EXEDIR)/ ; fi ; done

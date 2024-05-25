@@ -2,4 +2,5 @@
 wg_obfuscator
 *.o
 *.dll
-*.stackdump
+*dump
+commit.h

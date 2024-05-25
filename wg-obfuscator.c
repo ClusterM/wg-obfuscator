@@ -8,16 +8,13 @@
 #include <signal.h>
 #include <time.h>
 #include <argp.h>
-
-#define BUFFER_SIZE 2048
-#define HANDSHAKE_TIMEOUT 5
+#include "wg-obfuscator.h"
+#include "commit.h"
 
 #define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, fmt, ##__VA_ARGS__); }
 #define debug_print(fmt, ...) print(4, fmt, ##__VA_ARGS__)
 
-// WireGuard handshake signature
-static const uint8_t wg_signature[] = {0x01, 0x00, 0x00, 0x00};
-static const uint8_t wg_signature_resp[] = {0x02, 0x00, 0x00, 0x00};
+
 
 static int listen_sock = 0, forward_sock = 0;
 
@@ -205,7 +202,7 @@ static struct argp argp = {
     .options = options,
     .parser = parse_opt,
     .args_doc = NULL,
-    .doc = "WireGuard obfuscator (c) 2024 by Alexey Cluster"
+    .doc = "WireGuard Obfuscator " VERSION " (commit " COMMIT " @ " GIT_REPO ")"
 };
 
 // XOR the data with the key
