@@ -65,19 +65,18 @@ static void read_config_file(char *filename)
             *comment_index = 0;
         }
         // Skip empty lines or with spaces only
-        if (strspn(line, " \t\n") == strlen(line)) {
+        if (strspn(line, " \t\r\n") == strlen(line)) {
             continue;
         }
-
         // debug_print("Read line: '%s'\n", line);
 
         // Parse key-value pairs
         char *key = strtok(line, "=");
         // Trim leading and trailing spaces
-        while (strlen(key) && (key[0] == ' ' || key[0] == '\t')) {
+        while (strlen(key) && (key[0] == ' ' || key[0] == '\t' || key[0] == '\r' || key[0] == '\n')) {
             key++;
         }
-        while (strlen(key) && (key[strlen(key) - 1] == ' ' || key[strlen(key) - 1] == '\t')) {
+        while (strlen(key) && (key[strlen(key) - 1] == ' ' || key[strlen(key) - 1] == '\t' || key[strlen(key) - 1] == '\r' || key[strlen(key) - 1] == '\n')) {
             key[strlen(key) - 1] = 0;
         }
         // debug_print("Key: '%s'\n", key);
@@ -87,10 +86,10 @@ static void read_config_file(char *filename)
             exit(EXIT_FAILURE);
         }
         // Trim leading and trailing spaces
-        while (strlen(value) && (value[0] == ' ' || value[0] == '\t')) {
+        while (strlen(value) && (value[0] == ' ' || value[0] == '\t' || value[0] == '\r' || value[0] == '\n')) {
             value++;
         }
-        while (strlen(value) && (value[strlen(value) - 1] == ' ' || value[strlen(value) - 1] == '\t')) {
+        while (strlen(value) && (value[strlen(value) - 1] == ' ' || value[strlen(value) - 1] == '\t' || value[strlen(value) - 1] == '\r' || value[strlen(value) - 1] == '\n')) {
             value[strlen(value) - 1] = 0;
         }
         if (value == NULL) {
