@@ -1,6 +1,6 @@
-PROG_NAME= wg_obfuscator
-CONFIG=wg_obfuscator.conf
-SERVICE_FILE=wg_obfuscator.service
+PROG_NAME    = wg-obfuscator
+CONFIG       = wg-obfuscator.conf
+SERVICE_FILE = wg-obfuscator.service
 
 RM    = rm -f
 CC    = gcc
@@ -9,7 +9,7 @@ ifdef DEBUG
 else
   CFLAGS   = -O2 -Wall -Wno-format-truncation 
 endif
-OBJS = wg_obfuscator.o
+OBJS = wg-obfuscator.o
 EXEDIR = .
 
 LDFLAGS +=
