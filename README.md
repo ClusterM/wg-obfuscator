@@ -76,8 +76,7 @@ Obfuscator configuration will be like this:
 listen_port = 13200
 
 # Host and port of the server-side obfuscator
-forward_host = example.com
-forward_port = 13300
+forward_to = server.example.com:13300
 
 # Obfuscation key, must be the same on both sides
 key = test
@@ -114,8 +113,7 @@ Obfuscator configuration will be like this:
 listen_port = 13300
 
 # Host and port of the real WireGuard server
-forward_host = 127.0.0.1
-forward_port = 13333
+forward_to = 127.0.0.1:13333
 
 key = test
 ```
@@ -125,15 +123,14 @@ In such case you can specify IP address and port of the other side obfuscator, j
 ```
 client_fixed_addr = 1.2.3.4:31241
 ```
-Where `1.2.3.4:31241` is IP address and port of the other side obfuscatorgit . In such case your server also can initiate connections to the other side.
+Where `1.2.3.4:31241` is IP address and port of the other side obfuscator. This option will disable automatic client address/port detection based on a handshake and will permanently use the specified address. In such case your server can initiate connections to the other side too.
 
 So, the configuration will be like this:
 ```
 listen_port = 13300
 
 # Host and port of the real WireGuard server
-forward_host = 127.0.0.1
-forward_port = 13333
+forward_to = 127.0.0.1:13333
 
 client_fixed_addr = 1.2.3.4:31241
 ```

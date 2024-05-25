@@ -20,10 +20,8 @@ static int listen_sock = 0, forward_sock = 0;
 
 // main parameters (TODO: IPv6?)
 static int listen_port = 1;
-static char forward_host[256] = {0};
-static int forward_port = -1;
+static char forward_host_port[256] = {0};
 static char xor_key[256] = {0};
-static size_t key_length = 0;
 // optional parameters: client and forward interfaces
 static char client_interface[256] = {0};
 static char forward_interface[256] = {0};
@@ -43,8 +41,7 @@ static void read_config_file(char *filename)
         exit(EXIT_FAILURE);
     }
     int listen_port_set = 0;
-    int forward_host_set = 0;
-    int forward_port_set = 0;
+    int forward_host_port_set = 0;
     int xor_key_set = 0;   
     while (fgets(line, sizeof(line), config_file)) {
         // Remove trailing newlines, carriage returns, spaces and tabs
@@ -98,22 +95,18 @@ static void read_config_file(char *filename)
         if (strcmp(key, "listen_port") == 0) {
             listen_port = atoi(value);
             listen_port_set = 1;
-        } else if (strcmp(key, "forward_host") == 0) {
-            strncat(forward_host, value, sizeof(forward_host)-1);
-            forward_host_set = 1;
-        } else if (strcmp(key, "forward_port") == 0) {
-            forward_port = atoi(value);
-            forward_port_set = 1;
+        } else if (strcmp(key, "forward_to") == 0) {
+            strlcat(forward_host_port, value, sizeof(forward_host_port));
+            forward_host_port_set = 1;
         } else if (strcmp(key, "key") == 0) {
-            strncat(xor_key, value, sizeof(xor_key)-1);
-            key_length = strlen(xor_key);
+            strlcat(xor_key, value, sizeof(xor_key));
             xor_key_set = 1;
         } else if (strcmp(key, "client_interface") == 0) {
-            strncat(client_interface, value, sizeof(client_interface)-1);
+            strlcat(client_interface, value, sizeof(client_interface));
         } else if (strcmp(key, "forward_interface") == 0) {
-            strncat(forward_interface, value, sizeof(forward_interface)-1);
+            strlcat(forward_interface, value, sizeof(forward_interface));
         } else if (strcmp(key, "client_fixed_addr") == 0) {
-            strncat(client_fixed_addr_port, value, sizeof(client_fixed_addr_port)-1);
+            strlcat(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
         } else {
             fprintf(stderr, "Unknown configuration key: %s\n", key);
             exit(EXIT_FAILURE);
@@ -121,19 +114,15 @@ static void read_config_file(char *filename)
     }
     fclose(config_file);
     if (!listen_port_set) {
-        fprintf(stderr, "listen_port is not set in the configuration file\n");
+        fprintf(stderr, "'listen_port' is not set in the configuration file\n");
         exit(EXIT_FAILURE);
     }
-    if (!forward_host_set) {
-        fprintf(stderr, "forward_host is not set in the configuration file\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!forward_port_set) {
-        fprintf(stderr, "forward_port is not set in the configuration file\n");
+    if (!forward_host_port_set) {
+        fprintf(stderr, "'forward_to' is not set in the configuration file\n");
         exit(EXIT_FAILURE);
     }
     if (!xor_key_set) {
-        fprintf(stderr, "key is not set in the configuration file\n");
+        fprintf(stderr, "'key' is not set in the configuration file\n");
         exit(EXIT_FAILURE);
     }    
 }
@@ -150,27 +139,23 @@ parse_opt (int key, char *arg, struct argp_state *state)
         case 'l':
             listen_port = atoi(arg);
             break;
-        case 'h':
-            strncat(forward_host, arg, sizeof(forward_host)-1);
-            break;
-        case 'p':
-            forward_port = atoi(arg);
+        case 'f':
+            strlcat(forward_host_port, arg, sizeof(forward_host_port));
             break;
         case 'k':
-            strncat(xor_key, arg, sizeof(xor_key)-1);
-            key_length = strlen(xor_key);
+            strlcat(xor_key, arg, sizeof(xor_key));
             break;
         case 's':
-            strncat(client_interface, arg, sizeof(client_interface)-1);
+            strlcat(client_interface, arg, sizeof(client_interface));
             break;
-        case 'f':
-            strncat(forward_interface, arg, sizeof(forward_interface)-1);
+        case 't':
+            strlcat(forward_interface, arg, sizeof(forward_interface));
             break;
         case 'a':
-            strncat(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port)-1);
+            strlcat(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port));
             break;
         case 'v':
-            strncat(verbose_str, arg, sizeof(verbose_str)-1);
+            strlcat(verbose_str, arg, sizeof(verbose_str));
             break;
         default:
             return ARGP_ERR_UNKNOWN;
@@ -182,13 +167,12 @@ parse_opt (int key, char *arg, struct argp_state *state)
 static const struct argp_option options[] = {
     { "config", 'c', "<config_file>", 0, "read configuration from file (can be used instead of the rest arguments)", .group = 0 },
     { "listen-port", 'l', "<port>", 0, "port to listen for the client", .group = 1 },
-    { "fw-host", 'h', "<host>", 0, "host to forward the data", .group = 2 },
-    { "fw-port", 'p', "<port>", 0, "port to forward the data", .group = 2 },
+    { "forward-to", 'f', "<host>", 0, "host and port to forward the data", .group = 2 },
     { "key", 'k', "<key>", 0, "key to XOR the data", .group = 3 },
     { "listen-int", 's', "<ip>", 0, "client interface to listen on (optional, default - 0.0.0.0)", .group = 4 },
-    { "fw-int", 'f', "<ip>", 0, "forward interface to listen on (optional - 0.0.0.0)", .group = 4 },
+    { "forward-int", 't', "<ip>", 0, "forward interface to use (optional - 0.0.0.0)", .group = 4 },
     { "source", 'a', "<ip>:<port>", 0, "fixed client address and port (optional, default - auto)", .group = 5 },
-    { "verbose", 'v', "<level 0-3>", 0, "verbosity level (optional, default - 2)", .group = 6 },
+    { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 6 },
     { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 6 },
     { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 6 },
     { " ", 0, 0, OPTION_DOC , "2 - status messages", .group = 6 },
@@ -202,7 +186,7 @@ static struct argp argp = {
     .options = options,
     .parser = parse_opt,
     .args_doc = NULL,
-    .doc = "WireGuard Obfuscator " VERSION " (commit " COMMIT " @ " GIT_REPO ")"
+    .doc = "WireGuard Obfuscator " VERSION " (commit" COMMIT " @ " GIT_REPO ")"
 };
 
 // XOR the data with the key
@@ -241,6 +225,11 @@ int main(int argc, char *argv[]) {
     uint8_t buffer[BUFFER_SIZE];
     int last_sender_set = 0;
     time_t last_handshake_time = 0;
+    char forward_host[256] = {0};
+    int forward_port = -1;
+    size_t key_length = 0;
+    unsigned long s_listen_addr_client = INADDR_ANY;
+    unsigned long s_listen_addr_forward = INADDR_ANY;
 
     // Parse command line arguments
     if (argc == 1) {
@@ -254,10 +243,31 @@ int main(int argc, char *argv[]) {
   
     // Check the parameters
     key_length = strlen(xor_key);
+    if (listen_port < 0) {
+        fprintf(stderr, "Source port to listen is not set\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!forward_host_port[0]) {
+        fprintf(stderr, "Forward host is not set\n");
+        exit(EXIT_FAILURE);
+    } else {
+        char *port_delimiter = strchr(forward_host_port, ':');
+        if (port_delimiter == NULL) {
+            fprintf(stderr, "Invalid forward host format: %s\n", forward_host_port);
+            exit(EXIT_FAILURE);
+        }
+        *port_delimiter = 0;
+        strlcat(forward_host, forward_host_port, sizeof(forward_host));
+        forward_port = atoi(port_delimiter + 1);
+        if (forward_port <= 0) {
+            fprintf(stderr, "Invalid forward port: %s\n", port_delimiter + 1);
+            exit(EXIT_FAILURE);
+        }
+    }
     if (client_fixed_addr_port[0]) {
         char *port_delimiter = strchr(client_fixed_addr_port, ':');
         if (port_delimiter == NULL) {
-            fprintf(stderr, "Invalid fixed client address format\n");
+            fprintf(stderr, "Invalid fixed client address format: %s\n", client_fixed_addr_port);
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
@@ -271,24 +281,10 @@ int main(int argc, char *argv[]) {
         last_sender_set = 1;
         fprintf(stderr, "Fixed client address: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
     }
-    if (listen_port < 0) {
-        fprintf(stderr, "Source port to listen is not set\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!forward_host[0]) {
-        fprintf(stderr, "Forward host is not set\n");
-        exit(EXIT_FAILURE);
-    }
-    if (forward_port < 0) {
-        fprintf(stderr, "Forward port is not set\n");
-        exit(EXIT_FAILURE);
-    }
     if (key_length == 0) {
         fprintf(stderr, "Key is not set\n");
         exit(EXIT_FAILURE);
     }
-    static unsigned long s_listen_addr_client = INADDR_ANY;
-    static unsigned long s_listen_addr_forward = INADDR_ANY;
     if (client_interface[0]) {
         s_listen_addr_client = inet_addr(client_interface);
     }
