@@ -1,0 +1,13 @@
+[Unit]
+Description=WireGuard Obfuscator
+After=network.target
+
+[Service]
+ExecStart=wg_obfuscator -c /etc/wg_obfuscator.conf
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+*.exe
+wg_obfuscator
+*.o
+*.dll
