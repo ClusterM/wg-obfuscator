@@ -8,9 +8,9 @@ HEADERS      = wg-obfuscator.h
 RM    = rm -f
 CC    = gcc
 ifdef DEBUG
-  CFLAGS   = -g -O0 -Wall -Wno-stringop-truncation -DDEBUG
+  CFLAGS   = -g -O0 -Wall -Wno-unknown-warning-option -Wno-stringop-truncation -DDEBUG
 else
-  CFLAGS   = -O2 -Wall -Wno-stringop-truncation
+  CFLAGS   = -O2 -Wall -Wno-unknown-warning-option -Wno-stringop-truncation
 endif
 OBJS = wg-obfuscator.o
 EXEDIR = .
@@ -57,7 +57,7 @@ $(COMMIT_INFO):
   # Try to get commit hash from git
 	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
 	if [ -n "$$COMMIT" ]; then \
-	  echo -n "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
+	  echo "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
 	else \
 	  echo > $(COMMIT_INFO) ; \
 	fi
