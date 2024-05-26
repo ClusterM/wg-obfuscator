@@ -40,33 +40,59 @@ It can be used even if one of the peers is behind a NAT or has a dynamic IP addr
 
 ## How to use
 
-Are are three possible configurations of a WireGuard peer:
-* **Client**: The peer is a client with a dynamic IP address or behind a NAT, it can only initiate connections to the fixed IP address of the server.
-* **Server**: The peer is a server with a static IP address, it listens for incoming connections but can't initiate outgoing connections.
-* **Hybrid**: The peer has a static IP address, listens for incoming connections but can also initiate outgoing connections to the fixed IP address of the server.
+You can pass parameters to the obfuscator using a configuration file or command line arguments. Available parameters are:
+* `source-if` - source interface to listen on. Optional, default is `0.0.0.0`, e.g. all interfaces. Can be used to listen only on a specific interface.
+* `source` - source client address and port in `address:port` format. Optional. By default any address and port is accepted but server replies will be sent to the last successfully handshake address, so it can work over NAT. If specified, only packets from this address will be accepted and all server replies will be sent to this address, in such case target side cat initiate connections to the source side too.
+* `source-lport` - source port to listen. Source client should connect to this port. Required.
+* `target-if` - target interface to listen on. Optional, default is `0.0.0.0`, e.g. all interfaces. Can be used to listen only on a specific interface.
+* `target` - target address and port in `address:port` format. Obfuscated data will be sent to this address. Required.
+* `target-lport` - target port to listen. Optional. Default is auto (assigned by the OS). If specified, target can initiate connections to the source side too.
+* `key` - obfuscation key. Just string. Longer - better. Required.
+* `verbose` - verbosity level, 0-4. Optional, default is 2.
 
+You can use configuration file with those parameters in `key=value` format. For example:
+```
+# Port to listen for the source client (real client or client obfuscator)
+source-lport = 13255
+
+# Host and port of the target to forward to (server obfuscator or real server)
+target = 10.13.1.100:13255
+
+# Obfuscation key, must be the same on both sides
+key = test
+```
+
+You can pass the configuration file to the obfuscator using `--config` argument. For example:
+```bash
+wg-obfuscator --config /etc/wg-obfuscator.conf
+```
+
+You can also pass parameters using command line arguments. For example:
+```bash
+wg-obfuscator --source-lport 13255 --target 10.13.1.100:13255 --key test
+```
 
 ### Settings diagram
 ```
 +------------------------------------------------------------------------------------------+
 |                                 Source WireGuard peer                                    |
-| ListenPort         = <from "client_fixed_addr" on the source obfuscator                  |
+| ListenPort         = <from "source" on the source obfuscator                             |
 |                      (required only for hybrid configuration)>                           |
 +------------------------------------------------------------------------------------------+
-| Endpoint           = <source obfuscator's IP : source obfuscator's "listen_port">        |
+| Endpoint           = <source obfuscator's IP : source obfuscator's "source-lport">        |
 +------------------------------------------------------------------------------------------+
                                             ^
                                             |
                                             v
 +------------------------------------------------------------------------------------------+
 |                                   Source obfuscator                                      |
-| client_fixed_addr  = <source WireGuard peer's IP : source WireGuard peer's "ListenPort"  |
+| source             = <source WireGuard peer's IP : source WireGuard peer's "ListenPort"  |
 |                    = (required only for hybrid configuration)>                           |
-| listen_port        = <port from "Endpoint" on the source WireGuard peer>                 |
+| source-lport       = <port from "Endpoint" on the source WireGuard peer>                 |
 +------------------------------------------------------------------------------------------+
-| forward_local_port = <port from "forward_to" on the target obfuscator                    |
+| target-lport       = <port from "source" on the target obfuscator                        |
 |                    = (required only for hybrid configuration)>                           |
-| forward_to         = <target obfuscator's IP and target obfuscator's "listen_port">      |
+| target             = <target obfuscator's IP and target obfuscator's "source-lport">      |
 +------------------------------------------------------------------------------------------+
                                             ^
                                             |
@@ -79,97 +105,24 @@ Are are three possible configurations of a WireGuard peer:
                                             v
 +------------------------------------------------------------------------------------------+
 |                                    Tartget obfuscator                                    |
-| client_fixed_addr  = <soucrce obfuscator's IP : source obfuscator's "forward_local_port" |
+| source             = <soucrce obfuscator's IP : source obfuscator's "target-lport"       |
 |                    = (required only for hybrid configuration)>                           |
-| listen_port        = <port from "forward_local_port" on the source obfuscator>           |
+| source-lport       = <port from "target" on the source obfuscator>                       |
 +------------------------------------------------------------------------------------------+
-| forward_local_port = <port from target WireGuard peer's "Endpoint">                      |
+| target-lport       = <port from target WireGuard peer's "Endpoint">                      |
 |                    = (required only for hybrid configuration)>                           |
-| forward_to         = <target WireGuard peer's IP : target WireGuard peer's "ListenPort"> |
+| target             = <target WireGuard peer's IP : target WireGuard peer's "ListenPort"> |
 +------------------------------------------------------------------------------------------+
                                             ^
                                             |
                                             v
 +------------------------------------------------------------------------------------------+
 |                                   Target WireGuard peer                                  |
-| ListenPort         = <from "forward_to" on the target obfuscator>                        |
+| ListenPort         = <from "target" on the target obfuscator>                            |
 +------------------------------------------------------------------------------------------+
-| Endpoint           = <target obfuscator's IP : target obfuscator's "forward_local_port"> |
+| Endpoint           = <target obfuscator's IP : target obfuscator's "target-lport">       |
 |                      (required only for hybrid configuration)>                           |
 +------------------------------------------------------------------------------------------+
-```
-
-### Client
-For example you have a simple configuration like this:
-```
-[Interface]
-PublicKey = ...
-Address = ...
-
-[Peer]
-PublicKey = ...
-AllowedIPs = 10.13.0.0/16
-Endpoint = example.com:13300
-```
-
-You can change it to this (endpoint is specified but listen port is not):
-```
-[Interface]
-PublicKey = ...
-Address = ...
-
-[Peer]
-PublicKey = ...
-AllowedIPs = ...
-Endpoint = 127.0.0.1:13200
-```
-Where `127.0.0.1:13200` is IP address and port of the obfuscator. You can run it on the same PC as the WireGuard peer or on the same network.
-
-Obfuscator configuration will be like this:
-```
-listen_port = 13200
-
-# Host and port of the server-side obfuscator
-forward_to = server.example.com:13300
-
-# Obfuscation key, must be the same on both sides
-key = test
-```
-
-### Server
-For example you have a simple configuration like this (listen port is specified but endpoint is not):
-```
-[Interface]
-PublicKey = ...
-Address = ...
-ListenPort = 13300
-
-[Peer]
-PublicKey = ...
-AllowedIPs = ...
-```
-
-You can change it to this, just change the listen port:
-```
-[Interface]
-PublicKey = ...
-Address = ...
-ListenPort = 13333
-
-[Peer]
-PublicKey = ...
-AllowedIPs = ...
-```
-
-Obfuscator configuration will be like this:
-```
-# Port to listen for the client, e.g. same as "forward_port" in the client configuration
-listen_port = 13300
-
-# Host and port of the real WireGuard server
-forward_to = 127.0.0.1:13333
-
-key = test
 ```
 
 ## How to build and install

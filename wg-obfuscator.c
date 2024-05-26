@@ -91,22 +91,22 @@ static void read_config_file(char *filename)
         }
         // debug_print("Value: '%s'\n", value);
 
-        if (strcmp(key, "listen_port") == 0) {
+        if (strcmp(key, "source-lport") == 0) {
             listen_port = atoi(value);
             listen_port_set = 1;
-        } else if (strcmp(key, "forward_to") == 0) {
+        } else if (strcmp(key, "target") == 0) {
             memcpy(forward_host_port, value, sizeof(forward_host_port));
             forward_host_port_set = 1;
         } else if (strcmp(key, "key") == 0) {
             memcpy(xor_key, value, sizeof(xor_key));
             xor_key_set = 1;
-        } else if (strcmp(key, "client_interface") == 0) {
+        } else if (strcmp(key, "source-if") == 0) {
             memcpy(client_interface, value, sizeof(client_interface));
-        } else if (strcmp(key, "forward_interface") == 0) {
+        } else if (strcmp(key, "target-if") == 0) {
             memcpy(forward_interface, value, sizeof(forward_interface));
-        } else if (strcmp(key, "client_fixed_addr") == 0) {
+        } else if (strcmp(key, "source") == 0) {
             memcpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
-        } else if (strcmp(key, "forward_local_port") == 0) {
+        } else if (strcmp(key, "target-lport") == 0) {
             server_local_port = atoi(value);
         } else if (strcmp(key, "verbose") == 0) {
             memcpy(verbose_str, value, sizeof(verbose_str));
@@ -117,11 +117,11 @@ static void read_config_file(char *filename)
     }
     fclose(config_file);
     if (!listen_port_set) {
-        fprintf(stderr, "'listen_port' is not set in the configuration file\n");
+        fprintf(stderr, "'source-lport' is not set in the configuration file\n");
         exit(EXIT_FAILURE);
     }
     if (!forward_host_port_set) {
-        fprintf(stderr, "'forward_to' is not set in the configuration file\n");
+        fprintf(stderr, "'target' is not set in the configuration file\n");
         exit(EXIT_FAILURE);
     }
     if (!xor_key_set) {
@@ -171,19 +171,19 @@ parse_opt (int key, char *arg, struct argp_state *state)
 /* The options we understand. */
 static const struct argp_option options[] = {
     { "config", 'c', "<config_file>", 0, "read configuration from file (can be used instead of the rest arguments)", .group = 0 },
-    { "listen-port", 'l', "<port>", 0, "port to listen for the client", .group = 1 },
-    { "forward-to", 'f', "<host>", 0, "host and port to forward the data", .group = 2 },
-    { "key", 'k', "<key>", 0, "key to XOR the data", .group = 3 },
-    { "listen-int", 's', "<ip>", 0, "client interface to listen on (optional, default - 0.0.0.0)", .group = 4 },
-    { "forward-int", 't', "<ip>", 0, "forward interface to use (optional - 0.0.0.0)", .group = 4 },
-    { "source", 'a', "<ip>:<port>", 0, "fixed client address and port (optional, default - auto)", .group = 5 },
-    { "forward-lport", 'p', "<port>", 0, "local port for the forward socket (optional, default - random)", .group = 5 },
-    { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 6 },
-    { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 6 },
-    { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 6 },
-    { " ", 0, 0, OPTION_DOC , "2 - status messages", .group = 6 },
-    { " ", 0, 0, OPTION_DOC , "3 - warnings", .group = 6 },
-    { " ", 0, 0, OPTION_DOC , "4 - debug mode, print out all transmitted data", .group = 6 },
+    { "source-if", 's', "<ip>", 0, "source interface to listen on (optional, default - 0.0.0.0, e.g. all)", .group = 1 },
+    { "source", 'a', "<ip>:<port>", 0, "source client address and port (optional, default - auto, dynamic)", .group = 2 },
+    { "source-lport", 'l', "<port>", 0, "source port to listen", .group = 3 },
+    { "target-if", 't', "<ip>", 0, "target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
+    { "target", 'f', "<ip>:<port>", 0, "target IP and port", .group = 5 },
+    { "target-lport", 'p', "<port>", 0, "target port to listen (optional, default - random)", .group = 6 },
+    { "key", 'k', "<key>", 0, "key to XOR the data", .group = 7 },
+    { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "2 - status messages", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "3 - warnings", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "4 - debug mode, print out all transmitted data", .group = 8 },
     { 0 }
 };
 
@@ -250,43 +250,50 @@ int main(int argc, char *argv[]) {
     // Check the parameters
     key_length = strlen(xor_key);
     if (listen_port < 0) {
-        fprintf(stderr, "Source port to listen is not set\n");
+        fprintf(stderr, "'source-lport' is not set\n");
         exit(EXIT_FAILURE);
     }
+    if (client_fixed_addr_port[0]) {
+        char *port_delimiter = strchr(client_fixed_addr_port, ':');
+        if (port_delimiter == NULL) {
+            fprintf(stderr, "Invalid source ip:port format: %s\n", client_fixed_addr_port);
+            exit(EXIT_FAILURE);
+        }
+        *port_delimiter = 0;
+        last_sender_addr.sin_addr.s_addr = inet_addr(client_fixed_addr_port);
+        if (last_sender_addr.sin_addr.s_addr == INADDR_NONE) {
+            fprintf(stderr, "Invalid source ip: %s\n", client_fixed_addr_port);
+            exit(EXIT_FAILURE);
+        }
+        last_sender_addr.sin_port = htons(atoi(port_delimiter + 1));
+        if (last_sender_addr.sin_port <= 0) {
+            fprintf(stderr, "Invalid source port: %s\n", port_delimiter + 1);
+            exit(EXIT_FAILURE);
+        }
+        last_sender_addr.sin_family = AF_INET;
+        last_sender_set = 1;
+        print(1, "Source: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+    } else {
+        print(1, "Source: any/auto\n");
+    }  
     if (!forward_host_port[0]) {
-        fprintf(stderr, "Forward host is not set\n");
+        fprintf(stderr, "'target' is not set\n");
         exit(EXIT_FAILURE);
     } else {
         char *port_delimiter = strchr(forward_host_port, ':');
         if (port_delimiter == NULL) {
-            fprintf(stderr, "Invalid forward host format: %s\n", forward_host_port);
+            fprintf(stderr, "Invalid target host:port format: %s\n", forward_host_port);
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
         memcpy(forward_host, forward_host_port, sizeof(forward_host));
         forward_port = atoi(port_delimiter + 1);
         if (forward_port <= 0) {
-            fprintf(stderr, "Invalid forward port: %s\n", port_delimiter + 1);
+            fprintf(stderr, "Invalid target port: %s\n", port_delimiter + 1);
             exit(EXIT_FAILURE);
         }
-    }
-    if (client_fixed_addr_port[0]) {
-        char *port_delimiter = strchr(client_fixed_addr_port, ':');
-        if (port_delimiter == NULL) {
-            fprintf(stderr, "Invalid fixed client address format: %s\n", client_fixed_addr_port);
-            exit(EXIT_FAILURE);
-        }
-        *port_delimiter = 0;
-        last_sender_addr.sin_addr.s_addr = inet_addr(client_fixed_addr_port);
-        if (last_sender_addr.sin_addr.s_addr == INADDR_NONE) {
-            fprintf(stderr, "Invalid fixed client addres: %s\n", client_fixed_addr_port);
-            exit(EXIT_FAILURE);
-        }
-        last_sender_addr.sin_port = htons(atoi(port_delimiter + 1));
-        last_sender_addr.sin_family = AF_INET;
-        last_sender_set = 1;
-        fprintf(stderr, "Fixed client address: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-    }
+        print(1, "Target: %s:%d\n", forward_host, forward_port);
+    } 
     if (key_length == 0) {
         fprintf(stderr, "Key is not set\n");
         exit(EXIT_FAILURE);
@@ -298,11 +305,11 @@ int main(int argc, char *argv[]) {
         s_listen_addr_forward = inet_addr(forward_interface);
     }
     if (s_listen_addr_client == INADDR_NONE) {
-        fprintf(stderr, "Invalid client interface: %s\n", client_interface);
+        fprintf(stderr, "Invalid source interface: %s\n", client_interface);
         exit(EXIT_FAILURE);
     }
     if (s_listen_addr_forward == INADDR_NONE) {
-        fprintf(stderr, "Invalid forward interface: %s\n", forward_interface);
+        fprintf(stderr, "Invalid target interface: %s\n", forward_interface);
         exit(EXIT_FAILURE);
     }
     if (verbose_str[0]) {
@@ -319,7 +326,7 @@ int main(int argc, char *argv[]) {
 
     // Create listening socket
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("client socket");
+        perror("source socket");
         exit(EXIT_FAILURE);
     }
 
@@ -329,15 +336,15 @@ int main(int argc, char *argv[]) {
     listen_addr.sin_port = htons(listen_port);
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        perror("client socket bind");
+        perror("source socket bind");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
-    print(1, "Listening on port %s:%d for client\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
+    print(1, "Listening on port %s:%d for source\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
     // Create forwarding socket and bind it to the same port
     if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("forward socket");
+        perror("target socket");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
@@ -349,7 +356,7 @@ int main(int argc, char *argv[]) {
     forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
 
     if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
-        perror("forward socket bind");
+        perror("target socket bind");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -363,7 +370,7 @@ int main(int argc, char *argv[]) {
         close(forward_sock);
         exit(EXIT_FAILURE);
     }
-    print(1, "Listening on port %s:%d for server\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
+    print(1, "Listening on port %s:%d for target\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
 
     // Set up forward address
     memset(&forward_addr, 0, sizeof(forward_addr));
@@ -411,7 +418,6 @@ int main(int argc, char *argv[]) {
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
                 print(2, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
-                last_handshake_time = time(NULL);
                 is_handshake = 1;
             }
 
@@ -433,14 +439,19 @@ int main(int argc, char *argv[]) {
             // Store the last sender address
             if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
                 print(2, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
-                last_handshake_time = time(NULL);
                 is_handshake = 1;
+            }
+
+            if (is_handshake) {
+                last_handshake_time = time(NULL);
+            } else {
+                last_handshake_time = 0;
             }
 
             // Send the data to the forward port if it's allowed client
             if (client_fixed_addr_port[0] && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
             {
-                print(3, "Fixed client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                print(3, "Fixed source address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
             } else if (!client_fixed_addr_port[0] && !is_handshake && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
             {
                 print(3, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
@@ -491,21 +502,18 @@ int main(int argc, char *argv[]) {
             }
 
             // Store the last sender address
-            if (need_to_set_client_addr) {
-                if (client_fixed_addr_port[0]) {
-                    if (memcmp(&last_sender_addr_temp, &last_sender_addr, sizeof(last_sender_addr)) != 0) {
-                        print(3, "Ignoring WireGuard handshake response, client address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-                        continue;
+            if (need_to_set_client_addr && !client_fixed_addr_port[0]) {
+                if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
+                    if (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port) {
+                        memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
+                        last_sender_set = 1;
+                        print(2, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
                     }
                 } else {
-                    if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
-                        if (memcmp(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr)) != 0) {
-                            memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
-                            last_sender_set = 1;
-                            print(2, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-                        }
-                    } else {
+                    if (last_handshake_time) {
                         print(3, "Ignoring WireGuard handshake response, handshake timeout\n");
+                    } else {
+                        print(3, "Ignoring WireGuard handshake response, no handshake request\n");                    
                     }
                 }
             }
@@ -514,7 +522,7 @@ int main(int argc, char *argv[]) {
             if (last_sender_set) {
                 sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, sizeof(last_sender_addr));
             } else {
-                print(3, "No client address set, ignoring the response\n");
+                print(3, "No source address set, ignoring the response\n");
             }
         }
     }
