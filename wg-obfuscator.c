@@ -201,7 +201,7 @@ static struct argp argp = {
 };
 
 // XOR the data with the key
-static void xor_data(uint8_t *data, size_t length, char *key, size_t key_length) {
+static void xor_data(uint8_t *data, int length, char *key, int key_length) {
     // Calculate the CRC8 based on the key
     uint8_t crc = 0;
     uint8_t i, j;
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
     time_t last_handshake_time = 0;
     char forward_host[256] = {0};
     int forward_port = -1;
-    size_t key_length = 0;
+    int key_length = 0;
     unsigned long s_listen_addr_client = INADDR_ANY;
     unsigned long s_listen_addr_forward = INADDR_ANY;
 
@@ -430,7 +430,7 @@ int main(int argc, char *argv[]) {
         if (FD_ISSET(listen_sock, &read_fds)) {
             socklen_t last_sender_addr_temp_len = sizeof(last_sender_addr_temp);
             uint8_t is_handshake = 0;
-            ssize_t received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
+            int received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
             if (received < 0) {
                 perror("recvfrom");
                 continue;
@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
                 is_handshake = 1;
             }
 
-            debug_print("Received %ld bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+            debug_print("Received %d bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
             debug_print("O->: ");
             for (int i = 0; i < received; ++i) {
                 debug_print("%02X ", buffer[i]);
@@ -483,7 +483,7 @@ int main(int argc, char *argv[]) {
 
         if (FD_ISSET(forward_sock, &read_fds)) {
             socklen_t forward_server_addr_len = sizeof(forward_server_addr);
-            ssize_t received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_addr_len);
+            int received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_addr_len);
             if (received < 0) {
                 perror("recvfrom");
                 continue;
@@ -494,7 +494,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            debug_print("Received %ld bytes from %s:%d\n", received, inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+            debug_print("Received %d bytes from %s:%d\n", received, inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
             debug_print("<-O: ");
             for (int i = 0; i < received; ++i) {
                 debug_print("%02X ", buffer[i]);
