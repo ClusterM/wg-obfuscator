@@ -71,6 +71,7 @@ You can also pass parameters using command line arguments. For example:
 ```bash
 wg-obfuscator --source-lport 13255 --target 10.13.1.100:13255 --key test
 ```
+Type `wg-obfuscator.exe --help` for more information.
 
 ### Settings diagram
 ```

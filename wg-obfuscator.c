@@ -95,21 +95,21 @@ static void read_config_file(char *filename)
             listen_port = atoi(value);
             listen_port_set = 1;
         } else if (strcmp(key, "target") == 0) {
-            memcpy(forward_host_port, value, sizeof(forward_host_port));
+            strncpy(forward_host_port, value, sizeof(forward_host_port) - 1);
             forward_host_port_set = 1;
         } else if (strcmp(key, "key") == 0) {
-            memcpy(xor_key, value, sizeof(xor_key));
+            strncpy(xor_key, value, sizeof(xor_key) - 1);
             xor_key_set = 1;
         } else if (strcmp(key, "source-if") == 0) {
-            memcpy(client_interface, value, sizeof(client_interface));
+            strncpy(client_interface, value, sizeof(client_interface) - 1);
         } else if (strcmp(key, "target-if") == 0) {
-            memcpy(forward_interface, value, sizeof(forward_interface));
+            strncpy(forward_interface, value, sizeof(forward_interface) - 1);
         } else if (strcmp(key, "source") == 0) {
-            memcpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port));
+            strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
         } else if (strcmp(key, "target-lport") == 0) {
             server_local_port = atoi(value);
         } else if (strcmp(key, "verbose") == 0) {
-            memcpy(verbose_str, value, sizeof(verbose_str));
+            strncpy(verbose_str, value, sizeof(verbose_str) - 1);
         } else {
             fprintf(stderr, "Unknown configuration key: %s\n", key);
             exit(EXIT_FAILURE);
@@ -139,28 +139,29 @@ parse_opt (int key, char *arg, struct argp_state *state)
         case 'c':
             read_config_file(arg);
             break;
-        case 'l':
-            listen_port = atoi(arg);
-            break;
-        case 'f':
-            memcpy(forward_host_port, arg, sizeof(forward_host_port));
-            break;
-        case 'k':
-            memcpy(xor_key, arg, sizeof(xor_key));
+        case 'i':
+            strncpy(client_interface, arg, sizeof(client_interface) - 1);
             break;
         case 's':
-            memcpy(client_interface, arg, sizeof(client_interface));
+            strncpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port) - 1);
+            break;
+        case 'p':
+            listen_port = atoi(arg);
+            break;
+        case 'o':
+            strncpy(forward_interface, arg, sizeof(forward_interface) - 1);
             break;
         case 't':
-            memcpy(forward_interface, arg, sizeof(forward_interface));
+            strncpy(forward_host_port, arg, sizeof(forward_host_port) - 1);
             break;
-        case 'a':
-            memcpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port));
-        case 'p':
+        case 'r':
             server_local_port = atoi(arg);
             break;
+        case 'k':
+            strncpy(xor_key, arg, sizeof(xor_key));
+            break;
         case 'v':
-            memcpy(verbose_str, arg, sizeof(verbose_str));
+            strncpy(verbose_str, arg, sizeof(verbose_str) - 1);
             break;
         default:
             return ARGP_ERR_UNKNOWN;
@@ -171,12 +172,12 @@ parse_opt (int key, char *arg, struct argp_state *state)
 /* The options we understand. */
 static const struct argp_option options[] = {
     { "config", 'c', "<config_file>", 0, "read configuration from file (can be used instead of the rest arguments)", .group = 0 },
-    { "source-if", 's', "<ip>", 0, "source interface to listen on (optional, default - 0.0.0.0, e.g. all)", .group = 1 },
-    { "source", 'a', "<ip>:<port>", 0, "source client address and port (optional, default - auto, dynamic)", .group = 2 },
-    { "source-lport", 'l', "<port>", 0, "source port to listen", .group = 3 },
-    { "target-if", 't', "<ip>", 0, "target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
-    { "target", 'f', "<ip>:<port>", 0, "target IP and port", .group = 5 },
-    { "target-lport", 'p', "<port>", 0, "target port to listen (optional, default - random)", .group = 6 },
+    { "source-if", 'i', "<ip>", 0, "source interface to listen on (optional, default - 0.0.0.0, e.g. all)", .group = 1 },
+    { "source", 's', "<ip>:<port>", 0, "source client address and port (optional, default - auto, dynamic)", .group = 2 },
+    { "source-lport", 'p', "<port>", 0, "source port to listen", .group = 3 },
+    { "target-if", 'o', "<ip>", 0, "target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
+    { "target", 't', "<ip>:<port>", 0, "target IP and port", .group = 5 },
+    { "target-lport", 'r', "<port>", 0, "target port to listen (optional, default - random)", .group = 6 },
     { "key", 'k', "<key>", 0, "key to XOR the data", .group = 7 },
     { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 8 },
     { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 8 },
@@ -286,7 +287,7 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
-        memcpy(forward_host, forward_host_port, sizeof(forward_host));
+        strncpy(forward_host, forward_host_port, sizeof(forward_host) - 1);
         forward_port = atoi(port_delimiter + 1);
         if (forward_port <= 0) {
             fprintf(stderr, "Invalid target port: %s\n", port_delimiter + 1);
