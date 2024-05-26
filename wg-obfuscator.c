@@ -111,7 +111,7 @@ static void read_config_file(char *filename)
         } else if (strcmp(key, "verbose") == 0) {
             strncpy(verbose_str, value, sizeof(verbose_str) - 1);
         } else {
-            fprintf(stderr, "Unknown configuration key: %s\n", key);
+            fprintf(stderr, "Unknown configuration key: '%s'\n", key);
             exit(EXIT_FAILURE);
         }
     }

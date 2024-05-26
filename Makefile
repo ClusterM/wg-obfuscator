@@ -8,9 +8,9 @@ HEADERS      = wg-obfuscator.h
 RM    = rm -f
 CC    = gcc
 ifdef DEBUG
-  CFLAGS   = -g -O0 -Wall -Wno-format-truncation -DDEBUG
+  CFLAGS   = -g -O0 -Wall -Wno-stringop-truncation -DDEBUG
 else
-  CFLAGS   = -O2 -Wall -Wno-format-truncation 
+  CFLAGS   = -O2 -Wall -Wno-stringop-truncation
 endif
 OBJS = wg-obfuscator.o
 EXEDIR = .
