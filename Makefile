@@ -8,9 +8,9 @@ HEADERS      = wg-obfuscator.h
 RM    = rm -f
 CC    = gcc
 ifdef DEBUG
-  CFLAGS   = -g -O0 -Wall -Wno-unknown-warning-option -Wno-stringop-truncation -DDEBUG
+  CFLAGS   = -g -O0 -Wall -DDEBUG
 else
-  CFLAGS   = -O2 -Wall -Wno-unknown-warning-option -Wno-stringop-truncation
+  CFLAGS   = -O2 -Wall
 endif
 OBJS = wg-obfuscator.o
 EXEDIR = .
@@ -37,8 +37,9 @@ ifneq ($(OS),Windows_NT)
 endif
 
 ifeq ($(OS),Windows_NT)
+  CFLAGS += -Wno-stringop-truncation
   LDFLAGS += -largp
-  TARGET = $(EXEDIR)/$(PROG_NAME).exe
+  TARGET = $(EXEDIR)/$(PROG_NAME).exe  
 else
   TARGET = $(EXEDIR)/$(PROG_NAME)
   # build on macos(arm) support
@@ -48,6 +49,8 @@ else
     ifeq ($(IS_MACARM), 1)
       LDFLAGS += -L$(shell brew --prefix)/lib
     endif
+  else
+    CFLAGS += -Wno-stringop-truncation
   endif
 endif
 
