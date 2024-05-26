@@ -53,8 +53,14 @@ endif
 
 all: $(TARGET)
 
-commit_file: 
-	@printf "#define COMMIT \"$(COMMIT)\"\\n" > $(COMMIT_INFO)
+$(COMMIT_INFO):
+  # Try to get commit hash from git
+	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
+	if [ -n "$$COMMIT" ]; then \
+	  echo -n "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
+	else \
+	  echo > $(COMMIT_INFO) ; \
+	fi
 
 clean:
 	$(RM) *.o $(COMMIT_INFO)
@@ -68,7 +74,7 @@ $(OBJS):
 %.o : %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(TARGET): commit_file $(OBJS) $(HEADERS)
+$(TARGET): $(COMMIT_INFO) $(OBJS) $(HEADERS)
 	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
 ifeq ($(OS),Windows_NT)
 	@for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do if [ ! -f "$(EXEDIR)/`basename $$f`" ] ; then cp -vf `cygpath "$$f"` $(EXEDIR)/ ; fi ; done
@@ -85,3 +91,5 @@ else
 	systemctl enable $(SERVICE_FILE)
 	systemctl restart $(SERVICE_FILE)
 endif
+
+.PHONY: clean install $(COMMIT_INFO)

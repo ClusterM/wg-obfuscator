@@ -193,7 +193,11 @@ static struct argp argp = {
     .options = options,
     .parser = parse_opt,
     .args_doc = NULL,
-    .doc = "WireGuard Obfuscator " VERSION " (commit" COMMIT " @ " GIT_REPO ")"
+#ifdef COMMIT
+    .doc = "WireGuard Obfuscator v" VERSION "\n(commit " COMMIT " @ " GIT_REPO ")"
+#else
+	.doc = "WireGuard Obfuscator v" VERSION
+#endif
 };
 
 // XOR the data with the key
