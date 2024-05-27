@@ -207,8 +207,8 @@ static void xor_data(uint8_t *data, int length, char *key, int key_length) {
     uint8_t i, j;
     for (i = 0; i < length; i++) 
     {
-        // Get key byte and add the data length
-		uint8_t inbyte = key[i % key_length] + length;
+        // Get key byte and add the data length and the key length
+		uint8_t inbyte = key[i % key_length] + length + key_length;
         for (j=0; j<8; j++) 
 		{
 			uint8_t mix = (crc ^ inbyte) & 0x01;
