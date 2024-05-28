@@ -203,8 +203,8 @@ static struct argp argp = {
 // XOR the data with the key
 static void xor_data(uint8_t *data, int length, char *key, int key_length) {
     // Calculate the CRC8 based on the key
-    uint8_t crc = 0;
-    uint8_t i, j;
+    uint8_t crc = 0, j;
+    int i;
     for (i = 0; i < length; i++) 
     {
         // Get key byte and add the data length and the key length
