@@ -5,3 +5,5 @@ wg_obfuscator
 *dump
 commit.h
 .vscode
+.wg-obfuscator.conf
+.idea/
