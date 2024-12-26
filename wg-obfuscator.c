@@ -11,12 +11,13 @@
 #include "wg-obfuscator.h"
 #include "commit.h"
 
-#define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, fmt, ##__VA_ARGS__); }
+#define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, "[%s]" fmt, section_name, ##__VA_ARGS__); }
 #define debug_print(fmt, ...) print(4, fmt, ##__VA_ARGS__)
 
 static int listen_sock = 0, forward_sock = 0;
 
 // main parameters (TODO: IPv6?)
+static char section_name[256] = "main";
 static int listen_port = -1;
 static char forward_host_port[256] = {0};
 static char xor_key[256] = {0};
@@ -41,7 +42,9 @@ static void read_config_file(char *filename)
     }
     int listen_port_set = 0;
     int forward_host_port_set = 0;
-    int xor_key_set = 0;   
+    int xor_key_set = 0;
+    int something_set = 0;
+
     while (fgets(line, sizeof(line), config_file)) {
         // Remove trailing newlines, carriage returns, spaces and tabs
         while (strlen(line) && (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r' 
@@ -62,6 +65,18 @@ static void read_config_file(char *filename)
             continue;
         }
         // debug_print("Read line: '%s'\n", line);
+
+        // It can be new section
+        if (line[0] == '[' && line[strlen(line) - 1] == ']') {
+            if (something_set) {
+                // new config, need to fork the process
+                if (fork() == 0) {
+                    return;
+                }
+            }
+            strncpy(section_name, line, sizeof(section_name) - 1);
+            continue;
+        }
 
         // Parse key-value pairs
         char *key = strtok(line, "=");
