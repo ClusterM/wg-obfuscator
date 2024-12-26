@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  wg-obfuscator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./.wg-obfuscator.conf:/etc/wg-obfuscator.conf
+    ports:
+      - "13255:13255/udp"
+      - "13255:13255/tcp"
+    container_name: wg-obfuscator-container
+    restart: unless-stopped
