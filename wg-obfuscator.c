@@ -74,7 +74,11 @@ static void read_config_file(char *filename)
                     return;
                 }
             }
-            strncpy(section_name, line, sizeof(section_name) - 1);
+            size_t len = strlen(line) - 2;
+            if (len > sizeof(section_name) - 1) {
+                len = sizeof(section_name) - 1;
+            }
+            strncpy(section_name, line + 1, len);
             continue;
         }
 
