@@ -88,7 +88,11 @@ ifeq ($(OS),Windows_NT)
 	@echo "Windows is not supported for install"
 else
 	install -m 755 $(TARGET) $(DESTDIR)/usr/bin
-	install -m 644 $(CONFIG) $(DESTDIR)/etc
+	@if [ ! -f "$(DESTDIR)/etc/$(CONFIG)" ]; then \
+		install -m 644 $(CONFIG) $(DESTDIR)/etc; \
+	else \
+		echo "$(DESTDIR)/etc/$(CONFIG) already exists, skipping"; \
+	fi
 	install -m 644 $(SERVICE_FILE) $(DESTDIR)/etc/systemd/system
 	systemctl daemon-reload
 	systemctl enable $(SERVICE_FILE)

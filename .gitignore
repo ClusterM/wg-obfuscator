@@ -1,9 +1,9 @@
 *.exe
-wg_obfuscator
+wg-obfuscator
 *.o
 *.dll
 *dump
 commit.h
-.vscode
+.vscode/
 .wg-obfuscator.conf
 .idea/

@@ -11,7 +11,7 @@
 #include "wg-obfuscator.h"
 #include "commit.h"
 
-#define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, "[%s]" fmt, section_name, ##__VA_ARGS__); }
+#define print(level, fmt, ...) { if (verbose >= level) fprintf(stderr, "[%s] " fmt, section_name, ##__VA_ARGS__); }
 #define debug_print(fmt, ...) print(4, fmt, ##__VA_ARGS__)
 
 static int listen_sock = 0, forward_sock = 0;
@@ -31,13 +31,22 @@ static int server_local_port = 0;
 static char verbose_str[256] = {0};
 static int verbose = 2;
 
+static void perror_sect(char *str, char* section)
+{
+    char buf[512];
+    snprintf(buf, sizeof(buf), "[%s] %s", section, str);
+    perror(buf);
+}
+
+#define serror(x) perror_sect(x, section_name)
+
 static void read_config_file(char *filename)
 {
     // Read configuration from file
     char line[256];
     FILE *config_file = fopen(filename, "r");
     if (config_file == NULL) {
-        perror("config file");
+        serror("config file");
         exit(EXIT_FAILURE);
     }
     int listen_port_set = 0;
@@ -79,6 +88,21 @@ static void read_config_file(char *filename)
                 len = sizeof(section_name) - 1;
             }
             strncpy(section_name, line + 1, len);
+
+            // Reset all the parameters
+            listen_port = -1;
+            memset(forward_host_port, 0, sizeof(forward_host_port));
+            memset(xor_key, 0, sizeof(xor_key));
+            memset(client_interface, 0, sizeof(client_interface));
+            memset(forward_interface, 0, sizeof(forward_interface));
+            memset(client_fixed_addr_port, 0, sizeof(client_fixed_addr_port));
+            server_local_port = 0;
+            memset(verbose_str, 0, sizeof(verbose_str));
+            verbose = 2;
+            listen_port_set = 0;
+            forward_host_port_set = 0;
+            xor_key_set = 0;
+            something_set = 0;
             continue;
         }
 
@@ -113,22 +137,30 @@ static void read_config_file(char *filename)
         if (strcmp(key, "source-lport") == 0) {
             listen_port = atoi(value);
             listen_port_set = 1;
+            something_set = 1;
         } else if (strcmp(key, "target") == 0) {
             strncpy(forward_host_port, value, sizeof(forward_host_port) - 1);
             forward_host_port_set = 1;
+            something_set = 1;
         } else if (strcmp(key, "key") == 0) {
             strncpy(xor_key, value, sizeof(xor_key) - 1);
             xor_key_set = 1;
+            something_set = 1;
         } else if (strcmp(key, "source-if") == 0) {
             strncpy(client_interface, value, sizeof(client_interface) - 1);
+            something_set = 1;
         } else if (strcmp(key, "target-if") == 0) {
             strncpy(forward_interface, value, sizeof(forward_interface) - 1);
+            something_set = 1;
         } else if (strcmp(key, "source") == 0) {
             strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
+            something_set = 1;
         } else if (strcmp(key, "target-lport") == 0) {
             server_local_port = atoi(value);
+            something_set = 1;
         } else if (strcmp(key, "verbose") == 0) {
             strncpy(verbose_str, value, sizeof(verbose_str) - 1);
+            something_set = 1;
         } else {
             fprintf(stderr, "Unknown configuration key: '%s'\n", key);
             exit(EXIT_FAILURE);
@@ -366,7 +398,7 @@ int main(int argc, char *argv[]) {
 
     // Create listening socket
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("source socket");
+        serror("source socket");
         exit(EXIT_FAILURE);
     }
 
@@ -376,7 +408,7 @@ int main(int argc, char *argv[]) {
     listen_addr.sin_port = htons(listen_port);
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        perror("source socket bind");
+        serror("source socket bind");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
@@ -384,7 +416,7 @@ int main(int argc, char *argv[]) {
 
     // Create forwarding socket and bind it to the same port
     if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("target socket");
+        serror("target socket");
         close(listen_sock);
         exit(EXIT_FAILURE);
     }
@@ -396,7 +428,7 @@ int main(int argc, char *argv[]) {
     forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
 
     if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
-        perror("target socket bind");
+        serror("target socket bind");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -405,7 +437,7 @@ int main(int argc, char *argv[]) {
     // Get the assigned port number
     socklen_t forward_client_addr_len = sizeof(forward_client_addr);
     if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
-        perror("failed to get socket port number");
+        serror("failed to get socket port number");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -417,7 +449,7 @@ int main(int argc, char *argv[]) {
     forward_addr.sin_family = AF_INET;
     struct hostent *host = gethostbyname(forward_host);
     if (host == NULL) {
-        perror("can't resolve hostname");
+        serror("can't resolve hostname");
         close(listen_sock);
         close(forward_sock);
         exit(EXIT_FAILURE);
@@ -442,7 +474,7 @@ int main(int argc, char *argv[]) {
         int activity = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
 
         if (activity < 0) {
-            perror("select");
+            serror("select");
             continue;
         }
 
@@ -451,7 +483,7 @@ int main(int argc, char *argv[]) {
             uint8_t is_handshake = 0;
             int received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
             if (received < 0) {
-                perror("recvfrom");
+                serror("recvfrom");
                 continue;
             }
 
@@ -504,7 +536,7 @@ int main(int argc, char *argv[]) {
             socklen_t forward_server_addr_len = sizeof(forward_server_addr);
             int received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_addr_len);
             if (received < 0) {
-                perror("recvfrom");
+                serror("recvfrom");
                 continue;
             }
 
