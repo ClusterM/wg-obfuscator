@@ -52,6 +52,9 @@ You can pass parameters to the obfuscator using a configuration file or command 
 
 You can use configuration file with those parameters in `key=value` format. For example:
 ```
+# Instance name
+[main]
+
 # Port to listen for the source client (real client or client obfuscator)
 source-lport = 13255
 
@@ -60,6 +63,12 @@ target = 10.13.1.100:13255
 
 # Obfuscation key, must be the same on both sides
 key = test
+
+# You can specify multiple instances, so you can obfuscate multiple connections:
+[second_server]
+source-lport = 13256
+target = 10.13.1.101:13255
+key = test2
 ```
 
 You can pass the configuration file to the obfuscator using `--config` argument. For example:
