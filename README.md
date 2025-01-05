@@ -83,6 +83,7 @@ wg-obfuscator --source-lport 13255 --target 10.13.1.100:13255 --key test
 Type `wg-obfuscator.exe --help` for more information.
 
 ### Settings diagram
+
 ```
 +------------------------------------------------------------------------------------------+
 |                                 Source WireGuard peer                                    |
@@ -136,6 +137,7 @@ Type `wg-obfuscator.exe --help` for more information.
 ```
 
 ## How to build and install
+
 On Linux:
 ```bash
 make
@@ -152,7 +154,14 @@ You can also run it from the command line, type `wg-obfuscator --help` for more 
 
 On Windows and MacOS you can only run it from the command line.
 
+## Caveats
+
+WireGuard automatically excludes the IP address of the server specified in the Endpoint from the `AllowedIPs` list. This can cause a non-obvious issue: if the obfuscator is located on the local machine, after the handshake, the traffic to the VPN server will be routed through the VPN itself. Therefore, you need to manually exclude the real IP address of the VPN server from the `AllowedIPs` list.
+
+Also, the obfuscator currently only supports point-to-point connections, meaning it does not allow multiple peers to connect to the same port simultaneously. If you plan to use multiple connections at the same time, each connection must have a separate `ListenPort` port opened.
+
 ## Donate
+
 * [Buy Me A Coffee](https://www.buymeacoffee.com/cluster)
 * [Donation Alerts](https://www.donationalerts.com/r/clustermeerkat)
 * [Boosty](https://boosty.to/cluster)
