@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ./.wg-obfuscator.conf:/etc/wg-obfuscator.conf
+      - ./.wg-obfuscator.conf:/etc/wg-obfuscator/wg-obfuscator.conf
     ports:
       - "13255:13255/udp"
       - "13255:13255/tcp"
