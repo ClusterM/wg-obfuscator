@@ -12,11 +12,9 @@ env:
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/386,linux/ppc64le,linux/s390x
 
 jobs:
+
   build-docker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     strategy:
       matrix:
@@ -52,51 +50,51 @@ jobs:
           name: ${{ env.IMAGE_NAME }}-docker-${{ steps.prep.outputs.safe_platform }}.tar
           path: ${{ env.IMAGE_NAME }}-docker-${{ steps.prep.outputs.safe_platform }}.tar
 
-  build-linux-x64:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: make clean all x64
-      run: make clean all
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: wg-obfuscator-linux-x64
-        path: .
-    - name: apt update
-      run: sudo apt-get update
-    - name: Get ARM toolchain
-      run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-    - name: make clean all arm
-      run: make clean all CC=arm-linux-gnueabihf-gcc
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: wg-obfuscator-linux-arm
-        path: .
-    - name: make clean all arm64
-      run: make clean all CC=aarch64-linux-gnu-gcc
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.IMAGE_NAME }}-linux-arm64
-        path: .
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: make clean all x64
+        run: make clean all
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-x64.zip
+          path: .
+      - name: apt update
+        run: sudo apt-get update
+      - name: Get ARM toolchain
+        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+      - name: make clean all arm
+        run: make clean all CC=arm-linux-gnueabihf-gcc
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-arm.zip
+          path: .
+      - name: make clean all arm64
+        run: make clean all CC=aarch64-linux-gnu-gcc
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-linux-arm64.zip
+          path: .
 
   build-macos:
     runs-on: macos-latest
     steps:
-    - name: Install argp
-      run: brew install argp-standalone
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: make clean all
-      run: make clean all
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.IMAGE_NAME }}-macos
-        path: .
+      - name: Install argp
+        run: brew install argp-standalone
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: make clean all
+        run: make clean all
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-macos.zip
+          path: .
 
   build-windows:
     runs-on: windows-latest
@@ -104,20 +102,20 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-    - uses: msys2/setup-msys2@v2
-      with:
-        update: true
-        install: >-
-          base-devel
-          gcc
-          git
-          libargp-devel
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: make clean all
-      run: make clean all
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.IMAGE_NAME }}-windows
-        path: .
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            gcc
+            git
+            libargp-devel
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: make clean all
+        run: make clean all
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-windows.zip
+          path: .
