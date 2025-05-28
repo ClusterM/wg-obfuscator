@@ -109,13 +109,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: make x64
-        run: make clean all
+        run: make clean all RELEASE=1
+
       - name: Prepare version
         id: prep
         run: |
           VERSION=$(grep VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: zip
         run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64.zip LICENSE *.md ${{ env.IMAGE_NAME }}
 
@@ -149,17 +152,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: apt update
         run: sudo apt-get update
+
       - name: Get ARM toolchain
         run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+
       - name: make arm
-        run: make all CC=arm-linux-gnueabihf-gcc
+        run: make all CC=arm-linux-gnueabihf-gcc RELEASE=1
+
       - name: Prepare version
         id: prep
         run: |
           VERSION=$(grep VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: zip
         run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm.zip LICENSE *.md ${{ env.IMAGE_NAME }}
 
@@ -201,7 +209,7 @@ jobs:
         run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
       - name: make all arm64
-        run: make all CC=aarch64-linux-gnu-gcc
+        run: make all CC=aarch64-linux-gnu-gcc RELEASE=1
 
       - name: Prepare version
         id: prep
@@ -247,7 +255,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: make clean all
-        run: make clean all
+        run: make clean all RELEASE=1
 
       - name: Prepare version
         id: prep
@@ -303,7 +311,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: make clean all
-        run: make clean all
+        run: make clean all RELEASE=1
 
       - name: Prepare version
         id: prep
@@ -372,4 +380,3 @@ jobs:
             clustermeerkat/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }}
           platforms: ${{ env.PLATFORMS }}
           context: .
-

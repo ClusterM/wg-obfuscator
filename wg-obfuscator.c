@@ -245,7 +245,7 @@ static struct argp argp = {
     .parser = parse_opt,
     .args_doc = NULL,
 #ifdef COMMIT
-    .doc = "WireGuard Obfuscator v" VERSION "\n(commit " COMMIT " @ " GIT_REPO ")"
+    .doc = "WireGuard Obfuscator\n(commit " COMMIT " @ " GIT_REPO ")"
 #else
 	.doc = "WireGuard Obfuscator v" VERSION
 #endif

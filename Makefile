@@ -5,6 +5,8 @@ COMMIT		   :=
 COMMIT_INFO	 = commit.h
 HEADERS      = wg-obfuscator.h
 
+RELEASE ?= 0
+
 RM    = rm -f
 CC    = gcc
 ifdef DEBUG
@@ -58,12 +60,17 @@ all: $(TARGET)
 
 $(COMMIT_INFO):
   # Try to get commit hash from git
+ifeq ($(RELEASE),0)
 	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
 	if [ -n "$$COMMIT" ]; then \
 	  echo "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
 	else \
 	  echo > $(COMMIT_INFO) ; \
 	fi
+else
+	rm -rf $(COMMIT_INFO)
+	touch $(COMMIT_INFO)
+endif
 
 clean:
 	$(RM) *.o $(COMMIT_INFO)
