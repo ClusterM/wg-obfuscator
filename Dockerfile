@@ -6,7 +6,7 @@ COPY wg-obfuscator.c wg-obfuscator.h Makefile ./
 RUN make clean && make CC="gcc -static" LDFLAGS="-largp"
 
 # Stage 2: Runtime
-FROM alpine:latest
+FROM scratch
 WORKDIR /app
 COPY --from=build /src/wg-obfuscator ./wg-obfuscator
 COPY wg-obfuscator.conf /etc/wg-obfuscator/wg-obfuscator.conf
