@@ -1,4 +1,4 @@
-name: Build & Publish Nightly Multiarch Docker Image
+name: Publish Nightly Docker Image
 
 on:
   push:
