@@ -292,6 +292,37 @@ static void signal_handler(int signal) {
     }
 }
 
+static int extend_packet(uint8_t *buffer, int length) {
+    // Extend the handshake to a random length
+    int new_length = length + (rand() % (MAX_DUMMY_LENGTH - length));
+    for (int i = length; i < new_length; ++i) {
+        buffer[i] = 0xFF;
+    }
+    print(3, "Extended packet to %d bytes\n", new_length);
+    return new_length;
+}
+
+static int trim_packet(uint8_t *buffer, int length, int original_length) {
+    // Trim the handshake to the original length
+    if (length == original_length) {
+        print(3, "Packet is already at the original length of %d bytes\n", length);
+        return length;
+    }
+    if (length < original_length) {
+        print(3, "Packet is too short, expected %d bytes, got %d bytes\n", original_length, length);
+        return length;
+    }
+    // Check if the padding data is FFs
+    for (int i = original_length; i < length; ++i) {
+        if (buffer[i] != 0xFF) {
+            print(3, "Trimming packet from %d to %d bytes, but padding is invalid\n", length, original_length);
+            return length; // Return the original length if padding is invalid
+        }
+    }
+    print(3, "Trimmed packet from %d to %d bytes\n", length, original_length);
+    return original_length;
+}
+
 int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
@@ -488,9 +519,14 @@ int main(int argc, char *argv[]) {
             }
 
             // Store the last sender address
-            if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                print(2, "Received WireGuard handshake (non-obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+            if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
+                print(2, "Received WireGuard handshake (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
                 is_handshake = 1;
+                if (received == HANDSHAKE_LENGTH) {
+                    received = extend_packet(buffer, received);
+                } else {
+                    print(3, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
+                }
             }
 
             debug_print("Received %d bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
@@ -509,8 +545,9 @@ int main(int argc, char *argv[]) {
             debug_print("\n");
 
             // Store the last sender address
-            if (received >= sizeof(wg_signature) && memcmp(buffer, wg_signature, sizeof(wg_signature)) == 0) {
-                print(2, "Received WireGuard handshake (obfuscated) from %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
+            if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
+                print(2, "Received WireGuard handshake (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
+                received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
                 is_handshake = 1;
             }
 
@@ -554,8 +591,13 @@ int main(int argc, char *argv[]) {
 
             int need_to_set_client_addr = 0;
             // Check if the response is a WireGuard handshake response
-            if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
-                print(2, "Received WireGuard handshake response (non-obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+            if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
+                print(2, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
+                if (received == HANDSHAKE_RESP_LENGTH) {
+                    received = extend_packet(buffer, received);
+                } else {
+                    print(3, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
+                }
                 need_to_set_client_addr = 1;
             }
 
@@ -568,8 +610,9 @@ int main(int argc, char *argv[]) {
             debug_print("\n");
 
             // Check if the response is a WireGuard handshake response
-            if (received >= sizeof(wg_signature_resp) && memcmp(buffer, wg_signature_resp, sizeof(wg_signature_resp)) == 0) {
-                print(2, "Received WireGuard handshake response (obfuscated) from %s:%d\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
+            if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
+                print(2, "Received WireGuard handshake response (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
+                received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
                 need_to_set_client_addr = 1;
             }
 

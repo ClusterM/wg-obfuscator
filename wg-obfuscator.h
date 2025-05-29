@@ -8,9 +8,14 @@
 
 #define BUFFER_SIZE 2048
 #define HANDSHAKE_TIMEOUT 5
+#define MAX_DUMMY_LENGTH 1024
 
 // WireGuard handshake signature
-static const uint8_t wg_signature[] = {0x01, 0x00, 0x00, 0x00};
-static const uint8_t wg_signature_resp[] = {0x02, 0x00, 0x00, 0x00};
+static const uint8_t wg_signature_handshake[] = {0x01, 0x00, 0x00, 0x00};
+static const uint8_t wg_signature_handshake_resp[] = {0x02, 0x00, 0x00, 0x00};
+
+// WireGuard handshake lengths (for latest versions)
+#define HANDSHAKE_LENGTH 148
+#define HANDSHAKE_RESP_LENGTH 92
 
 #endif
