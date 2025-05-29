@@ -18,4 +18,11 @@ static const uint8_t wg_signature_handshake_resp[] = {0x02, 0x00, 0x00, 0x00};
 #define HANDSHAKE_LENGTH 148
 #define HANDSHAKE_RESP_LENGTH 92
 
+// Logging levels
+#define LL_ERROR        0
+#define LL_WARN         1
+#define LL_INFO         2
+#define LL_DEBUG        3
+#define LL_TRACE        4
+
 #endif
