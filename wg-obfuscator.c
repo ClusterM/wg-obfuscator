@@ -301,7 +301,11 @@ static void signal_handler(int signal) {
 
 static int extend_packet(uint8_t *buffer, int length) {
     // Extend the handshake to a random length
-    int new_length = length + (rand() % (MAX_DUMMY_LENGTH - length));
+    if (length >= MAX_DUMMY_LENGTH) {
+        log(LL_DEBUG, "Packet is already at the maximum length of %d bytes\n", MAX_DUMMY_LENGTH);
+        return length;
+    }
+    int new_length = length + 1 + (rand() % (MAX_DUMMY_LENGTH - length - 1));
     for (int i = length; i < new_length; ++i) {
         buffer[i] = 0xFF;
     }
@@ -346,6 +350,8 @@ int main(int argc, char *argv[]) {
     int key_length = 0;
     unsigned long s_listen_addr_client = INADDR_ANY;
     unsigned long s_listen_addr_forward = INADDR_ANY;
+
+    uint8_t disable_dummy_data = 0;
 
     // Parse command line arguments
     if (argc == 1) {
@@ -529,10 +535,12 @@ int main(int argc, char *argv[]) {
             if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
                 log(LL_INFO, "Received WireGuard handshake (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
                 is_handshake = 1;
-                if (received == HANDSHAKE_LENGTH) {
-                    received = extend_packet(buffer, received);
-                } else {
-                    log(LL_DEBUG, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
+                if (!disable_dummy_data) {
+                    if (received == HANDSHAKE_LENGTH) {
+                        received = extend_packet(buffer, received);
+                    } else {
+                        log(LL_DEBUG, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
+                    }
                 }
             }
 
@@ -554,7 +562,14 @@ int main(int argc, char *argv[]) {
             // Store the last sender address
             if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
                 log(LL_INFO, "Received WireGuard handshake (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
-                received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
+                if (!disable_dummy_data) {
+                    int old_length = received;
+                    received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
+                    if (old_length == received) {
+                        disable_dummy_data = 1;
+                        log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
+                    }
+                }
                 is_handshake = 1;
             }
 
@@ -600,10 +615,12 @@ int main(int argc, char *argv[]) {
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
                 log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
-                if (received == HANDSHAKE_RESP_LENGTH) {
-                    received = extend_packet(buffer, received);
-                } else {
-                    log(LL_DEBUG, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
+                if (!disable_dummy_data) {
+                    if (received == HANDSHAKE_RESP_LENGTH) {
+                        received = extend_packet(buffer, received);
+                    } else {
+                        log(LL_DEBUG, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
+                    }
                 }
                 need_to_set_client_addr = 1;
             }
@@ -619,7 +636,14 @@ int main(int argc, char *argv[]) {
             // Check if the response is a WireGuard handshake response
             if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
                 log(LL_INFO, "Received WireGuard handshake response (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
-                received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
+                if (!disable_dummy_data) {
+                    int old_length = received;
+                    received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
+                    if (old_length == received) {
+                        disable_dummy_data = 1;
+                        log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
+                    }
+                }
                 need_to_set_client_addr = 1;
             }
 
