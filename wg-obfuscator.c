@@ -261,27 +261,93 @@ static struct argp argp = {
 #endif
 };
 
+static uint8_t is_obfuscated(uint8_t *data) {
+    return !(*((uint32_t*)data) >= 1 && *((uint32_t*)data) <= 4);
+}
+
 // XOR the data with the key
-static void xor_data(uint8_t *data, int length, char *key, int key_length) {
+static inline void xor_data(uint8_t *buffer, int length, char *key, int key_length) {
     // Calculate the CRC8 based on the key
     uint8_t crc = 0, j;
     int i;
     for (i = 0; i < length; i++) 
     {
         // Get key byte and add the data length and the key length
-		uint8_t inbyte = key[i % key_length] + length + key_length;
+        uint8_t inbyte = key[i % key_length] + length + key_length;
         for (j=0; j<8; j++) 
-		{
-			uint8_t mix = (crc ^ inbyte) & 0x01;
-			crc >>= 1;
+        {
+            uint8_t mix = (crc ^ inbyte) & 0x01;
+            crc >>= 1;
             if (mix) {
                 crc ^= 0x8C;
             }
-			inbyte >>= 1;
+            inbyte >>= 1;
         }
         // XOR the data with the CRC
-        data[i] ^= crc;
+        buffer[i] ^= crc;
     }
+}
+
+static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
+    if (version >= 1) {
+        uint32_t packet_type = *((uint32_t*)buffer);
+        // Add some randomness to the packet
+        uint8_t rnd = 1 + (rand() % 255);
+        buffer[0] ^= rnd; // Xor the first byte to a random value
+        buffer[1] = rnd; // Set the second byte to a random value
+        // Add dummy data to the packet
+        if (length < MAX_DUMMY_LENGTH_TOTAL) {
+            uint16_t dummy_length = 0;
+            switch (packet_type) {
+                case WG_TYPE_HANDSHAKE:
+                case WG_TYPE_HANDSHAKE_RESP:
+                    // length to MAX_DUMMY_LENGTH_HANDSHAKE
+                    dummy_length = rand() % MAX_DUMMY_LENGTH_HANDSHAKE;
+                    break;
+                case WG_TYPE_COOKIE:
+                case WG_TYPE_DATA:
+                    // length to MAX_DUMMY_LENGTH_HANDSHAKE
+#if MAX_DUMMY_LENGTH_DATA > 0
+                    dummy_length = rand() % MAX_DUMMY_LENGTH_DATA;
+#endif
+                    break;
+                default:
+                    //assert(0);
+                    break;
+            }
+            *((uint16_t*)(buffer+2)) = dummy_length; // Set the dummy length in the packet
+            if (length + dummy_length > MAX_DUMMY_LENGTH_TOTAL) {
+                dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
+            }
+            if (dummy_length > 0) {
+                int i = length;
+                length += dummy_length;
+                for (; i < length; ++i) {
+                    buffer[i] = 0xFF; // Fill with FFs, random data is not needed
+                }
+            }
+        }
+    }
+
+    xor_data(buffer, length, key, key_length);
+
+    return length;
+}
+
+static inline int decode(uint8_t *buffer, int length, char *key, int key_length, uint8_t *version_out) {
+    xor_data(buffer, length, key, key_length);
+
+    if (!is_obfuscated(buffer)) {
+        // Looks like an old version
+        *version_out = 0;
+        return length;
+    }
+
+    buffer[0] ^= buffer[1]; // Restore the first byte by XORing it with the second byte
+    buffer[1] = 0; // Set the second byte to 0
+    length -= *((uint16_t*)(buffer+2)); // Remove dummy data length from the packet
+    *((uint16_t*)(buffer+2)) = 0; // Reset the dummy length field to 0
+    return length;
 }
 
 // Handle signals
@@ -314,43 +380,7 @@ static void signal_handler(int signal) {
     }
     exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
-
-# define FAILURE() signal_handler(-1)
-
-static int extend_packet(uint8_t *buffer, int length) {
-    // Extend the handshake to a random length
-    if (length >= MAX_DUMMY_LENGTH) {
-        log(LL_DEBUG, "Packet is already at the maximum length of %d bytes\n", MAX_DUMMY_LENGTH);
-        return length;
-    }
-    int new_length = length + 1 + (rand() % (MAX_DUMMY_LENGTH - length - 1));
-    for (int i = length; i < new_length; ++i) {
-        buffer[i] = 0xFF;
-    }
-    log(LL_DEBUG, "Extended packet to %d bytes\n", new_length);
-    return new_length;
-}
-
-static int trim_packet(uint8_t *buffer, int length, int original_length) {
-    // Trim the handshake to the original length
-    if (length == original_length) {
-        log(LL_DEBUG, "Packet is already at the original length of %d bytes\n", length);
-        return length;
-    }
-    if (length < original_length) {
-        log(LL_DEBUG, "Packet is too short, expected %d bytes, got %d bytes\n", original_length, length);
-        return length;
-    }
-    // Check if the padding data is FFs
-    for (int i = original_length; i < length; ++i) {
-        if (buffer[i] != 0xFF) {
-            log(LL_DEBUG, "Trimming packet from %d to %d bytes, but padding is invalid\n", length, original_length);
-            return length; // Return the original length if padding is invalid
-        }
-    }
-    log(LL_DEBUG, "Trimmed packet from %d to %d bytes\n", length, original_length);
-    return original_length;
-}
+#define FAILURE() signal_handler(-1)
 
 static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
     if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
@@ -404,8 +434,6 @@ int main(int argc, char *argv[]) {
     unsigned long s_listen_addr_forward = INADDR_ANY;
     struct epoll_event events[MAX_EVENTS];
     struct timespec now, last_cleanup_time;
-
-    uint8_t disable_dummy_data = 0; // TODO: remove
 
     // Parse command line arguments
     if (argc == 1) {
@@ -598,155 +626,169 @@ int main(int argc, char *argv[]) {
             if (event->data.fd == listen_sock) {
                 struct sockaddr_in sender_addr;
                 socklen_t sender_addr_len = sizeof(sender_addr);
-                int received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
-                if (received < 0) {
+                int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
+                if (length < 0) {
                     serror("recvfrom");
+                    continue;
+                }
+                if (length < 4) {
+                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                     continue;
                 }
 
                 client_entry_t *client_entry;
                 HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
 
-                // TODO: original length
-                log(LL_TRACE, "Received %d bytes from %s:%d (known=%s)\n", received, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), client_entry ? "yes" : "no");
-                trace("O->: ");
-                for (int i = 0; i < received; ++i) {
-                    trace("%02X ", buffer[i]);
+                uint8_t obfuscated = is_obfuscated(buffer);
+                uint8_t version = OBFUSCATION_VERSION;
+
+                if (verbose >= LL_TRACE) {
+                    log(LL_TRACE, "Received %d bytes from %s:%d (known=%s, obfuscated=%s)\n", length, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                        client_entry ? "yes" : "no", obfuscated ? "yes" : "no");
+                    if (obfuscated) {
+                        trace("X->: ");
+                    } else {
+                        trace("O->: ");
+                    }
+                    for (int i = 0; i < length; ++i) {
+                        trace("%02X ", buffer[i]);
+                    }
+                    trace("\n");
                 }
-                trace("\n");
+
+                if (obfuscated) {
+                    // decode
+                    length = decode(buffer, length, xor_key, key_length, &version);
+                    if (length < 4) {
+                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        continue;
+                    }
+                }
 
                 // Is it handshake?
-                if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
-                    log(LL_INFO, "Received WireGuard handshake (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), received);
+                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
+                    log(LL_INFO, "Received WireGuard handshake from %s:%d (%d bytes, obfuscated=%s)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, 
+                        obfuscated ? "yes" : "no");
 
                     if (!client_entry) {
                         client_entry = new_client_entry(&sender_addr, &forward_addr);
                         if (!client_entry) {
                             continue;
                         }
-                    }
-
-                    if (!disable_dummy_data) { // TODO: remove
-                        if (received == HANDSHAKE_LENGTH) {
-                            received = extend_packet(buffer, received);
-                        } else {
-                            log(LL_DEBUG, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
+                        client_entry->version = version;
+                        if (version < OBFUSCATION_VERSION) {
+                            log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
+                                OBFUSCATION_VERSION, version);
                         }
                     }
 
                     client_entry->last_handshake_request_time = now;
-                }
-
-                // XOR the data
-                xor_data(buffer, received, xor_key, key_length);
-                trace("X->: ");
-                for (int i = 0; i < received; ++i) {
-                    trace("%02X ", buffer[i]);
-                }
-                trace("\n");
-
-                if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
-                    log(LL_INFO, "Received WireGuard handshake (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), received);
-                    if (!disable_dummy_data) {
-                        int old_length = received;
-                        received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
-                        if (old_length == received) {
-                            disable_dummy_data = 1;
-                            log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
-                        }
-                    }
-
-                    if (!client_entry) {
-                        client_entry = new_client_entry(&sender_addr, &forward_addr);
-                        if (!client_entry) {
-                            continue;
-                        }
-                    }
-
-                    client_entry->last_handshake_request_time = now;
-                }
-                else if (!client_entry || !client_entry->handshaked) {
+                } else if (!client_entry || !client_entry->handshaked) {
                     log(LL_DEBUG, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
                     continue;
                 }
 
-                sendto(client_entry->server_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+                if (!obfuscated) {
+                    // If the packet is not obfuscated, we need to encode it
+                    length = encode(buffer, length, xor_key, key_length, client_entry->version);
+                    if (length < 4) {
+                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        continue;
+                    }
+                }
+
+                if (verbose >= LL_TRACE) {
+                    if (!obfuscated) {
+                        trace("X->: ");
+                    } else {
+                        trace("O->: ");
+                    }
+                    for (int i = 0; i < length; ++i) {
+                        trace("%02X ", buffer[i]);
+                    }
+                    trace("\n");
+                }
+
+                sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
                 client_entry->last_activity_time = now;
             } else { // if (event->data.fd == listen_sock)
                 client_entry_t *client_entry = event->data.ptr;
-                int received = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
-                if (received < 0) {
-                    serror("recvfrom");
+                int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
+                if (length < 0) {
+                    serror("recv");
+                    continue;
+                }
+                if (length < 4) {
+                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), length);
                     continue;
                 }
 
-                log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d\n", received, inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), 
-                    inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
-                trace("<-O: ");
-                for (int i = 0; i < received; ++i) {
-                    trace("%02X ", buffer[i]);
-                }
-                trace("\n");
+                uint8_t obfuscated = is_obfuscated(buffer);
 
-                if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
-                    log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), received);
-                    if (!disable_dummy_data) {
-                        if (received == HANDSHAKE_RESP_LENGTH) {
-                            received = extend_packet(buffer, received);
-                        } else {
-                            log(LL_DEBUG, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
-                        }
+                if (verbose >= LL_TRACE) {
+                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)\n", length, inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), 
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+                        obfuscated ? "yes" : "no");
+                    if (obfuscated) {
+                        trace("<-X: ");
+                    } else {
+                        trace("<-O: ");
                     }
+                    for (int i = 0; i < length; ++i) {
+                        trace("%02X ", buffer[i]);
+                    }
+                    trace("\n");
+                }
+
+                if (obfuscated) {
+                    // decode
+                    length = decode(buffer, length, xor_key, key_length, &client_entry->version);
+                    if (length < 4) {
+                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                        continue;
+                    }
+                }
+
+                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
+                    log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes, obfuscated=%s)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port),
+                        length, obfuscated ? "yes" : "no");
 
                     // Check handshake timeout
                     if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
                         log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
-                        // TODO: remove client entry?
                         continue;
                     }
 
                     client_entry->handshaked = 1;
                     client_entry->last_handshake_time = now;
-                }
-
-                // XOR the data
-                xor_data(buffer, received, xor_key, key_length);
-                trace("<-X: ");
-                for (int i = 0; i < received; ++i) {
-                    trace("%02X ", buffer[i]);
-                }
-                trace("\n");
-
-                // Check if the response is a WireGuard handshake response
-                if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
-                    log(LL_INFO, "Received WireGuard handshake response (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), received);
-                    if (!disable_dummy_data) {
-                        int old_length = received;
-                        received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
-                        if (old_length == received) {
-                            disable_dummy_data = 1;
-                            log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
-                        }
-                    }
-
-                    // Check handshake timeout
-                    if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
-                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
-                        // TODO: remove client entry?
-                        continue;
-                    }
-
-                    client_entry->handshaked = 1;
-                    client_entry->last_handshake_time = now;
-                }
-
-                if (!client_entry->handshaked) {
+                } else if (!client_entry->handshaked) {
                     log(LL_DEBUG, "Ignoring response from %s:%d until the handshake is completed\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
                     continue;
                 }
 
+                if (!obfuscated) {
+                    // If the packet is not obfuscated, we need to encode it
+                    length = encode(buffer, length, xor_key, key_length, client_entry->version);
+                    if (length < 4) {
+                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                        continue;
+                    }
+                }
+                
+                if (verbose >= LL_TRACE) {
+                    if (!obfuscated) {
+                        trace("<-X: ");
+                    } else {
+                        trace("<-O: ");
+                    }
+                    for (int i = 0; i < length; ++i) {
+                        trace("%02X ", buffer[i]);
+                    }
+                    trace("\n");
+                }
+
                 // Send the response back to the original client
-                sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));
+                sendto(listen_sock, buffer, length, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));
                 client_entry->last_activity_time = now;
             } // if (event->data.fd != listen_sock)
         } // for (int e = 0; e < events_n; e++)
@@ -755,7 +797,10 @@ int main(int argc, char *argv[]) {
             // Cleanup old entries
             client_entry_t *current_entry, *tmp;
             HASH_ITER(hh, conn_table, current_entry, tmp) {
-                if (now.tv_sec - current_entry->last_activity_time.tv_sec >= IDLE_TIMEOUT) {
+                if (
+                    (now.tv_sec - current_entry->last_activity_time.tv_sec >= IDLE_TIMEOUT)
+                    || (!current_entry->handshaked && now.tv_sec - current_entry->last_handshake_request_time.tv_sec >= HANDSHAKE_TIMEOUT)
+                ) {
                     log(LL_DEBUG, "Removing idle client %s:%d\n", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
                     close(current_entry->server_sock);
