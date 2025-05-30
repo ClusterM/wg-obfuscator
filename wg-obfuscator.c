@@ -8,7 +8,9 @@
 #include <signal.h>
 #include <time.h>
 #include <argp.h>
+#include <sys/epoll.h>
 #include "wg-obfuscator.h"
+#include "uthash.h"
 #include "commit.h"
 
 #define log(level, fmt, ...) { if (verbose >= level)            \
@@ -24,7 +26,8 @@
 }
 #define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
 
-static int listen_sock = 0, forward_sock = 0;
+static int listen_sock = 0, /*forward_sock = 0,*/ epfd = 0; // sockets and epoll file descriptor
+static client_entry_t *conn_table = NULL; // hash table for client connections
 
 // main parameters (TODO: IPv6?)
 static char section_name[256] = "main";
@@ -44,7 +47,7 @@ static int verbose = 2;
 static void perror_sect(char *str, char* section)
 {
     char buf[512];
-    snprintf(buf, sizeof(buf), "[%s] %s", section, str);
+    snprintf(buf, sizeof(buf), "[%s][E] %s", section, str);
     perror(buf);
 }
 
@@ -283,21 +286,36 @@ static void xor_data(uint8_t *data, int length, char *key, int key_length) {
 
 // Handle signals
 static void signal_handler(int signal) {
+    client_entry_t *current_entry, *tmp;
+
     switch (signal) {
+        case -1:
         case SIGINT:
         case SIGTERM:
             // Stop the main loop
             if (listen_sock) {
                 close(listen_sock);
             }
-            if (forward_sock) {
-                close(forward_sock);
+            // if (forward_sock) {
+            //     close(forward_sock);
+            // }
+            HASH_ITER(hh, conn_table, current_entry, tmp) {
+                if (current_entry->server_sock) {
+                    close(current_entry->server_sock);
+                }
+                HASH_DEL(conn_table, current_entry);
+                free(current_entry);
+            }
+            if (epfd) {
+                close(epfd);
             }
             log(LL_WARN, "Stopped.\n");
-            exit(EXIT_SUCCESS);
             break;
     }
+    exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
+
+# define FAILURE() signal_handler(-1)
 
 static int extend_packet(uint8_t *buffer, int length) {
     // Extend the handshake to a random length
@@ -334,24 +352,60 @@ static int trim_packet(uint8_t *buffer, int length, int original_length) {
     return original_length;
 }
 
+static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
+    if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client\n", MAX_CLIENTS);
+        return NULL;
+    }
+    client_entry_t * client_entry = malloc(sizeof(client_entry_t));
+    if (!client_entry) {
+        log(LL_ERROR, "Failed to allocate memory for client entry\n");
+        return NULL;
+    }
+    memset(client_entry, 0, sizeof(client_entry_t));
+    memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
+    client_entry->server_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_entry->server_sock < 0) {
+        serror("Failed to create server socket for client");
+        free(client_entry);
+        return NULL;
+    }
+    connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
+    // Get the assigned port number
+    socklen_t our_addr_len = sizeof(client_entry->our_addr);
+    if (getsockname(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, &our_addr_len) == -1) {
+        serror("failed to get socket port number");
+        FAILURE();
+    }
+    struct epoll_event e = {
+        .events = EPOLLIN,
+        .data.ptr = client_entry
+    };
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_entry->server_sock, &e) != 0) {
+        serror("epoll_ctl for client socket");
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
+    }
+    HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
+
+    return client_entry;
+}
+
 int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
-        forward_addr, // Address for forwarding socket, for sending data to the server
-        last_sender_addr_temp, // Address of the client to which we will send the response (temporary)
-        last_sender_addr, // Address of the client to which we will send the response
-        forward_client_addr, // Address of the forward socket, for receiving data from the server
-        forward_server_addr; // Address of the server, from which we will receive the response
+        forward_addr; // Address for forwarding socket, for sending data to the server
     uint8_t buffer[BUFFER_SIZE];
-    int last_sender_set = 0;
-    time_t last_handshake_time = 0;
     char forward_host[256] = {0};
     int forward_port = -1;
     int key_length = 0;
     unsigned long s_listen_addr_client = INADDR_ANY;
     unsigned long s_listen_addr_forward = INADDR_ANY;
+    struct epoll_event events[MAX_EVENTS];
+    struct timespec now, last_cleanup_time;
 
-    uint8_t disable_dummy_data = 0;
+    uint8_t disable_dummy_data = 0; // TODO: remove
 
     // Parse command line arguments
     if (argc == 1) {
@@ -369,6 +423,7 @@ int main(int argc, char *argv[]) {
         log(LL_ERROR, "'source-lport' is not set\n");
         exit(EXIT_FAILURE);
     }
+    /*
     if (client_fixed_addr_port[0]) {
         char *port_delimiter = strchr(client_fixed_addr_port, ':');
         if (port_delimiter == NULL) {
@@ -387,11 +442,11 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         last_sender_addr.sin_family = AF_INET;
-        last_sender_set = 1;
         log(LL_INFO, "Source: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
     } else {
         log(LL_INFO, "Source: any/auto\n");
-    }  
+    }
+    */  
     if (!forward_host_port[0]) {
         log(LL_ERROR, "'target' is not set\n");
         exit(EXIT_FAILURE);
@@ -453,40 +508,65 @@ int main(int argc, char *argv[]) {
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
         serror("source socket bind");
-        close(listen_sock);
-        exit(EXIT_FAILURE);
+        FAILURE();
     }
     log(LL_WARN, "Listening on port %s:%d for source\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
-    // Create forwarding socket and bind it to the same port
-    if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        serror("target socket");
-        close(listen_sock);
-        exit(EXIT_FAILURE);
+    epfd = epoll_create1(0);
+    if (epfd < 0) {
+        serror("epoll_create1");
+        FAILURE();
     }
 
-    // Create a client address for the forward socket
-    memset(&forward_client_addr, 0, sizeof(forward_client_addr));
-    forward_client_addr.sin_family = AF_INET;
-    forward_client_addr.sin_addr.s_addr = s_listen_addr_forward;
-    forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
-
-    if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
-        serror("target socket bind");
-        close(listen_sock);
-        close(forward_sock);
-        exit(EXIT_FAILURE);
+    {
+        struct epoll_event ev = {
+            .events = EPOLLIN,
+            .data.fd = listen_sock
+        };
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, listen_sock, &ev) != 0) {
+            serror("epoll_ctl for listen_sock");
+            FAILURE();
+        }
     }
 
-    // Get the assigned port number
-    socklen_t forward_client_addr_len = sizeof(forward_client_addr);
-    if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
-        serror("failed to get socket port number");
-        close(listen_sock);
-        close(forward_sock);
-        exit(EXIT_FAILURE);
+    // Create forwarding socket if fixed port is used
+    // TODO
+    /*
+    if (server_local_port) {
+        if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+            serror("target socket");
+            FAILURE();
+        }
+
+        // Create a client address for the forward socket
+        memset(&forward_client_addr, 0, sizeof(forward_client_addr));
+        forward_client_addr.sin_family = AF_INET;
+        forward_client_addr.sin_addr.s_addr = s_listen_addr_forward;
+        forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
+
+        if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
+            serror("target socket bind");
+            FAILURE();
+        }
+
+        // Get the assigned port number
+        socklen_t forward_client_addr_len = sizeof(forward_client_addr);
+        if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
+            serror("failed to get socket port number");
+            FAILURE();
+        }
+        log(LL_WARN, "Listening on port %s:%d for target\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
+
+        struct epoll_event ev = {
+            .events = EPOLLIN,
+            .data.fd = listen_sock
+        };
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, forward_sock, &ev) != 0) {
+            serror("epoll_ctl for forward_sock");
+            FAILURE();
+        }
     }
-    log(LL_WARN, "Listening on port %s:%d for target\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
+    */
 
     // Set up forward address
     memset(&forward_addr, 0, sizeof(forward_addr));
@@ -494,189 +574,199 @@ int main(int argc, char *argv[]) {
     struct hostent *host = gethostbyname(forward_host);
     if (host == NULL) {
         serror("can't resolve hostname");
-        close(listen_sock);
-        close(forward_sock);
-        exit(EXIT_FAILURE);
+        FAILURE();
     }
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
     forward_addr.sin_port = htons(forward_port);
 
     log(LL_WARN, "WireGuard obfuscator successfully started\n");
 
+    clock_gettime(CLOCK_MONOTONIC, &last_cleanup_time);
+
     while (1) {
-        fd_set read_fds;
-        FD_ZERO(&read_fds);
-        FD_SET(listen_sock, &read_fds);
-        FD_SET(forward_sock, &read_fds);
-
-        int max_fd = (listen_sock > forward_sock) ? listen_sock : forward_sock;
-
-        struct timeval timeout;
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-
-        int activity = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
-
-        if (activity < 0) {
-            serror("select");
-            continue;
+        int events_n = epoll_wait(epfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
+        if (events_n < 0) {
+            serror("epoll_wait");
+            FAILURE();
         }
 
-        if (FD_ISSET(listen_sock, &read_fds)) {
-            socklen_t last_sender_addr_temp_len = sizeof(last_sender_addr_temp);
-            uint8_t is_handshake = 0;
-            int received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&last_sender_addr_temp, &last_sender_addr_temp_len);
-            if (received < 0) {
-                serror("recvfrom");
-                continue;
-            }
+        clock_gettime(CLOCK_MONOTONIC, &now);
 
-            // Store the last sender address
-            if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
-                log(LL_INFO, "Received WireGuard handshake (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
-                is_handshake = 1;
-                if (!disable_dummy_data) {
-                    if (received == HANDSHAKE_LENGTH) {
-                        received = extend_packet(buffer, received);
-                    } else {
-                        log(LL_DEBUG, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
-                    }
+        for (int e = 0; e < events_n; e++) {
+            struct epoll_event *event = &events[e];
+
+            if (event->data.fd == listen_sock) {
+                struct sockaddr_in sender_addr;
+                socklen_t sender_addr_len = sizeof(sender_addr);
+                int received = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
+                if (received < 0) {
+                    serror("recvfrom");
+                    continue;
                 }
-            }
 
-            log(LL_TRACE, "Received %d bytes from %s:%d\n", received, inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
-            trace("O->: ");
-            for (int i = 0; i < received; ++i) {
-                trace("%02X ", buffer[i]);
-            }
-            trace("\n");
+                client_entry_t *client_entry;
+                HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
 
-            // XOR the data
-            xor_data(buffer, received, xor_key, key_length);
-            trace("X->: ");
-            for (int i = 0; i < received; ++i) {
-                trace("%02X ", buffer[i]);
-            }
-            trace("\n");
-
-            // Store the last sender address
-            if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
-                log(LL_INFO, "Received WireGuard handshake (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), received);
-                if (!disable_dummy_data) {
-                    int old_length = received;
-                    received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
-                    if (old_length == received) {
-                        disable_dummy_data = 1;
-                        log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
-                    }
+                // TODO: original length
+                log(LL_TRACE, "Received %d bytes from %s:%d (known=%s)\n", received, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), client_entry ? "yes" : "no");
+                trace("O->: ");
+                for (int i = 0; i < received; ++i) {
+                    trace("%02X ", buffer[i]);
                 }
-                is_handshake = 1;
-            }
+                trace("\n");
 
-            if (is_handshake) {
-                last_handshake_time = time(NULL);
-            } else {
-                last_handshake_time = 0;
-            }
+                // Is it handshake?
+                if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
+                    log(LL_INFO, "Received WireGuard handshake (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), received);
 
-            // Send the data to the forward port if it's allowed client
-            if (client_fixed_addr_port[0] && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
-            {
-                log(LL_DEBUG, "Fixed source address mismatch: %s:%d != %s:%d\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port), inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-            } else if (!client_fixed_addr_port[0] && !is_handshake && (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port))
-            {
-                log(LL_DEBUG, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(last_sender_addr_temp.sin_addr), ntohs(last_sender_addr_temp.sin_port));
-            } else {
-                sendto(forward_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
-            }
-        }
-
-        if (FD_ISSET(forward_sock, &read_fds)) {
-            socklen_t forward_server_addr_len = sizeof(forward_server_addr);
-            int received = recvfrom(forward_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&forward_server_addr, &forward_server_addr_len);
-            if (received < 0) {
-                serror("recvfrom");
-                continue;
-            }
-
-            // Ignore if the sender is not the server
-            if (memcmp(&forward_server_addr, &forward_addr, sizeof(forward_server_addr)) != 0) {
-                continue;
-            }
-
-            log(LL_TRACE, "Received %d bytes from %s:%d\n", received, inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port));
-            trace("<-O: ");
-            for (int i = 0; i < received; ++i) {
-                trace("%02X ", buffer[i]);
-            }
-            trace("\n");
-
-            int need_to_set_client_addr = 0;
-            // Check if the response is a WireGuard handshake response
-            if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
-                log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
-                if (!disable_dummy_data) {
-                    if (received == HANDSHAKE_RESP_LENGTH) {
-                        received = extend_packet(buffer, received);
-                    } else {
-                        log(LL_DEBUG, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
+                    if (!client_entry) {
+                        client_entry = new_client_entry(&sender_addr, &forward_addr);
+                        if (!client_entry) {
+                            continue;
+                        }
                     }
+
+                    if (!disable_dummy_data) { // TODO: remove
+                        if (received == HANDSHAKE_LENGTH) {
+                            received = extend_packet(buffer, received);
+                        } else {
+                            log(LL_DEBUG, "Invalid handshake length: %d, expected %d, will not extend\n", received, HANDSHAKE_LENGTH);
+                        }
+                    }
+
+                    client_entry->last_handshake_request_time = now;
                 }
-                need_to_set_client_addr = 1;
-            }
 
-            // XOR the data
-            xor_data(buffer, received, xor_key, key_length);
-            trace("<-X: ");
-            for (int i = 0; i < received; ++i) {
-                trace("%02X ", buffer[i]);
-            }
-            trace("\n");
-
-            // Check if the response is a WireGuard handshake response
-            if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
-                log(LL_INFO, "Received WireGuard handshake response (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_server_addr.sin_addr), ntohs(forward_server_addr.sin_port), received);
-                if (!disable_dummy_data) {
-                    int old_length = received;
-                    received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
-                    if (old_length == received) {
-                        disable_dummy_data = 1;
-                        log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
-                    }
+                // XOR the data
+                xor_data(buffer, received, xor_key, key_length);
+                trace("X->: ");
+                for (int i = 0; i < received; ++i) {
+                    trace("%02X ", buffer[i]);
                 }
-                need_to_set_client_addr = 1;
-            }
+                trace("\n");
 
-            // Store the last sender address
-            if (need_to_set_client_addr && !client_fixed_addr_port[0]) {
-                if (time(NULL) - last_handshake_time < HANDSHAKE_TIMEOUT) {
-                    if (last_sender_addr_temp.sin_addr.s_addr != last_sender_addr.sin_addr.s_addr || last_sender_addr_temp.sin_port != last_sender_addr.sin_port) {
-                        memcpy(&last_sender_addr, &last_sender_addr_temp, sizeof(last_sender_addr));
-                        last_sender_set = 1;
-                        log(LL_INFO, "Client address set to %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
+                if (received >= sizeof(wg_signature_handshake) && memcmp(buffer, wg_signature_handshake, sizeof(wg_signature_handshake)) == 0) {
+                    log(LL_INFO, "Received WireGuard handshake (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), received);
+                    if (!disable_dummy_data) {
+                        int old_length = received;
+                        received = trim_packet(buffer, received, HANDSHAKE_LENGTH);
+                        if (old_length == received) {
+                            disable_dummy_data = 1;
+                            log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
+                        }
                     }
-                } else {
-                    if (last_handshake_time) {
+
+                    if (!client_entry) {
+                        client_entry = new_client_entry(&sender_addr, &forward_addr);
+                        if (!client_entry) {
+                            continue;
+                        }
+                    }
+
+                    client_entry->last_handshake_request_time = now;
+                }
+                else if (!client_entry || !client_entry->handshaked) {
+                    log(LL_DEBUG, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                    continue;
+                }
+
+                sendto(client_entry->server_sock, buffer, received, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+                client_entry->last_activity_time = now;
+            } else { // if (event->data.fd == listen_sock)
+                client_entry_t *client_entry = event->data.ptr;
+                int received = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
+                if (received < 0) {
+                    serror("recvfrom");
+                    continue;
+                }
+
+                log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d\n", received, inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), 
+                    inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                trace("<-O: ");
+                for (int i = 0; i < received; ++i) {
+                    trace("%02X ", buffer[i]);
+                }
+                trace("\n");
+
+                if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
+                    log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), received);
+                    if (!disable_dummy_data) {
+                        if (received == HANDSHAKE_RESP_LENGTH) {
+                            received = extend_packet(buffer, received);
+                        } else {
+                            log(LL_DEBUG, "Invalid handshake response length: %d, expected %d, will not extend\n", received, HANDSHAKE_RESP_LENGTH);
+                        }
+                    }
+
+                    // Check handshake timeout
+                    if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
                         log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
-                    } else {
-                        log(LL_DEBUG, "Ignoring WireGuard handshake response, no handshake request\n");                    
+                        // TODO: remove client entry?
+                        continue;
                     }
+
+                    client_entry->handshaked = 1;
+                    client_entry->last_handshake_time = now;
+                }
+
+                // XOR the data
+                xor_data(buffer, received, xor_key, key_length);
+                trace("<-X: ");
+                for (int i = 0; i < received; ++i) {
+                    trace("%02X ", buffer[i]);
+                }
+                trace("\n");
+
+                // Check if the response is a WireGuard handshake response
+                if (received >= sizeof(wg_signature_handshake_resp) && memcmp(buffer, wg_signature_handshake_resp, sizeof(wg_signature_handshake_resp)) == 0) {
+                    log(LL_INFO, "Received WireGuard handshake response (obfuscated) from %s:%d (%d bytes)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), received);
+                    if (!disable_dummy_data) {
+                        int old_length = received;
+                        received = trim_packet(buffer, received, HANDSHAKE_RESP_LENGTH);
+                        if (old_length == received) {
+                            disable_dummy_data = 1;
+                            log(LL_INFO, "Seems like other side uses old obfuscator version, disabling dummy data extension\n");
+                        }
+                    }
+
+                    // Check handshake timeout
+                    if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
+                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
+                        // TODO: remove client entry?
+                        continue;
+                    }
+
+                    client_entry->handshaked = 1;
+                    client_entry->last_handshake_time = now;
+                }
+
+                if (!client_entry->handshaked) {
+                    log(LL_DEBUG, "Ignoring response from %s:%d until the handshake is completed\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                    continue;
+                }
+
+                // Send the response back to the original client
+                sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));
+                client_entry->last_activity_time = now;
+            } // if (event->data.fd != listen_sock)
+        } // for (int e = 0; e < events_n; e++)
+
+        if (now.tv_sec - last_cleanup_time.tv_sec >= CLEANUP_INTERVAL) {
+            // Cleanup old entries
+            client_entry_t *current_entry, *tmp;
+            HASH_ITER(hh, conn_table, current_entry, tmp) {
+                if (now.tv_sec - current_entry->last_activity_time.tv_sec >= IDLE_TIMEOUT) {
+                    log(LL_DEBUG, "Removing idle client %s:%d\n", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
+                    close(current_entry->server_sock);
+                    HASH_DEL(conn_table, current_entry);
+                    free(current_entry);
                 }
             }
-
-            // Send the response back to the original client
-            if (last_sender_set) {
-                sendto(listen_sock, buffer, received, 0, (struct sockaddr *)&last_sender_addr, sizeof(last_sender_addr));
-            } else {
-                log(LL_DEBUG, "No source address set, ignoring the response\n");
-            }
+            last_cleanup_time = now;
         }
-    }
+    } // while (1)
 
-    close(listen_sock);
-    close(forward_sock);
-
-    log(LL_WARN, "Stopped.\n");
-
+    // You should never reach this point, but just in case
     return 0;
 }
