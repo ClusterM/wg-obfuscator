@@ -643,7 +643,10 @@ int main(int argc, char *argv[]) {
                 uint8_t version = OBFUSCATION_VERSION;
 
                 if (verbose >= LL_TRACE) {
-                    log(LL_TRACE, "Received %d bytes from %s:%d (known=%s, obfuscated=%s)\n", length, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)\n",
+                        length,
+                        inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                        forward_host, forward_port,
                         client_entry ? "yes" : "no", obfuscated ? "yes" : "no");
                     if (obfuscated) {
                         trace("X->: ");
@@ -684,7 +687,9 @@ int main(int argc, char *argv[]) {
 
                     client_entry->last_handshake_request_time = now;
                 } else if (!client_entry || !client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring data from %s:%d until the handshake is completed\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                    log(LL_DEBUG, "Ignoring data from %s:%d to %s:%d until the handshake is completed\n",
+                        inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                        forward_host, forward_port);
                     continue;
                 }
 
@@ -719,14 +724,16 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 if (length < 4) {
-                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), length);
+                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", forward_host, forward_port, length);
                     continue;
                 }
 
                 uint8_t obfuscated = is_obfuscated(buffer);
 
                 if (verbose >= LL_TRACE) {
-                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)\n", length, inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port), 
+                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)\n",
+                        length,
+                        forward_host, forward_port, 
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         obfuscated ? "yes" : "no");
                     if (obfuscated) {
@@ -744,13 +751,13 @@ int main(int argc, char *argv[]) {
                     // decode
                     length = decode(buffer, length, xor_key, key_length, &client_entry->version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", forward_host, forward_port);
                         continue;
                     }
                 }
 
                 if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
-                    log(LL_INFO, "Received WireGuard handshake response (non-obfuscated) from %s:%d (%d bytes, obfuscated=%s)\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port),
+                    log(LL_INFO, "Received WireGuard handshake response from %s:%d (%d bytes, obfuscated=%s)\n", forward_host, forward_port,
                         length, obfuscated ? "yes" : "no");
 
                     // Check handshake timeout
@@ -762,7 +769,9 @@ int main(int argc, char *argv[]) {
                     client_entry->handshaked = 1;
                     client_entry->last_handshake_time = now;
                 } else if (!client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring response from %s:%d until the handshake is completed\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                    log(LL_DEBUG, "Ignoring response from %s:%d to %s:%d until the handshake is completed\n",
+                        forward_host, forward_port,
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
                     continue;
                 }
 
@@ -770,7 +779,7 @@ int main(int argc, char *argv[]) {
                     // If the packet is not obfuscated, we need to encode it
                     length = encode(buffer, length, xor_key, key_length, client_entry->version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", inet_ntoa(forward_addr.sin_addr), ntohs(forward_addr.sin_port));
+                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", forward_host, forward_port);
                         continue;
                     }
                 }
