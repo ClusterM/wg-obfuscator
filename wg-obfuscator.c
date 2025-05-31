@@ -244,11 +244,11 @@ static const struct argp_option options[] = {
     { "target-lport", 'r', "<port>", 0, "target port to listen (optional, default - random)", .group = 6 },
     { "key", 'k', "<key>", 0, "key to XOR the data", .group = 7 },
     { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "0 - silent, critical startup errors only", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "1 - only startup/shutdown messages", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "2 - status messages", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "3 - warnings", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "4 - debug mode, print out all transmitted data", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "0 - ERRORS (critical errors only)", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "1 - WARNINGS (important messages: startup and shutdown messages)", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "2 - INFO (informational messages: status messages, connection established, etc.)", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "3 - DEBUG (detailed debug messages)", .group = 8 },
+    { " ", 0, 0, OPTION_DOC , "4 - TRACE (very detailed debug messages, including packet dumps)", .group = 8 },
     { 0 }
 };
 
@@ -258,9 +258,9 @@ static struct argp argp = {
     .parser = parse_opt,
     .args_doc = NULL,
 #ifdef COMMIT
-    .doc = "WireGuard Obfuscator\n(commit " COMMIT " @ " GIT_REPO ")"
+    .doc = "WireGuard Obfuscator\n(commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")"
 #else
-	.doc = "WireGuard Obfuscator v" VERSION
+	.doc = "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION
 #endif
 };
 

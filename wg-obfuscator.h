@@ -16,11 +16,11 @@
 #include <poll.h>
 #endif
 
-#define VERSION "1.0"
-#define GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
+#define WG_OBFUSCATOR_VERSION "1.0"
+#define WG_OBFUSCATOR_GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
 
 #define BUFFER_SIZE             2048
-#define OBFUSCATION_VERSION     1 // current obfuscation version
+#define OBFUSCATION_VERSION     1       // current obfuscation version
 
 #define MAX_DUMMY_LENGTH_TOTAL  1024    // maximum length of a packet after dummy data extension
 #define MAX_DUMMY_LENGTH_HANDSHAKE  512 // maximum length of dummy data for handshake packets
