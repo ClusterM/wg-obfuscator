@@ -8,7 +8,6 @@
 #include <signal.h>
 #include <time.h>
 #include <argp.h>
-#include <sys/epoll.h>
 #include "wg-obfuscator.h"
 #include "uthash.h"
 #include "commit.h"
@@ -26,8 +25,12 @@
 }
 #define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
 
-static int listen_sock = 0, /*forward_sock = 0,*/ epfd = 0; // sockets and epoll file descriptor
+static int listen_sock = 0; // listening socket for receiving data from the clients
 static client_entry_t *conn_table = NULL; // hash table for client connections
+
+#ifdef USE_EPOLL
+    static int epfd = 0;
+#endif
 
 // main parameters (TODO: IPv6?)
 static char section_name[256] = "main";
@@ -362,9 +365,6 @@ static void signal_handler(int signal) {
             if (listen_sock) {
                 close(listen_sock);
             }
-            // if (forward_sock) {
-            //     close(forward_sock);
-            // }
             HASH_ITER(hh, conn_table, current_entry, tmp) {
                 if (current_entry->server_sock) {
                     close(current_entry->server_sock);
@@ -372,9 +372,11 @@ static void signal_handler(int signal) {
                 HASH_DEL(conn_table, current_entry);
                 free(current_entry);
             }
+#ifdef USE_EPOLL
             if (epfd) {
                 close(epfd);
             }
+#endif
             log(LL_WARN, "Stopped.\n");
             break;
     }
@@ -407,6 +409,8 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         serror("failed to get socket port number");
         FAILURE();
     }
+
+#ifdef USE_EPOLL    
     struct epoll_event e = {
         .events = EPOLLIN,
         .data.ptr = client_entry
@@ -417,10 +421,22 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         free(client_entry);
         return NULL;
     }
+#endif
+
     HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
 
     return client_entry;
 }
+
+#ifndef USE_EPOLL
+static client_entry_t *find_by_server_sock(int fd) {
+    client_entry_t *e, *tmp;
+    HASH_ITER(hh, conn_table, e, tmp) {
+        if (e->server_sock == fd) return e;
+    }
+    return NULL;
+}
+#endif
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in 
@@ -432,8 +448,13 @@ int main(int argc, char *argv[]) {
     int key_length = 0;
     unsigned long s_listen_addr_client = INADDR_ANY;
     unsigned long s_listen_addr_forward = INADDR_ANY;
-    struct epoll_event events[MAX_EVENTS];
     struct timespec now, last_cleanup_time;
+
+#ifdef USE_EPOLL
+    struct epoll_event events[MAX_EVENTS];
+#else
+    struct pollfd pollfds[MAX_CLIENTS + 1];
+#endif
 
     // Parse command line arguments
     if (argc == 1) {
@@ -540,6 +561,7 @@ int main(int argc, char *argv[]) {
     }
     log(LL_WARN, "Listening on port %s:%d for source\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
+#ifdef USE_EPOLL
     epfd = epoll_create1(0);
     if (epfd < 0) {
         serror("epoll_create1");
@@ -556,6 +578,7 @@ int main(int argc, char *argv[]) {
             FAILURE();
         }
     }
+#endif
 
     // Create forwarding socket if fixed port is used
     // TODO
@@ -612,18 +635,44 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &last_cleanup_time);
 
     while (1) {
-        int events_n = epoll_wait(epfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
+#ifdef USE_EPOLL
+        int events_n = epoll_wait(epfd, events, MAX_EVENTS, POLL_TIMEOUT);
         if (events_n < 0) {
             serror("epoll_wait");
             FAILURE();
         }
+#else
+        int nfds = 0;
+        pollfds[nfds].fd = listen_sock;
+        pollfds[nfds].events = POLLIN;
+        nfds++;
+        client_entry_t *entry, *tmp;
+        HASH_ITER(hh, conn_table, entry, tmp) {
+            if (nfds >= MAX_CLIENTS) {
+                log(LL_DEBUG, "Too many clients, cannot add more\n");
+                break;
+            }
+            pollfds[nfds].fd = entry->server_sock;
+            pollfds[nfds].events = POLLIN;
+            nfds++;
+        }
+        int ret = poll(pollfds, nfds, POLL_TIMEOUT);
+        if (ret < 0) {
+            serror("poll");
+            FAILURE();
+        }
+#endif
 
         clock_gettime(CLOCK_MONOTONIC, &now);
 
+#ifdef USE_EPOLL
         for (int e = 0; e < events_n; e++) {
             struct epoll_event *event = &events[e];
-
             if (event->data.fd == listen_sock) {
+#else
+        for (int e = 0; e < nfds; e++) if (pollfds[e].revents & POLLIN) {
+            if (pollfds[e].fd == listen_sock) {
+#endif
                 struct sockaddr_in sender_addr;
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
@@ -720,7 +769,11 @@ int main(int argc, char *argv[]) {
                 sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
                 client_entry->last_activity_time = now;
             } else { // if (event->data.fd == listen_sock)
+#ifdef USE_EPOLL
                 client_entry_t *client_entry = event->data.ptr;
+#else
+                client_entry_t *client_entry = find_by_server_sock(pollfds[e].fd);
+#endif
                 int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
                 if (length < 0) {
                     serror("recv");
@@ -816,7 +869,9 @@ int main(int argc, char *argv[]) {
                     || (!current_entry->handshaked && now.tv_sec - current_entry->last_handshake_request_time.tv_sec >= HANDSHAKE_TIMEOUT)
                 ) {
                     log(LL_DEBUG, "Removing idle client %s:%d\n", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+#ifdef USE_EPOLL
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
+#endif
                     close(current_entry->server_sock);
                     HASH_DEL(conn_table, current_entry);
                     free(current_entry);

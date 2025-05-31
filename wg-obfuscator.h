@@ -1,14 +1,25 @@
 #ifndef _WG_OBFUSCATOR_H_
 #define _WG_OBFUSCATOR_H_
 
+// on Linux, use epoll for better performance
+#ifdef __linux__
+#define USE_EPOLL
+#endif
+
 #include <stdint.h>
 #include "uthash.h"
+
+#ifdef USE_EPOLL
+#include <sys/epoll.h>
+#define MAX_EVENTS              1024
+#else
+#include <poll.h>
+#endif
 
 #define VERSION "1.0"
 #define GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
 
 #define BUFFER_SIZE             2048
-#define MAX_EVENTS              1024
 #define OBFUSCATION_VERSION     1 // current obfuscation version
 
 #define MAX_DUMMY_LENGTH_TOTAL  1024    // maximum length of a packet after dummy data extension
@@ -16,7 +27,7 @@
 #define MAX_DUMMY_LENGTH_DATA   4       // maximum length of dummy data for data packets
 
 
-#define EPOLL_TIMEOUT           5000    // in milliseconds
+#define POLL_TIMEOUT            5000    // in milliseconds
 #define HANDSHAKE_TIMEOUT       5       // seconds
 #define MAX_CLIENTS             1024    // maximum number of clients
 #define CLEANUP_INTERVAL        15      // seconds
@@ -27,9 +38,6 @@
 #define WG_TYPE_HANDSHAKE_RESP  0x02
 #define WG_TYPE_COOKIE          0x03
 #define WG_TYPE_DATA            0x04
-
-static const uint8_t wg_signature_handshake[] = {0x01, 0x00, 0x00, 0x00};
-static const uint8_t wg_signature_handshake_resp[] = {0x02, 0x00, 0x00, 0x00};
 
 // WireGuard handshake lengths (for the latest versions)
 #define HANDSHAKE_LENGTH 148
