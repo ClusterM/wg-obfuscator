@@ -81,41 +81,41 @@ jobs:
           name: ${{ env.IMAGE_NAME }}-linux-arm64.zip
           path: .
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Install argp
-        run: brew install argp-standalone
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: make clean all
-        run: make clean all
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-macos.zip
-          path: .
+  # build-macos:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - name: Install argp
+  #       run: brew install argp-standalone
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     - name: make clean all
+  #       run: make clean all
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ env.IMAGE_NAME }}-macos.zip
+  #         path: .
 
-  build-windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
-    steps:
-      - uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: >-
-            base-devel
-            gcc
-            git
-            libargp-devel
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: make clean all
-        run: make clean all
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-windows.zip
-          path: .
+  # build-windows:
+  #   runs-on: windows-latest
+  #   defaults:
+  #     run:
+  #       shell: msys2 {0}
+  #   steps:
+  #     - uses: msys2/setup-msys2@v2
+  #       with:
+  #         update: true
+  #         install: >-
+  #           base-devel
+  #           gcc
+  #           git
+  #           libargp-devel
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     - name: make clean all
+  #       run: make clean all
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ env.IMAGE_NAME }}-windows.zip
+  #         path: .

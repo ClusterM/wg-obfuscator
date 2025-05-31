@@ -2,7 +2,7 @@
 FROM alpine:latest AS build
 WORKDIR /src
 RUN apk add --no-cache build-base argp-standalone
-COPY wg-obfuscator.c wg-obfuscator.h Makefile ./
+COPY *.c *.h Makefile ./
 RUN make clean && make CC="gcc -static" LDFLAGS="-largp"
 
 # Stage 2: Runtime
