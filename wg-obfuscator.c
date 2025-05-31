@@ -670,7 +670,10 @@ int main(int argc, char *argv[]) {
 
                 // Is it handshake?
                 if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
-                    log(LL_INFO, "Received WireGuard handshake from %s:%d (%d bytes, obfuscated=%s)\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, 
+                    log(LL_INFO, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                        inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                        forward_host, forward_port,
+                        length, 
                         obfuscated ? "yes" : "no");
 
                     if (!client_entry) {
@@ -757,7 +760,9 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
-                    log(LL_INFO, "Received WireGuard handshake response from %s:%d (%d bytes, obfuscated=%s)\n", forward_host, forward_port,
+                    log(LL_INFO, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                        forward_host, forward_port,
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, obfuscated ? "yes" : "no");
 
                     // Check handshake timeout
