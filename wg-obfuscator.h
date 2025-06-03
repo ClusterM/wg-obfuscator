@@ -16,7 +16,7 @@
 #include <poll.h>
 #endif
 
-#define WG_OBFUSCATOR_VERSION "1.0"
+#define WG_OBFUSCATOR_VERSION "1.1"
 #define WG_OBFUSCATOR_GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
 
 // Logging levels
@@ -26,19 +26,17 @@
 #define LL_DEBUG        3
 #define LL_TRACE        4
 
-#define BUFFER_SIZE             2048
-#define OBFUSCATION_VERSION     1       // current obfuscation version
-
+// Main parameters
+// TODO: make these configurable via command line arguments or config file
+#define BUFFER_SIZE             10*1024 // size of the buffer for receiving data from the clients and server
+#define POLL_TIMEOUT            5000    // in milliseconds
+#define HANDSHAKE_TIMEOUT       5000    // in milliseconds
+#define MAX_CLIENTS             1024    // maximum number of clients
+#define CLEANUP_INTERVAL        15000   // in milliseconds
+#define IDLE_TIMEOUT            300000  // in milliseconds
 #define MAX_DUMMY_LENGTH_TOTAL  1024    // maximum length of a packet after dummy data extension
 #define MAX_DUMMY_LENGTH_HANDSHAKE  512 // maximum length of dummy data for handshake packets
 #define MAX_DUMMY_LENGTH_DATA   4       // maximum length of dummy data for data packets
-
-
-#define POLL_TIMEOUT            5000    // in milliseconds
-#define HANDSHAKE_TIMEOUT       5       // seconds
-#define MAX_CLIENTS             1024    // maximum number of clients
-#define CLEANUP_INTERVAL        15      // seconds
-#define IDLE_TIMEOUT            300     // seconds
 
 // WireGuard packet types
 #define WG_TYPE_HANDSHAKE       0x01
@@ -50,17 +48,22 @@
 #define HANDSHAKE_DIRECTION_CLIENT_TO_SERVER 0
 #define HANDSHAKE_DIRECTION_SERVER_TO_CLIENT 1
 
+// Current obfuscation version
+#define OBFUSCATION_VERSION     1
+#define DEFAULT_INSTANCE_NAME   "main"
+
+// Structure to hold client connection information
 typedef struct {
     struct sockaddr_in client_addr;             // client address and port (key for the hash table)
     struct sockaddr_in our_addr;                // our address and port on the server connection
-    struct timespec last_activity_time;         // last time we received data from/to this client
-    struct timespec last_handshake_request_time;// last time we received a handshake request from/to this client
-    struct timespec last_handshake_time;        // last time we received a handshake response from/to this client
+    long last_activity_time;                    // last time we received data from/to this client
+    long last_handshake_request_time;           // last time we received a handshake request from/to this client
+    long last_handshake_time;                   // last time we received a handshake response from/to this client
     int server_sock;                            // socket for the connection to the server    
     uint8_t version;                            // obfuscation version
-    uint8_t handshaked : 1;                     // 1 if the client has completed the handshake, 0 otherwise
+    uint8_t handshaked          : 1;            // 1 if the client has completed the handshake, 0 otherwise
     uint8_t handshake_direction : 1;            // 1 if the handshake is from client to server, 0 if from server to client
-    uint8_t is_static : 1;                      // 1 if this is a static binding entry, 0 otherwise
+    uint8_t is_static           : 1;            // 1 if this is a static binding entry, 0 otherwise
     UT_hash_handle hh;
 } client_entry_t;
 
