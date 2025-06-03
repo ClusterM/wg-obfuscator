@@ -19,6 +19,13 @@
 #define WG_OBFUSCATOR_VERSION "1.0"
 #define WG_OBFUSCATOR_GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
 
+// Logging levels
+#define LL_ERROR        0
+#define LL_WARN         1
+#define LL_INFO         2
+#define LL_DEBUG        3
+#define LL_TRACE        4
+
 #define BUFFER_SIZE             2048
 #define OBFUSCATION_VERSION     1       // current obfuscation version
 
@@ -39,26 +46,21 @@
 #define WG_TYPE_COOKIE          0x03
 #define WG_TYPE_DATA            0x04
 
-// WireGuard handshake lengths (for the latest versions)
-#define HANDSHAKE_LENGTH 148
-#define HANDSHAKE_RESP_LENGTH 92
-
-// Logging levels
-#define LL_ERROR        0
-#define LL_WARN         1
-#define LL_INFO         2
-#define LL_DEBUG        3
-#define LL_TRACE        4
+// Handshake directions
+#define HANDSHAKE_DIRECTION_CLIENT_TO_SERVER 0
+#define HANDSHAKE_DIRECTION_SERVER_TO_CLIENT 1
 
 typedef struct {
-    struct sockaddr_in client_addr; // key
-    struct sockaddr_in our_addr; // our address and port on the server connection
-    struct timespec last_activity_time; // last time we received data from this client
-    struct timespec last_handshake_request_time; // last time we received a handshake request from this client
-    struct timespec last_handshake_time;
-    int server_sock;
-    uint8_t handshaked; // 1 if the client has completed the handshake, 0 otherwise
-    uint8_t version; // obfuscation version
+    struct sockaddr_in client_addr;             // client address and port (key for the hash table)
+    struct sockaddr_in our_addr;                // our address and port on the server connection
+    struct timespec last_activity_time;         // last time we received data from/to this client
+    struct timespec last_handshake_request_time;// last time we received a handshake request from/to this client
+    struct timespec last_handshake_time;        // last time we received a handshake response from/to this client
+    int server_sock;                            // socket for the connection to the server    
+    uint8_t version;                            // obfuscation version
+    uint8_t handshaked : 1;                     // 1 if the client has completed the handshake, 0 otherwise
+    uint8_t handshake_direction : 1;            // 1 if the handshake is from client to server, 0 if from server to client
+    uint8_t is_static : 1;                      // 1 if this is a static binding entry, 0 otherwise
     UT_hash_handle hh;
 } client_entry_t;
 

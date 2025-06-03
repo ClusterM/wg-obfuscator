@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <time.h>
 #include <argp.h>
+#include <stdarg.h>
 #include "wg-obfuscator.h"
 #include "uthash.h"
 #include "commit.h"
@@ -39,22 +40,25 @@ static char forward_host_port[256] = {0};
 static char xor_key[256] = {0};
 // optional parameters: client and forward interfaces
 static char client_interface[256] = {0};
-static char forward_interface[256] = {0};
-// optional parameters: fixed client address
-static char client_fixed_addr_port[256] = {0};
-static int server_local_port = 0;
+static char static_bindings[1024] = {0}; // static bindings for two-way mode
 // verbosity level
 static char verbose_str[256] = {0};
 static int verbose = 2;
 
-static void perror_sect(char *str, char* section)
+static void perror_sect(char *str, char* section, ...)
 {
     char buf[512];
-    snprintf(buf, sizeof(buf), "[%s][E] %s", section, str);
-    perror(buf);
+    va_list args;
+    va_start(args, section);
+    vsnprintf(buf, sizeof(buf), str, args);
+    va_end(args);
+
+    char msg[1024];
+    snprintf(msg, sizeof(msg), "[%s][E] %s", section, buf);
+    perror(msg);
 }
 
-#define serror(x) perror_sect(x, section_name)
+#define serror(x, ...) perror_sect(x, section_name, ##__VA_ARGS__)
 
 static void read_config_file(char *filename)
 {
@@ -62,7 +66,7 @@ static void read_config_file(char *filename)
     char line[256];
     FILE *config_file = fopen(filename, "r");
     if (config_file == NULL) {
-        serror("config file");
+        serror("can't open config file");
         exit(EXIT_FAILURE);
     }
     int listen_port_set = 0;
@@ -109,9 +113,6 @@ static void read_config_file(char *filename)
             memset(forward_host_port, 0, sizeof(forward_host_port));
             memset(xor_key, 0, sizeof(xor_key));
             memset(client_interface, 0, sizeof(client_interface));
-            memset(forward_interface, 0, sizeof(forward_interface));
-            memset(client_fixed_addr_port, 0, sizeof(client_fixed_addr_port));
-            server_local_port = 0;
             memset(verbose_str, 0, sizeof(verbose_str));
             verbose = 2;
             listen_port_set = 0;
@@ -162,16 +163,21 @@ static void read_config_file(char *filename)
         } else if (strcmp(key, "source-if") == 0) {
             strncpy(client_interface, value, sizeof(client_interface) - 1);
             something_set = 1;
-        } else if (strcmp(key, "target-if") == 0) {
-            strncpy(forward_interface, value, sizeof(forward_interface) - 1);
+        }
+         else if (strcmp(key, "target-if") == 0) {
+            //strncpy(forward_interface, value, sizeof(forward_interface) - 1);
+            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.\n");
             something_set = 1;
         } else if (strcmp(key, "source") == 0) {
-            strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
+            //strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
+            log(LL_WARN, "The 'source' option is deprecated and will be ignored.\n");
             something_set = 1;
         } else if (strcmp(key, "target-lport") == 0) {
-            server_local_port = atoi(value);
+            //server_local_port = atoi(value);
+            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.\n");
             something_set = 1;
-        } else if (strcmp(key, "verbose") == 0) {
+        } 
+        else if (strcmp(key, "verbose") == 0) {
             strncpy(verbose_str, value, sizeof(verbose_str) - 1);
             something_set = 1;
         } else {
@@ -207,19 +213,25 @@ parse_opt (int key, char *arg, struct argp_state *state)
             strncpy(client_interface, arg, sizeof(client_interface) - 1);
             break;
         case 's':
-            strncpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port) - 1);
+            //strncpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port) - 1);
+            log(LL_WARN, "The 'source' option is deprecated and will be ignored.\n");
             break;
         case 'p':
             listen_port = atoi(arg);
             break;
         case 'o':
-            strncpy(forward_interface, arg, sizeof(forward_interface) - 1);
+            //strncpy(forward_interface, arg, sizeof(forward_interface) - 1);
+            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.\n");
             break;
         case 't':
             strncpy(forward_host_port, arg, sizeof(forward_host_port) - 1);
             break;
         case 'r':
-            server_local_port = atoi(arg);
+            //server_local_port = atoi(arg);
+            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.\n");
+            break;
+        case 'b':
+            strncpy(static_bindings, arg, sizeof(static_bindings) - 1);
             break;
         case 'k':
             strncpy(xor_key, arg, sizeof(xor_key));
@@ -237,18 +249,19 @@ parse_opt (int key, char *arg, struct argp_state *state)
 static const struct argp_option options[] = {
     { "config", 'c', "<config_file>", 0, "read configuration from file (can be used instead of the rest arguments)", .group = 0 },
     { "source-if", 'i', "<ip>", 0, "source interface to listen on (optional, default - 0.0.0.0, e.g. all)", .group = 1 },
-    { "source", 's', "<ip>:<port>", 0, "source client address and port (optional, default - auto, dynamic)", .group = 2 },
+    { "source", 's', "<ip>:<port>", OPTION_HIDDEN, "source client address and port (optional, default - auto, dynamic)", .group = 2 },
     { "source-lport", 'p', "<port>", 0, "source port to listen", .group = 3 },
-    { "target-if", 'o', "<ip>", 0, "target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
+    { "target-if", 'o', "<ip>", OPTION_HIDDEN, "target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
     { "target", 't', "<ip>:<port>", 0, "target IP and port", .group = 5 },
-    { "target-lport", 'r', "<port>", 0, "target port to listen (optional, default - random)", .group = 6 },
+    { "target-lport", 'r', "<port>", OPTION_HIDDEN, "target port to listen (optional, default - random)", .group = 6 },
     { "key", 'k', "<key>", 0, "key to XOR the data", .group = 7 },
-    { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "0 - ERRORS (critical errors only)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "1 - WARNINGS (important messages: startup and shutdown messages)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "2 - INFO (informational messages: status messages, connection established, etc.)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "3 - DEBUG (detailed debug messages)", .group = 8 },
-    { " ", 0, 0, OPTION_DOC , "4 - TRACE (very detailed debug messages, including packet dumps)", .group = 8 },
+    { "static-bindings", 'b', "<ip>:<port>:<port>,...", 0, "comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>", .group = 8 },
+    { "verbose", 'v', "<0-4>", 0, "verbosity level (optional, default - 2)", .group = 9 },
+    { " ", 0, 0, OPTION_DOC , "0 - ERRORS (critical errors only)", .group = 9 },
+    { " ", 0, 0, OPTION_DOC , "1 - WARNINGS (important messages: startup and shutdown messages)", .group = 9 },
+    { " ", 0, 0, OPTION_DOC , "2 - INFO (informational messages: status messages, connection established, etc.)", .group = 9 },
+    { " ", 0, 0, OPTION_DOC , "3 - DEBUG (detailed debug messages)", .group = 9 },
+    { " ", 0, 0, OPTION_DOC , "4 - TRACE (very detailed debug messages, including packet dumps)", .group = 9 },
     { 0 }
 };
 
@@ -402,8 +415,9 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         free(client_entry);
         return NULL;
     }
+    // Set the server address to the specified one
     connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
-    // Get the assigned port number
+    // Get the assigned port number    
     socklen_t our_addr_len = sizeof(client_entry->our_addr);
     if (getsockname(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, &our_addr_len) == -1) {
         serror("failed to get socket port number");
@@ -424,6 +438,66 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
 #endif
 
     HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
+
+    log(LL_DEBUG, "Added binding %s:%d:%d\n", 
+        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+        ntohs(client_entry->our_addr.sin_port));
+
+    return client_entry;
+}
+
+static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
+    if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client\n", MAX_CLIENTS);
+        return NULL;
+    }
+    client_entry_t * client_entry = malloc(sizeof(client_entry_t));
+    if (!client_entry) {
+        log(LL_ERROR, "Failed to allocate memory for client entry\n");
+        return NULL;
+    }
+    memset(client_entry, 0, sizeof(client_entry_t));
+    memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
+    client_entry->server_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_entry->server_sock < 0) {
+        serror("Failed to create server socket for client");
+        free(client_entry);
+        return NULL;
+    }
+    // Bind the socket to the specified local port
+    client_entry->our_addr.sin_family = AF_INET;
+    client_entry->our_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
+    client_entry->our_addr.sin_port = htons(local_port);
+    // Set the local port number
+    if (bind(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, sizeof(client_entry->our_addr)) < 0) {
+        serror("Failed to bind server socket for client");
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
+    }
+    // Set the server address to the specified one
+    connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
+
+#ifdef USE_EPOLL    
+    struct epoll_event e = {
+        .events = EPOLLIN,
+        .data.ptr = client_entry
+    };
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_entry->server_sock, &e) != 0) {
+        serror("epoll_ctl for client socket");
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
+    }
+#endif
+
+    client_entry->is_static = 1;
+
+    HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
+
+    log(LL_DEBUG, "Added static binding %s:%d:%d\n", 
+        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+        ntohs(client_entry->our_addr.sin_port));
 
     return client_entry;
 }
@@ -447,7 +521,7 @@ int main(int argc, char *argv[]) {
     int forward_port = -1;
     int key_length = 0;
     unsigned long s_listen_addr_client = INADDR_ANY;
-    unsigned long s_listen_addr_forward = INADDR_ANY;
+    //unsigned long s_listen_addr_forward = INADDR_ANY;
     struct timespec now, last_cleanup_time;
 
 #ifdef USE_EPOLL
@@ -521,17 +595,21 @@ int main(int argc, char *argv[]) {
     if (client_interface[0]) {
         s_listen_addr_client = inet_addr(client_interface);
     }
+    /*
     if (forward_interface[0]) {
         s_listen_addr_forward = inet_addr(forward_interface);
     }
+    */
     if (s_listen_addr_client == INADDR_NONE) {
         log(LL_ERROR, "Invalid source interface: %s\n", client_interface);
         exit(EXIT_FAILURE);
     }
+    /*
     if (s_listen_addr_forward == INADDR_NONE) {
         log(LL_ERROR, "Invalid target interface: %s\n", forward_interface);
         exit(EXIT_FAILURE);
     }
+    */
     if (verbose_str[0]) {
         verbose = atoi(verbose_str);
         if (verbose < 0 || verbose > 4) {
@@ -546,7 +624,7 @@ int main(int argc, char *argv[]) {
 
     // Create listening socket
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        serror("source socket");
+        serror("can't create source socket");
         exit(EXIT_FAILURE);
     }
 
@@ -556,7 +634,7 @@ int main(int argc, char *argv[]) {
     listen_addr.sin_port = htons(listen_port);
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        serror("source socket bind");
+        serror("can't bind source socket");
         FAILURE();
     }
     log(LL_WARN, "Listening on port %s:%d for source\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
@@ -580,60 +658,70 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    // Create forwarding socket if fixed port is used
-    // TODO
-    /*
-    if (server_local_port) {
-        if ((forward_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-            serror("target socket");
-            FAILURE();
-        }
-
-        // Create a client address for the forward socket
-        memset(&forward_client_addr, 0, sizeof(forward_client_addr));
-        forward_client_addr.sin_family = AF_INET;
-        forward_client_addr.sin_addr.s_addr = s_listen_addr_forward;
-        forward_client_addr.sin_port = server_local_port ? htons(server_local_port) : 0;
-
-        if (bind(forward_sock, (struct sockaddr *)&forward_client_addr, sizeof(forward_client_addr)) < 0) {
-            serror("target socket bind");
-            FAILURE();
-        }
-
-        // Get the assigned port number
-        socklen_t forward_client_addr_len = sizeof(forward_client_addr);
-        if (getsockname(forward_sock, (struct sockaddr *)&forward_client_addr, &forward_client_addr_len) == -1) {
-            serror("failed to get socket port number");
-            FAILURE();
-        }
-        log(LL_WARN, "Listening on port %s:%d for target\n", inet_ntoa(forward_client_addr.sin_addr), ntohs(forward_client_addr.sin_port));
-
-        struct epoll_event ev = {
-            .events = EPOLLIN,
-            .data.fd = listen_sock
-        };
-        if (epoll_ctl(epfd, EPOLL_CTL_ADD, forward_sock, &ev) != 0) {
-            serror("epoll_ctl for forward_sock");
-            FAILURE();
-        }
-    }
-    */
-
-    // Set up forward address
+    /* Set up forward address */
     memset(&forward_addr, 0, sizeof(forward_addr));
     forward_addr.sin_family = AF_INET;
     struct hostent *host = gethostbyname(forward_host);
     if (host == NULL) {
-        serror("can't resolve hostname");
+        serror("can't resolve hostname '%s'", forward_host);
         FAILURE();
     }
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
     forward_addr.sin_port = htons(forward_port);
 
+    /* Add static bindings if provided */
+    if (static_bindings[0]) {
+        // Parse static bindings
+        char *binding = strtok(static_bindings, ",");
+        while (binding) {
+            // Trim leading and trailing spaces
+            while (strlen(binding) && (binding[0] == ' ' || binding[0] == '\t' || binding[0] == '\r' || binding[0] == '\n')) {
+                binding++;
+            }
+            char *colon1 = strchr(binding, ':');
+            if (!colon1) {
+                log(LL_ERROR, "Invalid static binding format: %s\n", binding);
+                exit(EXIT_FAILURE);
+            }
+            *colon1 = 0;
+            char *colon2 = strchr(colon1 + 1, ':');
+            if (!colon2) {
+                log(LL_ERROR, "Invalid static binding format: %s\n", binding);
+                exit(EXIT_FAILURE);
+            }
+            *colon2 = 0;
+
+            struct sockaddr_in client_addr = {0};
+            client_addr.sin_family = AF_INET;
+            struct hostent *host = gethostbyname(binding);
+            if (host == NULL) {
+                serror("can't resolve hostname '%s', binding");
+                FAILURE();
+            }
+            client_addr.sin_addr = *(struct in_addr *)host->h_addr;
+            client_addr.sin_port = htons(atoi(colon1 + 1));
+            uint16_t local_port = atoi(colon2 + 1);
+
+            if (client_addr.sin_port <= 0 || local_port <= 0) {
+                log(LL_ERROR, "Invalid static binding port: %s\n", binding);
+                FAILURE();
+            }
+
+            if (!new_client_entry_static(&client_addr, &forward_addr, local_port)) {
+                log(LL_ERROR, "Failed to create static binding for %s:%d:%d\n", 
+                    inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), local_port);
+                FAILURE();
+            }
+
+            binding = strtok(NULL, ",");
+        }
+    }
+
     log(LL_WARN, "WireGuard obfuscator successfully started\n");
 
     clock_gettime(CLOCK_MONOTONIC, &last_cleanup_time);
 
+    /* Main loop */
     while (1) {
 #ifdef USE_EPOLL
         int events_n = epoll_wait(epfd, events, MAX_EVENTS, POLL_TIMEOUT);
@@ -673,7 +761,8 @@ int main(int argc, char *argv[]) {
         for (int e = 0; e < nfds; e++) if (pollfds[e].revents & POLLIN) {
             if (pollfds[e].fd == listen_sock) {
 #endif
-                struct sockaddr_in sender_addr;
+                /* *** Handle incoming data from the clients *** */
+                struct sockaddr_in sender_addr = {0};
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
@@ -737,8 +826,40 @@ int main(int argc, char *argv[]) {
                         }
                     }
 
+                    client_entry->handshake_direction = HANDSHAKE_DIRECTION_CLIENT_TO_SERVER;
                     client_entry->last_handshake_request_time = now;
-                } else if (!client_entry || !client_entry->handshaked) {
+                }
+                // Is it handshake response?
+                else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
+                    if (!client_entry) {
+                        log(LL_DEBUG, "Received WireGuard handshake response from %s:%d, but no connection entry found for this client\n",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        continue;
+                    }
+
+                    log(LL_INFO, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+                        forward_host, forward_port,
+                        length, obfuscated ? "yes" : "no");
+
+                    // Check handshake timeout
+                    if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
+                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
+                        continue;
+                    }
+
+                    if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_SERVER_TO_CLIENT) {
+                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to server-to-client\n",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                            forward_host, forward_port);
+                        continue;;
+                    }
+
+                    client_entry->handshaked = 1;
+                    client_entry->last_handshake_time = now;
+                }
+                // If it's not a handshake or handshake response, connection is not established yet
+                else if (!client_entry || !client_entry->handshaked) {
                     log(LL_DEBUG, "Ignoring data from %s:%d to %s:%d until the handshake is completed\n",
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         forward_host, forward_port);
@@ -769,6 +890,7 @@ int main(int argc, char *argv[]) {
                 sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
                 client_entry->last_activity_time = now;
             } else { // if (event->data.fd == listen_sock)
+                /* *** Handle data from the server *** */
 #ifdef USE_EPOLL
                 client_entry_t *client_entry = event->data.ptr;
 #else
@@ -812,7 +934,19 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
+                // Is it handshake?
+                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
+                    log(LL_INFO, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                        forward_host, forward_port,
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+                        length, 
+                        obfuscated ? "yes" : "no");
+
+                    client_entry->handshake_direction = HANDSHAKE_DIRECTION_SERVER_TO_CLIENT;
+                    client_entry->last_handshake_request_time = now;
+                }
+                // Is it handshake response?
+                else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     log(LL_INFO, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
                         forward_host, forward_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
@@ -824,9 +958,18 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
 
+                    if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_CLIENT_TO_SERVER) {
+                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to client-to-server\n",
+                            forward_host, forward_port,
+                            inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                        continue;
+                    }
+
                     client_entry->handshaked = 1;
                     client_entry->last_handshake_time = now;
-                } else if (!client_entry->handshaked) {
+                }
+                // If it's not a handshake or handshake response, connection is not established yet
+                else if (!client_entry->handshaked) {
                     log(LL_DEBUG, "Ignoring response from %s:%d to %s:%d until the handshake is completed\n",
                         forward_host, forward_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
@@ -861,12 +1004,14 @@ int main(int argc, char *argv[]) {
         } // for (int e = 0; e < events_n; e++)
 
         if (now.tv_sec - last_cleanup_time.tv_sec >= CLEANUP_INTERVAL) {
-            // Cleanup old entries
+            /* *** Cleanup old entries *** */
             client_entry_t *current_entry, *tmp;
             HASH_ITER(hh, conn_table, current_entry, tmp) {
                 if (
-                    (now.tv_sec - current_entry->last_activity_time.tv_sec >= IDLE_TIMEOUT)
-                    || (!current_entry->handshaked && now.tv_sec - current_entry->last_handshake_request_time.tv_sec >= HANDSHAKE_TIMEOUT)
+                    (
+                        (now.tv_sec - current_entry->last_activity_time.tv_sec >= IDLE_TIMEOUT)
+                        || (!current_entry->handshaked && now.tv_sec - current_entry->last_handshake_request_time.tv_sec >= HANDSHAKE_TIMEOUT)
+                    ) && !current_entry->is_static
                 ) {
                     log(LL_DEBUG, "Removing idle client %s:%d\n", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
 #ifdef USE_EPOLL
