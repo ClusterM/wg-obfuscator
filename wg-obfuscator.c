@@ -14,7 +14,7 @@
 #include "commit.h"
 
 #define log(level, fmt, ...) { if (verbose >= level)            \
-    fprintf(stderr, "[%s][%c] " fmt, section_name,              \
+    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,              \
     (                                                           \
           level == LL_ERROR ? 'E'                               \
         : level == LL_WARN  ? 'W'                               \
@@ -66,7 +66,7 @@ static void read_config_file(char *filename)
     char line[256];
     FILE *config_file = fopen(filename, "r");
     if (config_file == NULL) {
-        serror("can't open config file");
+        perror("Can't open config file");
         exit(EXIT_FAILURE);
     }
     int listen_port_set = 0;
@@ -113,6 +113,7 @@ static void read_config_file(char *filename)
             memset(forward_host_port, 0, sizeof(forward_host_port));
             memset(xor_key, 0, sizeof(xor_key));
             memset(client_interface, 0, sizeof(client_interface));
+            memset(static_bindings, 0, sizeof(static_bindings));
             memset(verbose_str, 0, sizeof(verbose_str));
             verbose = 2;
             listen_port_set = 0;
@@ -133,7 +134,7 @@ static void read_config_file(char *filename)
         }
         char *value = strtok(NULL, "=");
         if (value == NULL) {
-            log(LL_ERROR, "Invalid configuration line: %s\n", line);
+            log(LL_ERROR, "Invalid configuration line: %s", line);
             exit(EXIT_FAILURE);
         }
         // Trim leading and trailing spaces
@@ -144,7 +145,7 @@ static void read_config_file(char *filename)
             value[strlen(value) - 1] = 0;
         }
         if (value == NULL) {
-            log(LL_ERROR, "Invalid configuration line: %s\n", line);
+            log(LL_ERROR, "Invalid configuration line: %s", line);
             exit(EXIT_FAILURE);
         }
 
@@ -166,36 +167,40 @@ static void read_config_file(char *filename)
         }
          else if (strcmp(key, "target-if") == 0) {
             //strncpy(forward_interface, value, sizeof(forward_interface) - 1);
-            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.");
             something_set = 1;
         } else if (strcmp(key, "source") == 0) {
             //strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
-            log(LL_WARN, "The 'source' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
             something_set = 1;
         } else if (strcmp(key, "target-lport") == 0) {
             //server_local_port = atoi(value);
-            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
             something_set = 1;
-        } 
+        }
+        else if (strcmp(key, "static-bindings") == 0) {
+            strncpy(static_bindings, value, sizeof(static_bindings) - 1);
+            something_set = 1;
+        }
         else if (strcmp(key, "verbose") == 0) {
             strncpy(verbose_str, value, sizeof(verbose_str) - 1);
             something_set = 1;
         } else {
-            log(LL_ERROR, "Unknown configuration key: '%s'\n", key);
+            log(LL_ERROR, "Unknown configuration key: %s", key);
             exit(EXIT_FAILURE);
         }
     }
     fclose(config_file);
     if (!listen_port_set) {
-        log(LL_ERROR, "'source-lport' is not set in the configuration file\n");
+        log(LL_ERROR, "'source-lport' is not set in the configuration file");
         exit(EXIT_FAILURE);
     }
     if (!forward_host_port_set) {
-        log(LL_ERROR, "'target' is not set in the configuration file\n");
+        log(LL_ERROR, "'target' is not set in the configuration file");
         exit(EXIT_FAILURE);
     }
     if (!xor_key_set) {
-        log(LL_ERROR, "'key' is not set in the configuration file\n");
+        log(LL_ERROR, "'key' is not set in the configuration file");
         exit(EXIT_FAILURE);
     }    
 }
@@ -213,22 +218,19 @@ parse_opt (int key, char *arg, struct argp_state *state)
             strncpy(client_interface, arg, sizeof(client_interface) - 1);
             break;
         case 's':
-            //strncpy(client_fixed_addr_port, arg, sizeof(client_fixed_addr_port) - 1);
-            log(LL_WARN, "The 'source' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
             break;
         case 'p':
             listen_port = atoi(arg);
             break;
         case 'o':
-            //strncpy(forward_interface, arg, sizeof(forward_interface) - 1);
-            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.");
             break;
         case 't':
             strncpy(forward_host_port, arg, sizeof(forward_host_port) - 1);
             break;
         case 'r':
-            //server_local_port = atoi(arg);
-            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.\n");
+            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
             break;
         case 'b':
             strncpy(static_bindings, arg, sizeof(static_bindings) - 1);
@@ -390,7 +392,7 @@ static void signal_handler(int signal) {
                 close(epfd);
             }
 #endif
-            log(LL_WARN, "Stopped.\n");
+            log(LL_WARN, "Stopped.");
             break;
     }
     exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
@@ -399,12 +401,12 @@ static void signal_handler(int signal) {
 
 static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
     if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
-        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client\n", MAX_CLIENTS);
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", MAX_CLIENTS);
         return NULL;
     }
     client_entry_t * client_entry = malloc(sizeof(client_entry_t));
     if (!client_entry) {
-        log(LL_ERROR, "Failed to allocate memory for client entry\n");
+        log(LL_ERROR, "Failed to allocate memory for client entry");
         return NULL;
     }
     memset(client_entry, 0, sizeof(client_entry_t));
@@ -420,7 +422,7 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
     // Get the assigned port number    
     socklen_t our_addr_len = sizeof(client_entry->our_addr);
     if (getsockname(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, &our_addr_len) == -1) {
-        serror("failed to get socket port number");
+        serror("Failed to get socket port number");
         FAILURE();
     }
 
@@ -437,9 +439,9 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
     }
 #endif
 
-    HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
+    HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
 
-    log(LL_DEBUG, "Added binding %s:%d:%d\n", 
+    log(LL_DEBUG, "Added binding: %s:%d:%d", 
         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
         ntohs(client_entry->our_addr.sin_port));
 
@@ -448,12 +450,22 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
 
 static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
     if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
-        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client\n", MAX_CLIENTS);
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", MAX_CLIENTS);
         return NULL;
     }
+
+    // Check if such client already exists
+    client_entry_t *existing_entry;
+    HASH_FIND(hh, conn_table, client_addr, sizeof(*client_addr), existing_entry);
+    if (existing_entry) {
+        log(LL_ERROR, "Binding with client %s:%d already exists", 
+            inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
+        return NULL;
+    }
+
     client_entry_t * client_entry = malloc(sizeof(client_entry_t));
     if (!client_entry) {
-        log(LL_ERROR, "Failed to allocate memory for client entry\n");
+        log(LL_ERROR, "Failed to allocate memory for client entry");
         return NULL;
     }
     memset(client_entry, 0, sizeof(client_entry_t));
@@ -466,11 +478,13 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
     }
     // Bind the socket to the specified local port
     client_entry->our_addr.sin_family = AF_INET;
-    client_entry->our_addr.sin_addr.s_addr = INADDR_ANY; // Bind to any address
+    // TODO: ability to bind to a specific address
+    client_entry->our_addr.sin_addr.s_addr = INADDR_ANY;
     client_entry->our_addr.sin_port = htons(local_port);
     // Set the local port number
     if (bind(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, sizeof(client_entry->our_addr)) < 0) {
-        serror("Failed to bind server socket for client");
+        serror("Failed to bind server socket to %s:%d", 
+            inet_ntoa(client_entry->our_addr.sin_addr), local_port);
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
@@ -493,11 +507,11 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
 
     client_entry->is_static = 1;
 
-    HASH_ADD(hh, conn_table, client_addr, sizeof(client_entry->client_addr), client_entry);
+    HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
 
-    log(LL_DEBUG, "Added static binding %s:%d:%d\n", 
-        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
-        ntohs(client_entry->our_addr.sin_port));
+    // log(LL_DEBUG, "Added static binding: %s:%d:%d", 
+    //     inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+    //     ntohs(client_entry->our_addr.sin_port));
 
     return client_entry;
 }
@@ -532,88 +546,58 @@ int main(int argc, char *argv[]) {
 
     // Parse command line arguments
     if (argc == 1) {
-        log(LL_ERROR, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
+        log(LL_ERROR, "No arguments provided, use \"%s --help\" command for usage information", argv[0]);
         exit(EXIT_FAILURE);
     }
     if (argp_parse(&argp, argc, argv, 0, 0, 0) != 0) {
-        log(LL_ERROR, "Failed to parse command line arguments\n");
+        log(LL_ERROR, "Failed to parse command line arguments");
         exit(EXIT_FAILURE);
     }
   
     // Check the parameters
     key_length = strlen(xor_key);
+
     if (listen_port < 0) {
-        log(LL_ERROR, "'source-lport' is not set\n");
+        log(LL_ERROR, "'source-lport' is not set");
         exit(EXIT_FAILURE);
     }
-    /*
-    if (client_fixed_addr_port[0]) {
-        char *port_delimiter = strchr(client_fixed_addr_port, ':');
-        if (port_delimiter == NULL) {
-            log(LL_ERROR, "Invalid source ip:port format: %s\n", client_fixed_addr_port);
-            exit(EXIT_FAILURE);
-        }
-        *port_delimiter = 0;
-        last_sender_addr.sin_addr.s_addr = inet_addr(client_fixed_addr_port);
-        if (last_sender_addr.sin_addr.s_addr == INADDR_NONE) {
-            log(LL_ERROR, "Invalid source ip: %s\n", client_fixed_addr_port);
-            exit(EXIT_FAILURE);
-        }
-        last_sender_addr.sin_port = htons(atoi(port_delimiter + 1));
-        if (last_sender_addr.sin_port <= 0) {
-            log(LL_ERROR, "Invalid source port: %s\n", port_delimiter + 1);
-            exit(EXIT_FAILURE);
-        }
-        last_sender_addr.sin_family = AF_INET;
-        log(LL_INFO, "Source: %s:%d\n", inet_ntoa(last_sender_addr.sin_addr), ntohs(last_sender_addr.sin_port));
-    } else {
-        log(LL_INFO, "Source: any/auto\n");
-    }
-    */  
+ 
     if (!forward_host_port[0]) {
-        log(LL_ERROR, "'target' is not set\n");
+        log(LL_ERROR, "'target' is not set");
         exit(EXIT_FAILURE);
     } else {
         char *port_delimiter = strchr(forward_host_port, ':');
         if (port_delimiter == NULL) {
-            log(LL_ERROR, "Invalid target host:port format: %s\n", forward_host_port);
+            log(LL_ERROR, "Invalid target host:port format: %s", forward_host_port);
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
         strncpy(forward_host, forward_host_port, sizeof(forward_host) - 1);
         forward_port = atoi(port_delimiter + 1);
         if (forward_port <= 0) {
-            log(LL_ERROR, "Invalid target port: %s\n", port_delimiter + 1);
+            log(LL_ERROR, "Invalid target port: %s", port_delimiter + 1);
             exit(EXIT_FAILURE);
         }
-        log(LL_INFO, "Target: %s:%d\n", forward_host, forward_port);
-    } 
+    }
+
     if (key_length == 0) {
-        log(LL_ERROR, "Key is not set\n");
+        log(LL_ERROR, "Key is not set");
         exit(EXIT_FAILURE);
     }
+
     if (client_interface[0]) {
         s_listen_addr_client = inet_addr(client_interface);
     }
-    /*
-    if (forward_interface[0]) {
-        s_listen_addr_forward = inet_addr(forward_interface);
-    }
-    */
+
     if (s_listen_addr_client == INADDR_NONE) {
-        log(LL_ERROR, "Invalid source interface: %s\n", client_interface);
+        log(LL_ERROR, "Invalid source interface: %s", client_interface);
         exit(EXIT_FAILURE);
     }
-    /*
-    if (s_listen_addr_forward == INADDR_NONE) {
-        log(LL_ERROR, "Invalid target interface: %s\n", forward_interface);
-        exit(EXIT_FAILURE);
-    }
-    */
+
     if (verbose_str[0]) {
         verbose = atoi(verbose_str);
         if (verbose < 0 || verbose > 4) {
-            log(LL_ERROR, "Invalid verbosity level: %s\n", verbose_str);
+            log(LL_ERROR, "Invalid verbosity level: %s", verbose_str);
             exit(EXIT_FAILURE);
         }
     }
@@ -624,7 +608,7 @@ int main(int argc, char *argv[]) {
 
     // Create listening socket
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        serror("can't create source socket");
+        serror("Can't create source socket to listen");
         exit(EXIT_FAILURE);
     }
 
@@ -634,10 +618,11 @@ int main(int argc, char *argv[]) {
     listen_addr.sin_port = htons(listen_port);
 
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        serror("can't bind source socket");
+        serror("Failed to bind source socket to %s:%d", 
+            inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
         FAILURE();
     }
-    log(LL_WARN, "Listening on port %s:%d for source\n", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
+    log(LL_WARN, "Listening on port %s:%d for source", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
 #ifdef USE_EPOLL
     epfd = epoll_create1(0);
@@ -663,11 +648,17 @@ int main(int argc, char *argv[]) {
     forward_addr.sin_family = AF_INET;
     struct hostent *host = gethostbyname(forward_host);
     if (host == NULL) {
-        serror("can't resolve hostname '%s'", forward_host);
+        log(LL_ERROR, "Can't resolve hostname: %s", forward_host);
         FAILURE();
     }
+    log(LL_DEBUG, "Resolved target hostname '%s' to %s", forward_host, inet_ntoa(*(struct in_addr *)host->h_addr));
     forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
+    if (forward_port <= 0 || forward_port > 65535) {
+        log(LL_ERROR, "Invalid target port: %d", forward_port);
+        FAILURE();
+    }
     forward_addr.sin_port = htons(forward_port);
+    log(LL_WARN, "Target: %s:%d", forward_host, forward_port);
 
     /* Add static bindings if provided */
     if (static_bindings[0]) {
@@ -680,44 +671,56 @@ int main(int argc, char *argv[]) {
             }
             char *colon1 = strchr(binding, ':');
             if (!colon1) {
-                log(LL_ERROR, "Invalid static binding format: %s\n", binding);
+                log(LL_ERROR, "Invalid static binding format: %s", binding);
+                exit(EXIT_FAILURE);
+            }
+            char *colon2 = strchr(colon1 + 1, ':');
+            if (!colon2) {
+                log(LL_ERROR, "Invalid static binding format: %s", binding);
                 exit(EXIT_FAILURE);
             }
             *colon1 = 0;
-            char *colon2 = strchr(colon1 + 1, ':');
-            if (!colon2) {
-                log(LL_ERROR, "Invalid static binding format: %s\n", binding);
-                exit(EXIT_FAILURE);
-            }
             *colon2 = 0;
 
             struct sockaddr_in client_addr = {0};
             client_addr.sin_family = AF_INET;
             struct hostent *host = gethostbyname(binding);
             if (host == NULL) {
-                serror("can't resolve hostname '%s', binding");
+                log(LL_ERROR, "Can't resolve hostname '%s' for static binding '%s:%s:%s'", 
+                    binding, binding, colon1 + 1, colon2 + 1);
                 FAILURE();
             }
+            log(LL_DEBUG, "Resolved static binding hostname '%s' to %s", binding, inet_ntoa(*(struct in_addr *)host->h_addr));
             client_addr.sin_addr = *(struct in_addr *)host->h_addr;
-            client_addr.sin_port = htons(atoi(colon1 + 1));
-            uint16_t local_port = atoi(colon2 + 1);
-
-            if (client_addr.sin_port <= 0 || local_port <= 0) {
-                log(LL_ERROR, "Invalid static binding port: %s\n", binding);
+            int remote_port = atoi(colon1 + 1);
+            if (remote_port <= 0 || remote_port > 65535) {
+                log(LL_ERROR, "Invalid port '%s' for static binding '%s:%s:%s'",
+                    colon1 + 1, binding, colon1 + 1, colon2 + 1);
                 FAILURE();
             }
+            int local_port = atoi(colon2 + 1);
+            if (local_port <= 0 || local_port > 65535) {
+                log(LL_ERROR, "Invalid port '%s' for static binding '%s:%s:%s'",
+                    colon2 + 1, binding, colon1 + 1, colon2 + 1);
+                FAILURE();
+            }
+            client_addr.sin_port = htons(remote_port);
 
             if (!new_client_entry_static(&client_addr, &forward_addr, local_port)) {
-                log(LL_ERROR, "Failed to create static binding for %s:%d:%d\n", 
-                    inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), local_port);
+                log(LL_ERROR, "Failed to create static binding: %s:%s:%s",
+                    binding, colon1 + 1, colon2 + 1);
                 FAILURE();
             }
+
+            log(LL_WARN, "Added static binding: %s:%d <-> %d:obfuscator:%d <-> %s:%d", 
+                binding, remote_port, listen_port,
+                local_port, forward_host, forward_port);
 
             binding = strtok(NULL, ",");
         }
     }
 
-    log(LL_WARN, "WireGuard obfuscator successfully started\n");
+    log(LL_WARN, "WireGuard obfuscator successfully started");
 
     clock_gettime(CLOCK_MONOTONIC, &last_cleanup_time);
 
@@ -737,7 +740,7 @@ int main(int argc, char *argv[]) {
         client_entry_t *entry, *tmp;
         HASH_ITER(hh, conn_table, entry, tmp) {
             if (nfds >= MAX_CLIENTS) {
-                log(LL_DEBUG, "Too many clients, cannot add more\n");
+                log(LL_DEBUG, "Too many clients, cannot add more");
                 break;
             }
             pollfds[nfds].fd = entry->server_sock;
@@ -770,7 +773,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 if (length < 4) {
-                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
+                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                     continue;
                 }
 
@@ -781,7 +784,7 @@ int main(int argc, char *argv[]) {
                 uint8_t version = OBFUSCATION_VERSION;
 
                 if (verbose >= LL_TRACE) {
-                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)\n",
+                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)",
                         length,
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         forward_host, forward_port,
@@ -801,14 +804,15 @@ int main(int argc, char *argv[]) {
                     // decode
                     length = decode(buffer, length, xor_key, key_length, &version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        log(LL_ERROR, "Failed to decode packet from %s:%d (too short, length=%d)",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
                 }
 
                 // Is it handshake?
                 if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
-                    log(LL_INFO, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                    log(LL_DEBUG, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         forward_host, forward_port,
                         length, 
@@ -821,7 +825,7 @@ int main(int argc, char *argv[]) {
                         }
                         client_entry->version = version;
                         if (version < OBFUSCATION_VERSION) {
-                            log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
+                            log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
                                 OBFUSCATION_VERSION, version);
                         }
                     }
@@ -832,24 +836,24 @@ int main(int argc, char *argv[]) {
                 // Is it handshake response?
                 else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     if (!client_entry) {
-                        log(LL_DEBUG, "Received WireGuard handshake response from %s:%d, but no connection entry found for this client\n",
+                        log(LL_DEBUG, "Received WireGuard handshake response from %s:%d, but no connection entry found for this client",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
                         continue;
                     }
 
-                    log(LL_INFO, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                    log(LL_DEBUG, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         forward_host, forward_port,
                         length, obfuscated ? "yes" : "no");
 
                     // Check handshake timeout
                     if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
-                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
+                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout");
                         continue;
                     }
 
                     if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_SERVER_TO_CLIENT) {
-                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to server-to-client\n",
+                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to server-to-client",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                             forward_host, forward_port);
                         continue;;
@@ -857,10 +861,13 @@ int main(int argc, char *argv[]) {
 
                     client_entry->handshaked = 1;
                     client_entry->last_handshake_time = now;
+                    log(LL_INFO, "Handshake established with %s:%d to %s:%d (direct)",
+                        inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
+                        forward_host, forward_port);
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
                 else if (!client_entry || !client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring data from %s:%d to %s:%d until the handshake is completed\n",
+                    log(LL_DEBUG, "Ignoring data from %s:%d to %s:%d until the handshake is completed",
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         forward_host, forward_port);
                     continue;
@@ -870,7 +877,8 @@ int main(int argc, char *argv[]) {
                     // If the packet is not obfuscated, we need to encode it
                     length = encode(buffer, length, xor_key, key_length, client_entry->version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        log(LL_ERROR, "Failed to encode packet from %s:%d (too short, length=%d)",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
                 }
@@ -902,14 +910,14 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 if (length < 4) {
-                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring\n", forward_host, forward_port, length);
+                    log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", forward_host, forward_port, length);
                     continue;
                 }
 
                 uint8_t obfuscated = is_obfuscated(buffer);
 
                 if (verbose >= LL_TRACE) {
-                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)\n",
+                    log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)",
                         length,
                         forward_host, forward_port, 
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
@@ -929,14 +937,14 @@ int main(int argc, char *argv[]) {
                     // decode
                     length = decode(buffer, length, xor_key, key_length, &client_entry->version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to decode packet from %s:%d\n", forward_host, forward_port);
+                        log(LL_ERROR, "Failed to decode packet from %s:%d", forward_host, forward_port);
                         continue;
                     }
                 }
 
                 // Is it handshake?
                 if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
-                    log(LL_INFO, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                    log(LL_DEBUG, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         forward_host, forward_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, 
@@ -947,19 +955,19 @@ int main(int argc, char *argv[]) {
                 }
                 // Is it handshake response?
                 else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
-                    log(LL_INFO, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)\n",
+                    log(LL_DEBUG, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         forward_host, forward_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, obfuscated ? "yes" : "no");
 
                     // Check handshake timeout
                     if (now.tv_sec - client_entry->last_handshake_request_time.tv_sec > HANDSHAKE_TIMEOUT) {
-                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout\n");
+                        log(LL_DEBUG, "Ignoring WireGuard handshake response, handshake timeout");
                         continue;
                     }
 
                     if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_CLIENT_TO_SERVER) {
-                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to client-to-server\n",
+                        log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to client-to-server",
                             forward_host, forward_port,
                             inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
                         continue;
@@ -967,10 +975,13 @@ int main(int argc, char *argv[]) {
 
                     client_entry->handshaked = 1;
                     client_entry->last_handshake_time = now;
+                    log(LL_INFO, "Handshake established with %s:%d to %s:%d (reverse)",
+                        inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
+                        forward_host, forward_port);
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
                 else if (!client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring response from %s:%d to %s:%d until the handshake is completed\n",
+                    log(LL_DEBUG, "Ignoring response from %s:%d to %s:%d until the handshake is completed",
                         forward_host, forward_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
                     continue;
@@ -980,7 +991,7 @@ int main(int argc, char *argv[]) {
                     // If the packet is not obfuscated, we need to encode it
                     length = encode(buffer, length, xor_key, key_length, client_entry->version);
                     if (length < 4) {
-                        log(LL_ERROR, "Failed to encode packet from %s:%d\n", forward_host, forward_port);
+                        log(LL_ERROR, "Failed to encode packet from %s:%d", forward_host, forward_port);
                         continue;
                     }
                 }
@@ -1013,7 +1024,7 @@ int main(int argc, char *argv[]) {
                         || (!current_entry->handshaked && now.tv_sec - current_entry->last_handshake_request_time.tv_sec >= HANDSHAKE_TIMEOUT)
                     ) && !current_entry->is_static
                 ) {
-                    log(LL_DEBUG, "Removing idle client %s:%d\n", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    log(LL_DEBUG, "Removing idle client %s:%d", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
 #ifdef USE_EPOLL
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
 #endif
