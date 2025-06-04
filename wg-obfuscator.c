@@ -634,19 +634,19 @@ int main(int argc, char *argv[]) {
 
     if (verbose >= LL_WARN) {
 #ifdef COMMIT
-        log(LL_INFO, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION);
+    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
-        log(LL_INFO, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")");
+    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
 #endif
     }
 
     /* Parse command line arguments */
     if (argc == 1) {
-        fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information", argv[0]);
+        fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
         exit(EXIT_FAILURE);
     }
     if (argp_parse(&argp, argc, argv, 0, 0, 0) != 0) {
-        fprintf(stderr, "Failed to parse command line arguments");
+        fprintf(stderr, "Failed to parse command line arguments\n");
         exit(EXIT_FAILURE);
     }
   

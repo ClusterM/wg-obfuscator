@@ -2,31 +2,51 @@
 
 WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data, making it significantly harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government tries to block or throttle WireGuard traffic.
 
+- [Feature overview](#feature-overview)
+- [Basic Concept](#basic-concept)
+- [Configuration](#configuration)
+  - [Two-Way Mode](#two-way-mode)
+- [How to Build and Install](#how-to-build-and-install)
+  - [Linux](#linux)
+  - [Windows](#windows)
+  - [macOS](#macos)
+  - [Android](#android)
+  - [Running Docker Container on Linux](#running-docker-container-on-linux)
+  - [Running Docker Container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
+- [Caveats and Recommendations](#caveats-and-recommendations)
+- [Credits](#credits)
+- [Support the Developer and the Project](#support-the-developer-and-the-project)
+
+
+## Feature overview
+
 What started as a quick-and-dirty solution just for personal use has grown into a fully-featured project with the following capabilities:
 
-* **Key-Based Obfuscation**  
+* **WireGuard-specific design**  
+  This obfuscator is purpose-built for the WireGuard protocol: it recognizes WireGuard packet types and actively monitors handshake success to ensure reliable operation.
+* **Key-based obfuscation**  
   Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
 * **Symmetric operation**  
   You can use the obfuscator on both ends of a WireGuard tunnel, or just one—it will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
-* **Packet Salting**  
+* **Packet salting**  
   Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
-* **Handshake Randomization**  
-  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes.
-* **Built-In NAT Table**  
+* **Handshake randomization**  
+  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
+* **Very fast and efficient**  
+  The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
+* **Built-in NAT table**  
   The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
-* **Static (Manual) Bindings / Two-Way Mode**  
+* **Static (manual) bindings / two-way mode**  
   You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
-* **Multi-Section Configuration Files**  
+* **Multi-section configuration files**  
   Supports both simple configuration files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single configuration file.
 * **Detailed and customizable logging**  
   Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
-* **Cross-Platform and Lightweight**  
+* **Cross-platform and lightweight**  
   Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
-* **Cross-compile ready**  
-  Easily portable and compilable on Linux, macOS, and Windows (MSYS2/MinGW, with automatic fallback to poll()).
 * **Very low dependency footprint**  
   No huge libraries or frameworks.
-* **Android Client Coming Soon?**  
+* **Android client coming soon?**  
   A native Android version of the obfuscator is planned, allowing you to obfuscate WireGuard traffic directly on Android devices (including phones, tablets, or Android TVs). This will make it possible to use the obfuscator together with mobile WireGuard clients or WireGuard running on smart TVs.
 
 
@@ -55,7 +75,7 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 ```
 
 In most cases, the obfuscator is used in a scenario where there is a clear separation between a server (with a static or public IP address) and clients (which may be behind NAT). We’ll focus on this setup here.
-If **both** ends have public IPs and can initiate connections to each other, see the section on ["Two-way mode"](##two-way-mode) below.
+If **both** ends have public IPs and can initiate connections to each other, see the section on ["Two-way mode"](#two-way-mode) below.
 
 Usually, the obfuscator is installed on the same device as your WireGuard client or server. In this setup, you configure WireGuard to connect to the obfuscator’s address and port (typically `127.0.0.1` and a custom port), while the *real* remote address and port are specified in the obfuscator’s configuration.
 
@@ -121,7 +141,7 @@ You can pass parameters to the obfuscator using a configuration file or command 
   Obfuscation key. Just string. Longer - better. Required, must be 1-255 characters long.
 * `static-bindings`  
   Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
-  (see ["Two-way mode"](##two-way-mode))
+  (see ["Two-way mode"](#two-way-mode))
 * `verbose`  
  Verbosity level, 0-4. Optional, default is 2.  
  0 - ERRORS (critical errors only)  
@@ -162,6 +182,8 @@ You can also pass parameters using command line arguments. For example:
 wg-obfuscator --source-lport 13255 --target 10.13.1.100:13255 --key test
 ```
 Type `wg-obfuscator.exe --help` for more information.
+
+Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
 
 
 ### Two-Way Mode
@@ -241,25 +263,25 @@ This allows the remote obfuscator to recognize which static mapping (and which l
 > In UDP, the source port matters for this association. The packet will always be sent *to* the port specified in `target`, but the source port (the third value in the static binding) tells the obfuscator which local port to use for sending.
 
 ```
-   ┌───────────────────────────┐         ┌───────────────────────────┐
-   │        Peer A (1.2.3.4)   │         │        Peer B (5.6.7.8)   │
-   │   ┌─────────────┐         │         │   ┌─────────────┐         │
-   │   │ WireGuard   │         │         │   │ WireGuard   │         │
-   │   │  (5555)     │         │         │   │  (6666)     │         │
-   │   └─────▲───────┘         │         │   └─────▲───────┘         │
-   │         │                 │         │         │                 │
-   │   ┌─────▼───────┐         │         │   ┌─────▼───────┐         │
-   │   │ Obfuscator  │         │         │   │ Obfuscator  │         │
-   │   │             │         │         │   │             │         │
-   │   │             │         │         │   │             │         │
-   │   │ source-lport│         │         │   │ source-lport│         │
-   │   │   15555     │         │         │   │   16666     │         │
-   │   │             │         │         │   │             │         │
-   │   │ static-bind.│         │         │   │ static-bind.│         │
-   │   │ 127.0.0.1:5555:7777   │         │   │ 1.2.3.4:7777:8888     │
-   │   └─────▼───────┘         │         │   └─────▼───────┘         │
-   │         │                 │         │         │                 │
-   └─────────┼─────────────────┘         └─────────┼─────────────────┘
+   ┌───────────────────────────┐             ┌───────────────────────────┐
+   │        Peer A (1.2.3.4)   │             │        Peer B (5.6.7.8)   │
+   │   ┌─────────────┐         │             │   ┌─────────────┐         │
+   │   │ WireGuard   │         │             │   │ WireGuard   │         │
+   │   │  (5555)     │         │             │   │  (6666)     │         │
+   │   └─────▲───────┘         │             │   └─────▲───────┘         │
+   │         │                 │             │         │                 │
+   │   ┌─────▼───────┐         │             │   ┌─────▼───────┐         │
+   │   │ Obfuscator  │         │             │   │ Obfuscator  │         │
+   │   │             │         │             │   │             │         │
+   │   │             │         │             │   │             │         │
+   │   │ source-lport│         │             │   │ source-lport│         │
+   │   │   15555     │         │             │   │   16666     │         │
+   │   │             │         │             │   │             │         │
+   │   │ static-bind.│         │             │   │ static-bind.│         │
+   │   │ 127.0.0.1:5555:7777   │             │   │ 1.2.3.4:7777:8888     │
+   │   └─────▼───────┘         │             │   └─────▼───────┘         │
+   │         │                 │             │         │                 │
+   └─────────┼─────────────────┘             └─────────┼─────────────────┘
              │                                         │
              │  UDP/obfuscated traffic                 │
              │                                         │
@@ -303,6 +325,8 @@ This allows the remote obfuscator to recognize which static mapping (and which l
 
 * Peer A’s obfuscator sees a packet coming from `5.6.7.8:8888`.
 * It checks its static bindings (`127.0.0.1:5555:7777`) and knows to deliver the packet to the local WireGuard instance on port `5555`.
+
+Packets sent from Peer B to Peer A follow the exact same steps, but in the reverse order.
 
 #### Summary
 
@@ -483,17 +507,32 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 
 * Replace `13255` and the IP as needed for your network.
 
-##### 9. Check logs
+##### 9. Enable container logging (one time)
 
 ```shell
-/container/print logs
+/system logging add topics=container
 ```
+
+##### 10. Restart the container
+
+```shell
+/container/stop [/container/find where name="wg-obfuscator"]
+/container/start [/container/find where name="wg-obfuscator"]
+```
+
+##### 11. Check logs
+```shell
+/log print where topics~"container"
+```
+You should see logs indicating the container has started successfully and is ready to process WireGuard traffic.
 
 **Notes:**
 
 * `container` package and device-mode are only needed once per router.
 * No external disk is required; image is small and uses internal storage.
 * See [MikroTik Containers Docs](https://help.mikrotik.com/docs/display/ROS/Containers) for advanced usage.
+* Don't forget to change WireGuard's `Endpoint` to point to the obfuscator's IP and port.
+* Don't forget about the [Caveats and Recommendations](#caveats-and-recommendations) section below, especially regarding endpoint exclusion and routing loops.
 
 
 ## Caveats and Recommendations
@@ -507,6 +546,8 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
+* **IPv6 Support:**  
+  The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
 
 
 ## Credits
@@ -514,7 +555,7 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 * [uthash](https://troydhanson.github.io/uthash/) - a great C library for hash tables, used for the NAT table.
 
 
-## Donate
+## Support the Developer and the Project
 
 * [GitHub Sponsors](https://github.com/sponsors/ClusterM)
 * [Buy Me A Coffee](https://www.buymeacoffee.com/cluster)
