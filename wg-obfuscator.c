@@ -632,6 +632,14 @@ int main(int argc, char *argv[]) {
     struct pollfd pollfds[MAX_CLIENTS + 1];
 #endif
 
+    if (verbose >= LL_WARN) {
+#ifdef COMMIT
+        log(LL_INFO, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION);
+#else
+        log(LL_INFO, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")");
+#endif
+    }
+
     /* Parse command line arguments */
     if (argc == 1) {
         fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information", argv[0]);
