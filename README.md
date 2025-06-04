@@ -516,7 +516,7 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 
 ## Donate
 
+* [GitHub Sponsors](https://github.com/sponsors/ClusterM)
 * [Buy Me A Coffee](https://www.buymeacoffee.com/cluster)
 * [Donation Alerts](https://www.donationalerts.com/r/clustermeerkat)
 * [Boosty](https://boosty.to/cluster)
-* PayPal is not available in Armenia :(
