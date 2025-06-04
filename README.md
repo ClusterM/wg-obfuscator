@@ -1,8 +1,49 @@
 # WireGuard obfuscator
 
-This is a simple obfuscator for WireGuard. It is designed to make it harder to detect WireGuard traffic by making it look like something else. It does this by wrapping WireGuard packets in a layer of obfuscation using a simple XOR cipher. Usefull for bypassing DPI (Deep Packet Inspection) firewalls, e.g. if your ISP/government blocks WireGuard traffic.
+WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data, making it significantly harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government tries to block or throttle WireGuard traffic.
+
+What started as a quick-and-dirty solution just for personal use has grown into a fully-featured project with the following capabilities:
+
+##### Key-Based Obfuscation
+Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
+
+##### Symmetric operation
+You can use the obfuscator on both ends of a WireGuard tunnel, or just one—it will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
+
+##### Packet Salting
+Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
+
+##### Handshake Randomization
+WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes.
+
+##### Built-In NAT Table
+The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
+
+##### Static (Manual) Bindings / Two-Way Mode
+You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
+
+##### Multi-Section Config Files
+Supports both simple config files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single config file.
+
+##### Detailed and customizable logging
+Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
+
+##### Cross-Platform and Lightweight
+Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
+
+##### Cross-compile ready
+Easily portable and compilable on Linux, macOS, and Windows (MSYS2/MinGW, with automatic fallback to poll()).
+
+##### Very low dependency footprint
+No huge libraries or frameworks.
+
+##### Android Client Coming Soon?
+A companion Android client is planned.
+
 
 ## How it works
+
+TODO!!!
 
 ```
 +----------------+
@@ -37,6 +78,7 @@ This is a simple obfuscator for WireGuard. It is designed to make it harder to d
 Since the obfuscator is a simple XOR cipher, it is totally simmetric. You need to install this application on the same network as the WireGuard peer you want to obfuscate, you need to do this on the other peer too. The obfuscator will then obfuscate the WireGuard packets and send them to the Internet. On the other side the obfuscator will deobfuscate the packets and send them to the WireGuard peer.
 
 It can be used even if one of the peers is behind a NAT or has a dynamic IP address. The obfuscator will keep track of the IP address of the peer after handshake and will send the packets to the correct IP address.
+
 
 ## How to use
 
@@ -90,7 +132,7 @@ Type `wg-obfuscator.exe --help` for more information.
 | ListenPort         = <from "source" on the source obfuscator                             |
 |                      (required only for hybrid configuration)>                           |
 +------------------------------------------------------------------------------------------+
-| Endpoint           = <source obfuscator's IP : source obfuscator's "source-lport">        |
+| Endpoint           = <source obfuscator's IP : source obfuscator's "source-lport">       |
 +------------------------------------------------------------------------------------------+
                                             ^
                                             |
@@ -103,7 +145,7 @@ Type `wg-obfuscator.exe --help` for more information.
 +------------------------------------------------------------------------------------------+
 | target-lport       = <port from "source" on the target obfuscator                        |
 |                    = (required only for hybrid configuration)>                           |
-| target             = <target obfuscator's IP and target obfuscator's "source-lport">      |
+| target             = <target obfuscator's IP and target obfuscator's "source-lport">     |
 +------------------------------------------------------------------------------------------+
                                             ^
                                             |
@@ -154,11 +196,11 @@ You can also run it from the command line, type `wg-obfuscator --help` for more 
 
 On Windows and MacOS you can only run it from the command line.
 
+
 ## Caveats
 
 WireGuard automatically excludes the IP address of the server specified in the Endpoint from the `AllowedIPs` list. This can cause a non-obvious issue: if the obfuscator is located on the local machine, after the handshake, the traffic to the VPN server will be routed through the VPN itself. Therefore, you need to manually exclude the real IP address of the VPN server from the `AllowedIPs` list.
 
-Also, the obfuscator currently only supports point-to-point connections, meaning it does not allow multiple peers to connect to the same port simultaneously. If you plan to use multiple connections at the same time, each connection must have a separate `ListenPort` port opened.
 
 ## Donate
 
