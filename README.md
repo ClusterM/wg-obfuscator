@@ -4,41 +4,30 @@ WireGuard Obfuscator is a tool designed to make WireGuard traffic look like rand
 
 What started as a quick-and-dirty solution just for personal use has grown into a fully-featured project with the following capabilities:
 
-##### Key-Based Obfuscation
-Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
-
-##### Symmetric operation
-You can use the obfuscator on both ends of a WireGuard tunnel, or just one—it will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
-
-##### Packet Salting
-Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
-
-##### Handshake Randomization
-WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes.
-
-##### Built-In NAT Table
-The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
-
-##### Static (Manual) Bindings / Two-Way Mode
-You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
-
-##### Multi-Section Config Files
-Supports both simple config files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single config file.
-
-##### Detailed and customizable logging
-Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
-
-##### Cross-Platform and Lightweight
-Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
-
-##### Cross-compile ready
-Easily portable and compilable on Linux, macOS, and Windows (MSYS2/MinGW, with automatic fallback to poll()).
-
-##### Very low dependency footprint
-No huge libraries or frameworks.
-
-##### Android Client Coming Soon?
-A companion Android client is planned.
+* **Key-Based Obfuscation**  
+  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
+* **Symmetric operation**  
+  You can use the obfuscator on both ends of a WireGuard tunnel, or just one—it will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
+* **Packet Salting**  
+  Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
+* **Handshake Randomization**  
+  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes.
+* **Built-In NAT Table**  
+  The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
+* **Static (Manual) Bindings / Two-Way Mode**  
+  You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
+* **Multi-Section Config Files**  
+  Supports both simple config files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single config file.
+* **Detailed and customizable logging**  
+  Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
+* **Cross-Platform and Lightweight**  
+  Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
+* **Cross-compile ready**  
+  Easily portable and compilable on Linux, macOS, and Windows (MSYS2/MinGW, with automatic fallback to poll()).
+* **Very low dependency footprint**  
+  No huge libraries or frameworks.
+* **Android Client Coming Soon?**  
+  A native Android version of the obfuscator is planned, allowing you to obfuscate WireGuard traffic directly on Android devices (including phones, tablets, or Android TVs). This will make it possible to use the obfuscator together with mobile WireGuard clients or WireGuard running on smart TVs.
 
 
 ## How it works
