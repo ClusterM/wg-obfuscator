@@ -35,33 +35,33 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 TODO!!!
 
 ```
-+----------------+
-| WireGuard peer |
-+----------------+
-        ^
-        |
-        v
-+----------------+
-|   Obfuscator   |
-+----------------+
-        ^
-        |
-        v
-+----------------+
-|   Internet     |
-+----------------+
-        ^
-        |
-        v
-+----------------+
-|   Obfuscator   |
-+----------------+
-        ^
-        |
-        v
-+----------------+
-| WireGuard peer |
-+----------------+
++----------------+ +----------------+ +----------------+ +----------------+
+| WireGuard peer | | WireGuard peer | | WireGuard peer | | WireGuard peer |
++----------------+ +----------------+ +----------------+ +----------------+
+        ^                  ^                   ^                 ^
+        |                  |                   |   +-------------+
+        v                  v                   v   v
++----------------+ +----------------+ +----------------+
+|   Obfuscator   | |   Obfuscator   | |   Obfuscator   |
++----------------+ +----------------+ +----------------+
+        ^                  ^                   ^
+        |                  |                   |
+        |                  v                   |
+        |          +----------------+          |
+        +--------->|    Internet    |<---------+
+                   +----------------+
+                           ^
+                           |
+                           v
+                   +----------------+
+                   |   Obfuscator   |
+                   +----------------+
+                           ^
+                           |
+                           v
+               +------------------------+
+               | WireGuard  server peer |
+               +------------------------+
 ```
 
 Since the obfuscator is a simple XOR cipher, it is totally simmetric. You need to install this application on the same network as the WireGuard peer you want to obfuscate, you need to do this on the other peer too. The obfuscator will then obfuscate the WireGuard packets and send them to the Internet. On the other side the obfuscator will deobfuscate the packets and send them to the WireGuard peer.
