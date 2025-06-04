@@ -16,8 +16,8 @@ What started as a quick-and-dirty solution just for personal use has grown into 
   The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
 * **Static (Manual) Bindings / Two-Way Mode**  
   You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
-* **Multi-Section Config Files**  
-  Supports both simple config files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single config file.
+* **Multi-Section Configuration Files**  
+  Supports both simple configuration files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single configuration file.
 * **Detailed and customizable logging**  
   Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
 * **Cross-Platform and Lightweight**  
@@ -33,33 +33,25 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 ## Basic Concept
 
 ```
-+----------------+ +----------------+ +----------------+ +----------------+
+┌────────────────┐ ┌────────────────┐ ┌────────────────┐ ┌────────────────┐
 | WireGuard peer | | WireGuard peer | | WireGuard peer | | WireGuard peer |
-+----------------+ +----------------+ +----------------+ +----------------+
-        ^                  ^                   ^                 ^
-        |                  |                   +------+   +------+
-        v                  v                          v   v
-+----------------+ +----------------+           +----------------+
+└───────▲────────┘ └───────▲────────┘ └────────▲───────┘ └───────▲────────┘
+        |                  |                   └──────┐    ┌─────┘
+┌───────▼────────┐ ┌───────▼────────┐           ┌─────▼────▼─────┐
 |   Obfuscator   | |   Obfuscator   |           |   Obfuscator   |
-+----------------+ +----------------+           +----------------+
-        ^                  ^                             ^
+└───────▲────────┘ └───────▲────────┘           └────────▲───────┘
         |                  |                             |
-        v                  v                             v
-+-------------------------------------------------------------------------+
+┌───────▼──────────────────▼─────────────────────────────▼────────────────┐
 |       |                  |     Internet                |                |
-+-------------------------------------------------------------------------+
-        |                  ^                             |
+└───────▲──────────────────▲─────────────────────────────▲────────────────┘
         |                  |                             |
-        |                  v                             |
-        |          +----------------+                    |
-        +--------->|   Obfuscator   |<-------------------+
-                   +----------------+
-                           ^
+        |          ┌───────▼────────┐                    |
+        └─────────>|   Obfuscator   |<───────────────────┘
+                   └───────▲────────┘
                            |
-                           v
-               +------------------------+
+               ┌───────────▼────────────┐
                | WireGuard  server peer |
-               +------------------------+
+               └────────────────────────┘
 ```
 
 In most cases, the obfuscator is used in a scenario where there is a clear separation between a server (with a static or public IP address) and clients (which may be behind NAT). We’ll focus on this setup here.
@@ -158,7 +150,7 @@ key = hate
 verbose = 4
 ```
 
-As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single config file.
+As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single configuration file.
 
 You can pass the configuration file to the obfuscator using `--config` argument. For example:
 ```bash
@@ -256,7 +248,7 @@ This allows the remote obfuscator to recognize which static mapping (and which l
    │   │  (5555)     │         │         │   │  (6666)     │         │
    │   └─────▲───────┘         │         │   └─────▲───────┘         │
    │         │                 │         │         │                 │
-   │   ┌─────┴───────┐         │         │   ┌─────┴───────┐         │
+   │   ┌─────▼───────┐         │         │   ┌─────▼───────┐         │
    │   │ Obfuscator  │         │         │   │ Obfuscator  │         │
    │   │             │         │         │   │             │         │
    │   │             │         │         │   │             │         │
@@ -265,7 +257,7 @@ This allows the remote obfuscator to recognize which static mapping (and which l
    │   │             │         │         │   │             │         │
    │   │ static-bind.│         │         │   │ static-bind.│         │
    │   │ 127.0.0.1:5555:7777   │         │   │ 1.2.3.4:7777:8888     │
-   │   └─────┬───────┘         │         │   └─────┬───────┘         │
+   │   └─────▼───────┘         │         │   └─────▼───────┘         │
    │         │                 │         │         │                 │
    └─────────┼─────────────────┘         └─────────┼─────────────────┘
              │                                         │
@@ -286,7 +278,7 @@ This allows the remote obfuscator to recognize which static mapping (and which l
 
 **Step-by-step: How a Packet Travels in Two-way Mode**
 
-**1. Peer A (1.2.3.4) sends a packet:**
+**1. Peer A sends a packet:**
 
 * WireGuard on Peer A creates a packet.
 * The packet goes to A’s local obfuscator (`127.0.0.1:15555`).
@@ -319,7 +311,12 @@ With static bindings, each obfuscator knows in advance how to forward packets be
 
 ## How to build and install
 
+You can always find the latest release (source code and ready-to-use binaries for Linux, Windows, and macOS) at:
+https://github.com/ClusterM/wg-obfuscator/releases
+
 ### Linux
+On Linux, the obfuscator can be installed as a systemd service for automatic startup and management.
+
 To build and install on Linux, simply run:
 ```sh
 make
@@ -346,7 +343,7 @@ Install the required packages, then run:
 ```sh
 make
 ```
-> **Note:** On Windows, the obfuscator is only available as a console application. Run it from the MSYS2 terminal and manage startup manually.
+> **Note:** On Windows, the obfuscator is only available as a command-line application. Run it from the MSYS2 terminal and manage startup manually.
 
 ### macOS
 On macOS, install the `argp-standalone` package via Homebrew:
@@ -358,10 +355,145 @@ Then build as usual:
 ```sh
 make
 ```
-> **Note:** On macOS, the obfuscator is only available as a console application. You need to run it from the terminal and manage startup yourself.
+> **Note:** On macOS, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself.
 
-### Docker and Routers
-TODO
+### Android
+Android support is planned.
+
+### Running Docker Container on Linux
+
+WireGuard Obfuscator is available as a multi-architecture Docker image:
+**[clustermeerkat/wg-obfuscator on Docker Hub](https://hub.docker.com/repository/docker/clustermeerkat/wg-obfuscator)**
+
+**Supported tags:**
+
+* **`latest`** — always points to the most recent stable release.
+* **`nightly`** — built automatically from the current main branch; may be unstable. Use only for testing new features.
+* **Version tags** (e.g. `1.0`, `1.1`) — for specific releases.
+
+**Architectures available:**
+
+* `linux/amd64`
+* `linux/arm64`
+* `linux/arm/v7`
+* `linux/arm/v6`
+* `linux/386`
+* `linux/ppc64le`
+* `linux/s390x`
+
+#### Example: docker-compose.yml
+
+> **Note:**
+> Make sure to match the exposed port (`13255` in the example below) with the `source-lport` value in your configuration file.
+
+```yaml
+version: '3.8'
+
+services:
+  wg-obfuscator:
+    image: clustermeerkat/wg-obfuscator:latest
+    volumes:
+      - ./.wg-obfuscator.conf:/etc/wg-obfuscator/wg-obfuscator.conf
+    ports:
+      - "13255:13255/udp"
+    container_name: wg-obfuscator-container
+    restart: unless-stopped
+```
+
+* **`image`** can be changed to use a specific tag (e.g., `clustermeerkat/wg-obfuscator:1.1`).
+* Place your config as `.wg-obfuscator.conf` in the same directory as `docker-compose.yml`, or adjust the volume path.
+* **Port mapping** (`13255:13255/udp`) must correspond to your obfuscator’s listen port.
+
+#### Running manually
+
+You can also run the container directly:
+
+```sh
+docker run -d \
+  --name wg-obfuscator \
+  -v $PWD/.wg-obfuscator.conf:/etc/wg-obfuscator/wg-obfuscator.conf \
+  -p 13255:13255/udp \
+  clustermeerkat/wg-obfuscator:latest
+```
+
+### Running Docker Container on MikroTik Routers (RouterOS 7.4+)
+
+WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 7.4+** (ARM64/x86\_64).
+
+#### Quick Setup
+
+##### 1. Install the `container` package
+
+* Download the latest **Extra Packages** for your RouterOS version and platform from [mikrotik.com/download](https://mikrotik.com/download)
+* Extract and upload `container-*.npk` to the router
+* Reboot the router
+
+##### 2. Enable container device mode (**only required once!**)
+
+```shell
+/system/device-mode/update container=yes
+```
+
+* Confirm when prompted:
+  – For most models, press the physical reset button
+  – On x86, do a full power-off (cold reboot)
+
+##### 3. Configure container registry (one time)
+
+```shell
+/container/config/set registry-url=https://registry-1.docker.io tmpdir=temp
+```
+
+##### 4. Create a veth interface for container networking
+
+```shell
+/interface/veth/add name=veth-wg-ob address=192.168.100.2/24 gateway=192.168.100.1
+```
+
+##### 5. Create and mount a config directory
+
+```shell
+/container/mounts/add dst=/etc/wg-obfuscator name=wg-obfuscator-config src=/wg-obfuscator
+```
+
+##### 6. Add and start the container
+
+```shell
+/container/add \
+  interface=veth-wg-ob \
+  logging=yes \
+  mounts=wg-obfuscator-config \
+  name=wg-obfuscator \
+  root-dir=wg-obfuscator-data \
+  start-on-boot=yes \
+  remote-image=clustermeerkat/wg-obfuscator:latest
+```
+
+##### 7. Edit your config file
+
+* After the **first launch**, a default example config file will appear at `/wg-obfuscator/wg-obfuscator.conf` on your router.
+* **Edit this file** to match your actual WireGuard and obfuscator settings.
+  You can use WinBox, WebFig, or the `/file edit` command in the MikroTik terminal.
+
+##### 8. Forward UDP ports to the container
+
+```shell
+/ip firewall nat add chain=dstnat action=dst-nat protocol=udp dst-port=13255 to-addresses=192.168.100.2 to-ports=13255
+```
+
+* Replace `13255` and the IP as needed for your network.
+
+##### 9. Check logs
+
+```shell
+/container/print logs
+```
+
+**Notes:**
+
+* `container` package and device-mode are only needed once per router.
+* No external disk is required; image is small and uses internal storage.
+* See [MikroTik Containers Docs](https://help.mikrotik.com/docs/display/ROS/Containers) for advanced usage.
 
 
 ## Caveats and Recommendations
@@ -372,10 +504,14 @@ TODO
   **Solution:** Make sure to manually exclude the real (public) IP address of your VPN server from the `AllowedIPs` list in your WireGuard config.
 * **PersistentKeepalive:**  
   To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` or `60` seconds is generally sufficient.
-Вот как можно это органично добавить в раздел Caveats and Recommendations (на английском, с пояснением):
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
+
+
+## Credits
+* [WireGuard](https://www.wireguard.com/) - the VPN protocol this tool is designed to obfuscate.
+* [uthash](https://troydhanson.github.io/uthash/) - a great C library for hash tables, used for the NAT table.
 
 
 ## Donate
