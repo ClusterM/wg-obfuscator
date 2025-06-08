@@ -540,7 +540,7 @@ You should see logs indicating the container has started successfully and is rea
 * **Endpoint Exclusion and Routing Loops:**  
   WireGuard automatically excludes the server's IP address (as specified in the `Endpoint`) from the `AllowedIPs` list.
   If the obfuscator is running on the same machine as your WireGuard client or server, this can lead to a subtle issue: after the handshake, all traffic to the VPN server might get routed *through the VPN tunnel itself* (causing a routing loop or connection loss).
-  **Solution:** Make sure to manually exclude the real (public) IP address of your VPN server from the `AllowedIPs` list in your WireGuard config.
+  **Solution:** Make sure to manually exclude the real (public) IP address of your VPN server from the `AllowedIPs` list in your WireGuard config. You can use this script: https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ
 * **PersistentKeepalive:**  
   To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` or `60` seconds is generally sufficient.
 * **Initial Handshake Requirement:**  
