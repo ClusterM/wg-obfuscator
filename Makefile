@@ -56,12 +56,20 @@ else
   endif
 endif
 
+# force to RELEASE if ".git" directory is not present
+ifeq ($(wildcard .git),)
+  RELEASE := 1
+endif
+
 all: $(TARGET)
 
 $(COMMIT_INFO):
   # Try to get commit hash from git
 ifeq ($(RELEASE),0)
 	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
+	if ! git diff-index --quiet HEAD -- ; then \
+		COMMIT="$$COMMIT (dirty)"; \
+	fi; \
 	if [ -n "$$COMMIT" ]; then \
 	  echo "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
 	else \
