@@ -151,6 +151,7 @@ static void read_config_file(char *filename)
                 len = sizeof(section_name) - 1;
             }
             strncpy(section_name, line + 1, len);
+            section_name[len] = 0;
 
             // Reset all the parameters
             listen_port = -1;
