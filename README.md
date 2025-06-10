@@ -200,27 +200,40 @@ Without static bindings, the obfuscator only learns how to forward packets after
 
 Suppose you have two peers:
 
-* **Peer A**: Public IP `1.2.3.4`, runs WireGuard locally on port `5555`, the obfuscator listens on port `15555` externally and on port `7777` internally
-* **Peer B**: Public IP `5.6.7.8`, runs WireGuard locally on port `6666`, the obfuscator listens on port `16666` externally and on port `8888` internally
+* **Peer A**: Public IP `1.2.3.4`, runs WireGuard locally on port `1111`
+* **Peer B**: Public IP `5.6.7.8`, runs WireGuard locally on port `6666`
+
+We can set up the obfuscator on both peers:
+* **Peer A**: Obfuscator listens for local WireGuard traffic on port `2222` and listens for incoming obfuscated handshakes from **Peer A** on port `3333`.
+* **Peer B**: Obfuscator listens for incoming obfuscated handshakes from **Peer B** on port `4444` and listens for local WireGuard traffic on port `5555`.
 
 **Peer A WireGuard config** (`1.2.3.4`):
 
 ```
 [Interface]
 PrivateKey = <A's private key>
-ListenPort = 5555
+ListenPort = 1111
 
 [Peer]
 PublicKey = <B's public key>
-Endpoint = 127.0.0.1:15555
+Endpoint = 127.0.0.1:2222
 ```
 
 **Peer A Obfuscator config** (`1.2.3.4`):
 
 ```
-source-lport = 15555
-target = 5.6.7.8:16666
-static-bindings = 127.0.0.1:5555:7777
+source-lport = 2222
+target = 5.6.7.8:4444
+static-bindings = 127.0.0.1:1111:3333
+key = your_secret_key
+```
+
+**Peer B Obfuscator config** (`5.6.7.8`):
+
+```
+source-lport = 4444
+target = 127.0.0.1:6666
+static-bindings = 1.2.3.4:3333:5555
 key = your_secret_key
 ```
 
@@ -233,100 +246,69 @@ ListenPort = 6666
 
 [Peer]
 PublicKey = <A's public key>
-Endpoint = 127.0.0.1:8888
-```
-
-**Peer B Obfuscator config** (`5.6.7.8`):
-
-```
-source-lport = 16666
-target = 127.0.0.1:6666
-static-bindings = 1.2.3.4:7777:8888
-key = your_secret_key
+Endpoint = 127.0.0.1:5555
 ```
 
 In this example the line:
 
 ```
-static-bindings = 1.2.3.4:7777:8888
+static-bindings = 1.2.3.4:1111:3333
 ```
 
-means:
-
-* **If the obfuscator receives a UDP packet from `1.2.3.4`, where the sender’s *source port* is `7777`,**
-* it will associate that remote peer with a local UDP socket that uses port `8888` as its *source port* when sending packets out.
-
-So when the obfuscator sends packets to the peer's `target`, it does so from port `8888`.
-This allows the remote obfuscator to recognize which static mapping (and which local WireGuard instance or socket) should handle returning packets, based on the source port used by the sender.
-
-> **Note:**
-> In UDP, the source port matters for this association. The packet will always be sent *to* the port specified in `target`, but the source port (the third value in the static binding) tells the obfuscator which local port to use for sending.
-
+Visually, it looks like this:
 ```
    ┌───────────────────────────┐             ┌───────────────────────────┐
-   │        Peer A (1.2.3.4)   │             │        Peer B (5.6.7.8)   │
-   │   ┌─────────────┐         │             │   ┌─────────────┐         │
-   │   │ WireGuard   │         │             │   │ WireGuard   │         │
-   │   │  (5555)     │         │             │   │  (6666)     │         │
-   │   └─────▲───────┘         │             │   └─────▲───────┘         │
-   │         │                 │             │         │                 │
-   │   ┌─────▼───────┐         │             │   ┌─────▼───────┐         │
-   │   │ Obfuscator  │         │             │   │ Obfuscator  │         │
-   │   │             │         │             │   │             │         │
-   │   │             │         │             │   │             │         │
-   │   │ source-lport│         │             │   │ source-lport│         │
-   │   │   15555     │         │             │   │   16666     │         │
-   │   │             │         │             │   │             │         │
-   │   │ static-bind.│         │             │   │ static-bind.│         │
-   │   │ 127.0.0.1:5555:7777   │             │   │ 1.2.3.4:7777:8888     │
-   │   └─────▼───────┘         │             │   └─────▼───────┘         │
-   │         │                 │             │         │                 │
-   └─────────┼─────────────────┘             └─────────┼─────────────────┘
-             │                                         │
-             │  UDP/obfuscated traffic                 │
-             │                                         │
-        (source:7777, dest:16666)      (source:8888, dest:15555)
-             │<--------------------------------------->│
+   │      Peer A (1.2.3.4)     │             │      Peer B (5.6.7.8)     │
+   │  ┌─────────────────┐      |             │  ┌─────────────────┐      |
+   │  │ WireGuard       │      |             │  │ WireGuard       │      |
+   │  │ ListenPort=1111 |      |             │  │ ListenPort=6666 |      |
+   │  └─────▲───────────┘      |             │  └─────▲───────────┘      |
+   │        │                  │             │        │                  │
+   │  ┌─────▼───────────────┐  │             │  ┌─────▼───────────────┐  │
+   │  │ source-lport=2222   |  │             │  │ local port=5555     │  │
+   │  │                     |  │             │  │                     │  │
+   │  │ Obfuscator          |  │             │  │ Obfuscator          |  │
+   │  │ static-bind         |  │             │  │ static-bind         |  │
+   │  │ 127.0.0.1:1111:3333 |  │             │  │ 1.2.3.4:3333:5555   |  │
+   │  │                     |  │             │  │                     │  │
+   │  │ local port=3333     │  |             │  │ source-lport=4444   |  │
+   │  └─────▼───────────────┘  │             │  └─────▼───────────────┘  │
+   │        │                  │             │        │                  │
+   └────────┼──────────────────┘             └────────┼──────────────────┘
+            │                                         │
+            │         UDP/obfuscated traffic          │
+            │<--------------------------------------->│
 ```
 
-**Legend:**
+When **Peer A** initiates a handshake with **Peer B**:
 
-* When Peer A’s obfuscator sends a packet to Peer B’s obfuscator:  
-  * The packet is sent *from* port `7777` (as set in static-bindings on A) *to* port `16666` on Peer B.
-* When Peer B’s obfuscator replies:  
-  * The packet is sent *from* port `8888` (as set in static-bindings on B) *to* port `15555` on Peer A.
-* The static binding line:  
-  * `1.2.3.4:7777:8888` (on B) means: "packets *from* 1.2.3.4, *source port* 7777 → will be mapped to local UDP socket using *source port* 8888 for outbound packets".
+1. WireGuard on **Peer A** sends a non-obfuscated handshake UDP packet from port `1111` to the local obfuscator on port `2222`.
+2. The obfuscator on **Peer A** obfuscates the packet using the key and sends it to **Peer B**’s obfuscator on port `4444`, using `3333` as the source port.  
+   > Without static bindings, the obfuscator dynamically selects the source port and creates a mapping in its NAT table.  
+   > With the static binding `127.0.0.1:1111:3333`, it knows to always use port `3333` as the source port for packets from `127.0.0.1:1111`.
+3. **Peer B**’s obfuscator receives the packet, deobfuscates it, and forwards it to **Peer B**’s local WireGuard instance on port `6666`, using `5555` as the source port.  
+   > Without static bindings, the obfuscator dynamically selects the source port and creates a mapping.  
+   > With the static binding `1.2.3.4:3333:5555`, it knows to use port `5555` as the source port for packets from `1.2.3.4:3333`.
+4. **Peer B**’s WireGuard processes the handshake and sends a response from port `6666` to the obfuscator on port `5555`.
+5. **Peer B**’s obfuscator obfuscates the response and sends it back to **Peer A**’s obfuscator on port `3333`, using `4444` as the source port.  
+   > With static bindings, the necessary mappings already exist.
+6. **Peer A**’s obfuscator deobfuscates the response and forwards it from port `2222` to **Peer A**’s WireGuard on port `1111`.
+   > With static bindings, the necessary mappings already exist.
+7. **Peer A**’s WireGuard processes the response, completing the handshake.
 
-**Step-by-step: How a Packet Travels in Two-way Mode**
+When **Peer B** initiates a handshake with **Peer A**, the process is the same but in reverse:
 
-**1. Peer A sends a packet:**
-
-* WireGuard on Peer A creates a packet.
-* The packet goes to A’s local obfuscator (`127.0.0.1:15555`).
-* The obfuscator sends the packet to Peer B’s obfuscator (`5.6.7.8:16666`), using `7777` as the source port.
-* On the network, the packet is:
-  `source: 1.2.3.4:7777 → destination: 5.6.7.8:16666`
-
-**2. Peer B receives the packet:**
-
-* Peer B’s obfuscator sees a packet coming from `1.2.3.4:7777`.
-* It checks its static bindings and finds `1.2.3.4:7777:8888`, so it knows to associate this traffic with its local UDP socket bound to port `8888`.
-* The obfuscator passes the packet to local WireGuard on port `6666`.
-
-**3. Peer B responds:**
-
-* WireGuard on B sends a response to A, which is routed to B’s obfuscator (`127.0.0.1:8888`).
-* The obfuscator sends the packet to Peer A’s obfuscator (`1.2.3.4:15555`), using `8888` as the source port.
-* On the network:
-  `source: 5.6.7.8:8888 → destination: 1.2.3.4:15555`
-
-**4. Peer A receives the response:**
-
-* Peer A’s obfuscator sees a packet coming from `5.6.7.8:8888`.
-* It checks its static bindings (`127.0.0.1:5555:7777`) and knows to deliver the packet to the local WireGuard instance on port `5555`.
-
-Packets sent from Peer B to Peer A follow the exact same steps, but in the reverse order.
+1. WireGuard on **Peer B** sends a non-obfuscated handshake UDP packet from port `6666` to the local obfuscator on port `5555`.
+2. The obfuscator on **Peer B** obfuscates the packet and sends it to **Peer A**’s obfuscator on port `3333`, using `4444` as the source port.  
+   > Without static bindings, reverse connections would not work because the obfuscator would not know how to forward packets.  
+   > With the static binding `1.2.3.4:3333:5555`, the mapping already exists, so it knows to forward packets to `1.2.3.4:3333`.
+3. **Peer A**’s obfuscator receives the packet, deobfuscates it, and forwards it to **Peer A**’s WireGuard on port `1111`, using `2222` as the source port.  
+   > Without static bindings, reverse connections would not work because the obfuscator would not know how to forward packets.  
+   > With the static binding `127.0.0.1:1111:3333`, the mapping already exists, so it knows to forward packets to `127.0.0.1:1111`.
+4. **Peer A**’s WireGuard processes the handshake and sends a response from port `1111` to the obfuscator on port `2222`.
+5. **Peer A**’s obfuscator obfuscates the response and sends it to **Peer B**’s obfuscator on port `4444`, using `3333` as the source port.
+6. **Peer B**’s obfuscator deobfuscates the packet and forwards it to **Peer B**’s WireGuard on port `6666`, using `5555` as the source port.
+7. **Peer B**’s WireGuard processes the response, completing the handshake.
 
 #### Summary
 
@@ -551,6 +533,7 @@ You should see logs indicating the container has started successfully and is rea
 
 
 ## Credits
+* Me: [Cluster](https://github.com/ClusterM), email: cluster@cluster.wtf
 * [WireGuard](https://www.wireguard.com/) - the VPN protocol this tool is designed to obfuscate.
 * [uthash](https://troydhanson.github.io/uthash/) - a great C library for hash tables, used for the NAT table.
 
