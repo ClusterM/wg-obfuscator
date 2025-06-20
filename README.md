@@ -453,16 +453,41 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 ##### 4. Create a veth interface for container networking
 
 ```shell
-/interface/veth/add name=veth-wg-ob address=192.168.100.2/24 gateway=192.168.100.1
+/interface/veth/add name=veth-wg-ob address=172.17.13.2/24 gateway=172.17.13.1
 ```
+> **Note:** in this example, we use IP address `172.17.13.2` for the container and `172.17.13.1` for the host.
+> You can choose any other IP addresses as long as they are in the same subnet.
 
-##### 5. Create and mount a config directory
+##### 5. Add IP address for the veth interface
+
+```shell
+/ip address add address=172.17.13.1/24 interface=veth-wg-ob
+```
+> **Note:** This IP address is used by the host to communicate with the container. It must match the gateway set in the veth interface.
+
+##### 6. Forward UDP ports to the container
+
+```shell
+/ip firewall nat add chain=dstnat action=dst-nat protocol=udp dst-port=13255 to-addresses=172.17.13.2 to-ports=13255
+```
+> **Note:** This IP address is used by the container, it must match the `address` in the veth interface.
+
+> **Note:** Port number `13255` is just an example. It must match the `source-lport` in your obfuscator config.
+> In case if you are using two-way mode, you may need to forward multiple ports.
+
+##### 7. Create and mount a config directory
 
 ```shell
 /container/mounts/add dst=/etc/wg-obfuscator name=wg-obfuscator-config src=/wg-obfuscator
 ```
 
-##### 6. Add and start the container
+##### 8. Enable container logging (one time)
+
+```shell
+/system logging add topics=container
+```
+
+##### 9. Add and start the container
 
 ```shell
 /container/add \
@@ -473,36 +498,30 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
   root-dir=wg-obfuscator-data \
   start-on-boot=yes \
   remote-image=clustermeerkat/wg-obfuscator:latest
+/container/start [/container/find where name="wg-obfuscator"]
 ```
 
-##### 7. Edit your config file
+##### 10. Check logs
+
+```shell
+/log print where topics~"container"
+```
+You should see logs indicating the container has started successfully.
+
+##### 11. Edit your config file
 
 * After the **first launch**, a default example config file will appear at `/wg-obfuscator/wg-obfuscator.conf` on your router.
 * **Edit this file** to match your actual WireGuard and obfuscator settings.
   You can use WinBox, WebFig, or the `/file edit` command in the MikroTik terminal.
 
-##### 8. Forward UDP ports to the container
-
-```shell
-/ip firewall nat add chain=dstnat action=dst-nat protocol=udp dst-port=13255 to-addresses=192.168.100.2 to-ports=13255
-```
-
-* Replace `13255` and the IP as needed for your network.
-
-##### 9. Enable container logging (one time)
-
-```shell
-/system logging add topics=container
-```
-
-##### 10. Restart the container
+##### 12. Restart the container
 
 ```shell
 /container/stop [/container/find where name="wg-obfuscator"]
 /container/start [/container/find where name="wg-obfuscator"]
 ```
 
-##### 11. Check logs
+##### 13. Check logs
 ```shell
 /log print where topics~"container"
 ```
