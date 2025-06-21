@@ -39,5 +39,4 @@ jobs:
           tags: |
             clustermeerkat/${{ env.IMAGE_NAME }}:nightly
           platforms: ${{ env.PLATFORMS }}
-          build-args: NON_DIRTY=1
           context: .

@@ -6,7 +6,6 @@ COMMIT_INFO	 = commit.h
 HEADERS      = wg-obfuscator.h
 
 RELEASE ?= 0
-NON_DIRTY ?= 0
 
 RM    = rm -f
 CC    = gcc
@@ -67,7 +66,7 @@ endif
 endif
 ifeq ($(RELEASE),0)
 # Force to RELEASE if we are on the tag and repo is clean
-ifeq ($(shell git diff-index --quiet HEAD -- 2>/dev/null; echo $$?),0)
+ifeq ($(shell git update-index -q --refresh ; git diff-index --quiet HEAD -- 2>/dev/null; echo $$?),0)
 ifneq ($(shell git describe --exact-match --tags 2>/dev/null),)
   RELEASE := 1
 endif
@@ -77,8 +76,9 @@ endif
 $(COMMIT_INFO):
 # Try to get commit hash from git
 ifeq ($(RELEASE),0)
+	@git update-index -q --refresh
 	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
-	if [ $(NON_DIRTY) -eq "0" ] && ! git diff-index --quiet HEAD -- ; then \
+	if ! git diff-index --quiet HEAD -- ; then \
 		COMMIT="$$COMMIT (dirty)"; \
 	fi; \
 	if [ -n "$$COMMIT" ]; then \
