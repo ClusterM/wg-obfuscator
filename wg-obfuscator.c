@@ -937,14 +937,6 @@ int main(int argc, char *argv[]) {
                     client_entry->handshake_direction = HANDSHAKE_DIRECTION_CLIENT_TO_SERVER;
                     client_entry->last_handshake_request_time = now;
                 }
-
-                // Version downgrade check
-                if (version < client_entry->version) {
-                    client_entry->version = version;
-                    log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
-                        client_entry->version, version);
-                }
-
                 // Is it handshake response?
                 else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     if (!client_entry) {
@@ -983,6 +975,13 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port);
                     continue;
+                }
+
+                // Version downgrade check
+                if (version < client_entry->version) {
+                    client_entry->version = version;
+                    log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
+                        client_entry->version, version);
                 }
 
                 if (!obfuscated) {
