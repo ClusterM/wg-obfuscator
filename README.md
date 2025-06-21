@@ -467,13 +467,15 @@ WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 
 
 ##### 6. Forward UDP ports to the container
 
+In case if your obfuscator is configured to accept incoming connections from a server outside of the NAT, you need to forward the UDP port to the container. 
+For client side obfuscator without two-way mode (static bindings), you can skip this step.
+
 ```shell
 /ip firewall nat add chain=dstnat action=dst-nat protocol=udp dst-port=13255 to-addresses=172.17.13.2 to-ports=13255
 ```
 > **Note:** This IP address is used by the container, it must match the `address` in the veth interface.
 
-> **Note:** Port number `13255` is just an example. It must match the `source-lport` in your obfuscator config.
-> In case if you are using two-way mode, you may need to forward multiple ports.
+> **Note:** Port number `13255` is just an example. It must port you are using for incoming connections in your obfuscator configuration file (i.e. `source-lport` or port from static bindings).
 
 ##### 7. Create and mount a config directory
 
