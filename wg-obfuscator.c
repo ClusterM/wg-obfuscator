@@ -489,7 +489,11 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         return NULL;
     }
     memset(client_entry, 0, sizeof(client_entry_t));
+    // Set default version (latest)
+    client_entry->version = OBFUSCATION_VERSION;
+    // Set the client address
     memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
+    // Create a socket for the server connection
     client_entry->server_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_entry->server_sock < 0) {
         serror("Failed to create server socket for client");
@@ -559,7 +563,11 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
         return NULL;
     }
     memset(client_entry, 0, sizeof(client_entry_t));
+    // Set default version (latest)
+    client_entry->version = OBFUSCATION_VERSION;
+    // Set the client address
     memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
+    // Create a socket for the server connection
     client_entry->server_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_entry->server_sock < 0) {
         serror("Failed to create server socket for client");
@@ -598,10 +606,6 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
     client_entry->is_static = 1;
 
     HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
-
-    // log(LL_DEBUG, "Added static binding: %s:%d:%d", 
-    //     inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
-    //     ntohs(client_entry->our_addr.sin_port));
 
     return client_entry;
 }
@@ -874,7 +878,7 @@ int main(int argc, char *argv[]) {
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
-                    serror("recvfrom");
+                    serror("recvfrom client");
                     continue;
                 }
                 if (length < 4) {
@@ -886,7 +890,7 @@ int main(int argc, char *argv[]) {
                 HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
 
                 uint8_t obfuscated = is_obfuscated(buffer);
-                uint8_t version = OBFUSCATION_VERSION;
+                uint8_t version = client_entry ? client_entry->version : OBFUSCATION_VERSION;
 
                 if (verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)",
@@ -928,16 +932,19 @@ int main(int argc, char *argv[]) {
                         if (!client_entry) {
                             continue;
                         }
-                        client_entry->version = version;
-                        if (version < OBFUSCATION_VERSION) {
-                            log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
-                                OBFUSCATION_VERSION, version);
-                        }
                     }
 
                     client_entry->handshake_direction = HANDSHAKE_DIRECTION_CLIENT_TO_SERVER;
                     client_entry->last_handshake_request_time = now;
                 }
+
+                // Version downgrade check
+                if (version < client_entry->version) {
+                    client_entry->version = version;
+                    log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
+                        client_entry->version, version);
+                }
+
                 // Is it handshake response?
                 else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     if (!client_entry) {
@@ -1011,7 +1018,7 @@ int main(int argc, char *argv[]) {
 #endif
                 int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
                 if (length < 0) {
-                    serror("recv");
+                    serror("recv from server");
                     continue;
                 }
                 if (length < 4) {
@@ -1020,6 +1027,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 uint8_t obfuscated = is_obfuscated(buffer);
+                uint8_t version = client_entry->version;
 
                 if (verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)",
@@ -1040,7 +1048,7 @@ int main(int argc, char *argv[]) {
 
                 if (obfuscated) {
                     // decode
-                    length = decode(buffer, length, xor_key, key_length, &client_entry->version);
+                    length = decode(buffer, length, xor_key, key_length, &version);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to decode packet from %s:%d", target_host, target_port);
                         continue;
@@ -1090,6 +1098,13 @@ int main(int argc, char *argv[]) {
                         target_host, target_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
                     continue;
+                }
+
+                // Version downgrade check
+                if (version < client_entry->version) {
+                    client_entry->version = version;
+                    log(LL_WARN, "Server %s:%d uses old obfuscation version, downgrading from %d to %d", 
+                        target_host, target_port, client_entry->version, version);
                 }
 
                 if (!obfuscated) {
