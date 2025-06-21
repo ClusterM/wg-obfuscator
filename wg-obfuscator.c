@@ -639,9 +639,9 @@ int main(int argc, char *argv[]) {
 
     if (verbose >= LL_WARN) {
 #ifdef COMMIT
-    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+        fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+        fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
 #endif
     }
 

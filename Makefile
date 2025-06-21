@@ -6,6 +6,7 @@ COMMIT_INFO	 = commit.h
 HEADERS      = wg-obfuscator.h
 
 RELEASE ?= 0
+NON_DIRTY ?= 0
 
 RM    = rm -f
 CC    = gcc
@@ -56,28 +57,40 @@ else
   endif
 endif
 
-# force to RELEASE if ".git" directory is not present
-ifeq ($(wildcard .git),)
-  RELEASE := 1
-endif
-
 all: $(TARGET)
 
+# Force to RELEASE if ".git" directory is not present
+ifeq ($(RELEASE),0)
+ifeq ($(wildcard .git),)
+  RELEASE := 1
+endif	
+endif
+ifeq ($(RELEASE),0)
+# Force to RELEASE if we are on the tag and repo is clean
+ifeq ($(shell git diff-index --quiet HEAD -- 2>/dev/null; echo $$?),0)
+ifneq ($(shell git describe --exact-match --tags 2>/dev/null),)
+  RELEASE := 1
+endif
+endif
+endif
+
 $(COMMIT_INFO):
-  # Try to get commit hash from git
+# Try to get commit hash from git
 ifeq ($(RELEASE),0)
 	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
-	if ! git diff-index --quiet HEAD -- ; then \
+	if [ $(NON_DIRTY) -eq "0" ] && ! git diff-index --quiet HEAD -- ; then \
 		COMMIT="$$COMMIT (dirty)"; \
 	fi; \
 	if [ -n "$$COMMIT" ]; then \
 	  echo "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
 	else \
 	  echo > $(COMMIT_INFO) ; \
-	fi
+	fi ; \
+	echo "Building as commit \"$$COMMIT\""
 else
 	rm -rf $(COMMIT_INFO)
 	touch $(COMMIT_INFO)
+	@echo "Building as RELEASE"
 endif
 
 clean:

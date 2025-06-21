@@ -1,8 +1,10 @@
 # Stage 1: Build
 FROM alpine:latest AS build
 WORKDIR /src
-RUN apk add --no-cache build-base argp-standalone
-COPY *.c *.h Makefile ./
+RUN apk add --no-cache build-base argp-standalone git
+COPY ./. ./
+ARG NON_DIRTY="0"
+ENV NON_DIRTY=${NON_DIRTY}
 RUN make clean && make CC="gcc -static" LDFLAGS="-largp"
 
 # Stage 2: Runtime
