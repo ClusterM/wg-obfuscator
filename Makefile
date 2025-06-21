@@ -1,8 +1,6 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-COMMIT		   :=
-COMMIT_INFO	 = commit.h
 HEADERS      = wg-obfuscator.h
 
 RELEASE ?= 0
@@ -72,29 +70,16 @@ ifneq ($(shell git describe --exact-match --tags 2>/dev/null),)
 endif
 endif
 endif
-
-$(COMMIT_INFO):
-# Try to get commit hash from git
+# Get commit id
 ifeq ($(RELEASE),0)
-	@git update-index -q --refresh
-	@COMMIT=$$(git rev-parse --short HEAD 2>/dev/null) ; \
-	if ! git diff-index --quiet HEAD -- ; then \
-		COMMIT="$$COMMIT (dirty)"; \
-	fi; \
-	if [ -n "$$COMMIT" ]; then \
-	  echo "#define COMMIT \"$$COMMIT\"" > $(COMMIT_INFO) ; \
-	else \
-	  echo > $(COMMIT_INFO) ; \
-	fi ; \
-	echo "Building as commit \"$$COMMIT\""
-else
-	rm -rf $(COMMIT_INFO)
-	touch $(COMMIT_INFO)
-	@echo "Building as RELEASE"
+  COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
+  DIRTY := $(shell if ! git diff-index --quiet HEAD --; then echo " (dirty)"; fi)
+  COMMIT := $(COMMIT)$(DIRTY)
+  CFLAGS += -DCOMMIT="\"$(COMMIT)\""
 endif
 
 clean:
-	$(RM) *.o $(COMMIT_INFO)
+	$(RM) *.o
 ifeq ($(OS),Windows_NT)
 	@if [ -f "$(TARGET)" ]; then for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do rm -f $(EXEDIR)/`basename "$$f"` ; done fi
 endif
@@ -105,7 +90,7 @@ $(OBJS):
 %.o : %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(TARGET): $(COMMIT_INFO) $(OBJS) $(HEADERS)
+$(TARGET): $(OBJS) $(HEADERS)
 	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
 ifeq ($(OS),Windows_NT)
 	@for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do if [ ! -f "$(EXEDIR)/`basename $$f`" ] ; then cp -vf `cygpath "$$f"` $(EXEDIR)/ ; fi ; done
@@ -127,4 +112,4 @@ else
 	systemctl restart $(SERVICE_FILE)
 endif
 
-.PHONY: clean install $(COMMIT_INFO)
+.PHONY: clean install

@@ -10,7 +10,6 @@
 #include <stdarg.h>
 #include "wg-obfuscator.h"
 #include "uthash.h"
-#include "commit.h"
 
 #define log(level, fmt, ...) { if (verbose >= (level))          \
     fprintf(stderr, "[%s][%c] " fmt "\n", section_name,         \
