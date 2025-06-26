@@ -80,6 +80,31 @@ jobs:
         with:
           name: ${{ env.IMAGE_NAME }}-linux-arm64.zip
           path: .
+      - name: make clean all x64 static
+        run: make clean all LDFLAGS=-static
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-x64-static.zip
+          path: .
+      - name: apt update
+        run: sudo apt-get update
+      - name: Get ARM toolchain
+        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+      - name: make clean all arm
+        run: make clean all CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-arm-static.zip
+          path: .
+      - name: make clean all arm64 static
+        run: make clean all CC=aarch64-linux-gnu-gcc LDFLAGS=-static
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-linux-arm64-static.zip
+          path: .
 
   build-macos:
     runs-on: macos-latest

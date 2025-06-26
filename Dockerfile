@@ -3,7 +3,7 @@ FROM alpine:latest AS build
 WORKDIR /src
 RUN apk add --no-cache build-base argp-standalone git
 COPY ./. ./
-RUN make clean && make CC="gcc -static" LDFLAGS="-largp"
+RUN make clean && make LDFLAGS="-largp -static"
 
 # Stage 2: Runtime
 FROM scratch
