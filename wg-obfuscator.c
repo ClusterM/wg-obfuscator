@@ -190,14 +190,17 @@ static void read_config_file(char *filename)
             something_set = 1;
         } else if (strcmp(key, "target") == 0) {
             strncpy(forward_host_port, value, sizeof(forward_host_port) - 1);
+            forward_host_port[sizeof(forward_host_port) - 1] = 0; // Ensure null-termination
             forward_host_port_set = 1;
             something_set = 1;
         } else if (strcmp(key, "key") == 0) {
             strncpy(xor_key, value, sizeof(xor_key) - 1);
+            xor_key[sizeof(xor_key) - 1] = 0; // Ensure null-termination
             xor_key_set = 1;
             something_set = 1;
         } else if (strcmp(key, "source-if") == 0) {
             strncpy(client_interface, value, sizeof(client_interface) - 1);
+            client_interface[sizeof(client_interface) - 1] = 0; // Ensure null-termination
             something_set = 1;
         }
          else if (strcmp(key, "target-if") == 0) {
@@ -215,10 +218,12 @@ static void read_config_file(char *filename)
         }
         else if (strcmp(key, "static-bindings") == 0) {
             strncpy(static_bindings, value, sizeof(static_bindings) - 1);
+            static_bindings[sizeof(static_bindings) - 1] = 0; // Ensure null-termination
             something_set = 1;
         }
         else if (strcmp(key, "verbose") == 0) {
             strncpy(verbose_str, value, sizeof(verbose_str) - 1);
+            verbose_str[sizeof(verbose_str) - 1] = 0; // Ensure null-termination
             something_set = 1;
         } else {
             log(LL_ERROR, "Unknown configuration key: %s", key);
@@ -703,13 +708,16 @@ int main(int argc, char *argv[]) {
 
     // Check the client interface
     if (client_interface[0]) {
-        err = getaddrinfo(target_host, NULL, &hints, &addr);
-        if (err != 0 || addr == NULL) {
-            log(LL_ERROR, "Invalid source interface '%s': %s", client_interface, gai_strerror(err));
-            exit(EXIT_FAILURE);
+        s_listen_addr_client = inet_addr(client_interface);
+        if (s_listen_addr_client == INADDR_NONE) {
+            err = getaddrinfo(target_host, NULL, &hints, &addr);
+            if (err != 0 || addr == NULL) {
+                log(LL_ERROR, "Invalid source interface '%s': %s", client_interface, gai_strerror(err));
+                exit(EXIT_FAILURE);
+            }
+            s_listen_addr_client = ((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
+            freeaddrinfo(addr);
         }
-        s_listen_addr_client = ((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
-        freeaddrinfo(addr);
     }
 
     // Check and set the verbosity level
