@@ -372,6 +372,7 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  * @brief Encodes the given buffer using the specified key and version.
  *
  * This function applies an encoding algorithm to the input buffer using the provided key and version.
+ * WARNING: buffer must be at least 4 bytes long and aligned to 4 bytes.
  *
  * @param buffer      Pointer to the data buffer to encode.
  * @param length      Length of the data buffer in bytes.
@@ -382,8 +383,7 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  */
 static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
     if (version >= 1) {
-        uint32_t packet_type;
-        memcpy(&packet_type, buffer, sizeof(packet_type)); // safe for ARM
+        uint32_t packet_type = *((uint32_t*)buffer);
         // Add some randomness to the packet
         uint8_t rnd = 1 + (rand() % 255);
         buffer[0] ^= rnd; // Xor the first byte to a random value
@@ -411,7 +411,7 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
             if (length + dummy_length > MAX_DUMMY_LENGTH_TOTAL) {
                 dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
             }
-            memcpy(buffer + 2, &dummy_length, sizeof(uint16_t)); // safe for ARM
+            *((uint16_t*)(buffer+2)) = dummy_length; // Set the dummy length in the packet
             if (dummy_length > 0) {
                 int i = length;
                 length += dummy_length;
@@ -427,6 +427,18 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
     return length;
 }
 
+/**
+ * Decodes the given buffer using the provided key.
+ * 
+ * WARNING: buffer must be at least 4 bytes long and aligned to 4 bytes.
+ *
+ * @param buffer        Pointer to the input buffer to decode.
+ * @param length        Length of the input buffer.
+ * @param key           Pointer to the key used for decoding.
+ * @param key_length    Length of the key.
+ * @param version_out   Pointer to a variable where the decoded version will be stored.
+ * @return              Length of the decoded data (smaller than or equal to the input length).
+ */
 static inline int decode(uint8_t *buffer, int length, char *key, int key_length, uint8_t *version_out) {
     xor_data(buffer, length, key, key_length);
 
@@ -634,7 +646,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
-    uint8_t buffer[BUFFER_SIZE];
+    uint8_t buffer[BUFFER_SIZE] __attribute__((aligned(4)));
     char target_host[256] = {0};
     int target_port = -1;
     int key_length = 0;
