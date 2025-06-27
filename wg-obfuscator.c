@@ -251,6 +251,7 @@ parse_opt (int key, char *arg, struct argp_state *state)
             break;
         case 'i':
             strncpy(client_interface, arg, sizeof(client_interface) - 1);
+            client_interface[sizeof(client_interface) - 1] = 0; // Ensure null-termination
             break;
         case 's':
             log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
@@ -263,18 +264,22 @@ parse_opt (int key, char *arg, struct argp_state *state)
             break;
         case 't':
             strncpy(forward_host_port, arg, sizeof(forward_host_port) - 1);
+            forward_host_port[sizeof(forward_host_port) - 1] = 0; // Ensure null-termination
             break;
         case 'r':
             log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
             break;
         case 'b':
             strncpy(static_bindings, arg, sizeof(static_bindings) - 1);
+            static_bindings[sizeof(static_bindings) - 1] = 0; // Ensure null-termination
             break;
         case 'k':
             strncpy(xor_key, arg, sizeof(xor_key));
+            xor_key[sizeof(xor_key) - 1] = 0; // Ensure null-termination
             break;
         case 'v':
             strncpy(verbose_str, arg, sizeof(verbose_str) - 1);
+            verbose_str[sizeof(verbose_str) - 1] = 0; // Ensure null-termination
             break;
         default:
             return ARGP_ERR_UNKNOWN;
@@ -372,7 +377,8 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  */
 static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
     if (version >= 1) {
-        uint32_t packet_type = *((uint32_t*)buffer);
+        uint32_t packet_type;
+        memcpy(&packet_type, buffer, sizeof(packet_type)); // safe for ARM
         // Add some randomness to the packet
         uint8_t rnd = 1 + (rand() % 255);
         buffer[0] ^= rnd; // Xor the first byte to a random value
@@ -397,10 +403,10 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
                     //assert(0);
                     break;
             }
-            *((uint16_t*)(buffer+2)) = dummy_length; // Set the dummy length in the packet
             if (length + dummy_length > MAX_DUMMY_LENGTH_TOTAL) {
                 dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
             }
+            memcpy(buffer + 2, &dummy_length, sizeof(uint16_t)); // safe for ARM
             if (dummy_length > 0) {
                 int i = length;
                 length += dummy_length;
@@ -680,6 +686,7 @@ int main(int argc, char *argv[]) {
         }
         *port_delimiter = 0;
         strncpy(target_host, forward_host_port, sizeof(target_host) - 1);
+        target_host[sizeof(target_host) - 1] = 0; // Ensure null-termination
         target_port = atoi(port_delimiter + 1);
         if (target_port <= 0) {
             log(LL_ERROR, "Invalid target port: %s", port_delimiter + 1);
