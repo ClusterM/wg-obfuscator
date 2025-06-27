@@ -627,8 +627,14 @@ int main(int argc, char *argv[]) {
     char target_host[256] = {0};
     int target_port = -1;
     int key_length = 0;
-    unsigned long s_listen_addr_client = INADDR_ANY;
+    in_addr_t s_listen_addr_client = INADDR_ANY;
     long now, last_cleanup_time = 0;
+    struct addrinfo *addr;
+    int err;
+    struct addrinfo hints = { // for getaddrinfo
+        .ai_family = AF_INET, // IPv4
+        .ai_socktype = SOCK_DGRAM, // UDP
+    };
 
 #ifdef USE_EPOLL
     struct epoll_event events[MAX_EVENTS];
@@ -690,15 +696,13 @@ int main(int argc, char *argv[]) {
 
     // Check the client interface
     if (client_interface[0]) {
-        s_listen_addr_client = inet_addr(client_interface);
-        if (s_listen_addr_client == INADDR_NONE) {
-            struct hostent *he = gethostbyname(client_interface);
-            if (he == NULL) {
-                log(LL_ERROR, "Invalid source interface: %s", client_interface);
-                exit(EXIT_FAILURE);
-            }
-            s_listen_addr_client = *(unsigned long *)he->h_addr;
+        err = getaddrinfo(target_host, NULL, &hints, &addr);
+        if (err != 0 || addr == NULL) {
+            log(LL_ERROR, "Invalid source interface '%s': %s", client_interface, gai_strerror(err));
+            exit(EXIT_FAILURE);
         }
+        s_listen_addr_client = ((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
+        freeaddrinfo(addr);
     }
 
     // Check and set the verbosity level
@@ -754,13 +758,14 @@ int main(int argc, char *argv[]) {
     /* Set up forward address */
     memset(&forward_addr, 0, sizeof(forward_addr));
     forward_addr.sin_family = AF_INET;
-    struct hostent *host = gethostbyname(target_host);
-    if (host == NULL) {
-        log(LL_ERROR, "Can't resolve hostname: %s", target_host);
+    err = getaddrinfo(target_host, NULL, &hints, &addr);
+    if (err != 0 || addr == NULL) {
+        log(LL_ERROR, "Can't resolve hostname '%s': %s", target_host, gai_strerror(err));
         FAILURE();
     }
-    log(LL_DEBUG, "Resolved target hostname '%s' to %s", target_host, inet_ntoa(*(struct in_addr *)host->h_addr));
-    forward_addr.sin_addr = *(struct in_addr *)host->h_addr;
+    forward_addr.sin_addr = ((struct sockaddr_in *)addr->ai_addr)->sin_addr;
+    freeaddrinfo(addr);
+    log(LL_DEBUG, "Resolved target hostname '%s' to %s", target_host, inet_ntoa(forward_addr.sin_addr));
     if (target_port <= 0 || target_port > 65535) {
         log(LL_ERROR, "Invalid target port: %d", target_port);
         FAILURE();
@@ -790,14 +795,15 @@ int main(int argc, char *argv[]) {
 
             struct sockaddr_in client_addr = {0};
             client_addr.sin_family = AF_INET;
-            struct hostent *host = gethostbyname(binding);
-            if (host == NULL) {
-                log(LL_ERROR, "Can't resolve hostname '%s' for static binding '%s:%s:%s'", 
-                    binding, binding, colon1 + 1, colon2 + 1);
+            err = getaddrinfo(binding, NULL, &hints, &addr);
+            if (err != 0 || addr == NULL) {
+                log(LL_ERROR, "Can't resolve hostname '%s' for static binding '%s:%s:%s': %s", 
+                    binding, binding, colon1 + 1, colon2 + 1, gai_strerror(err));
                 FAILURE();
             }
-            log(LL_DEBUG, "Resolved static binding hostname '%s' to %s", binding, inet_ntoa(*(struct in_addr *)host->h_addr));
-            client_addr.sin_addr = *(struct in_addr *)host->h_addr;
+            client_addr.sin_addr = ((struct sockaddr_in *)addr->ai_addr)->sin_addr;
+            freeaddrinfo(addr);
+            log(LL_DEBUG, "Resolved static binding hostname '%s' to %s", binding, inet_ntoa(client_addr.sin_addr));
             int remote_port = atoi(colon1 + 1);
             if (remote_port <= 0 || remote_port > 65535) {
                 log(LL_ERROR, "Invalid port '%s' for static binding '%s:%s:%s'",
