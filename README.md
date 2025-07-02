@@ -2,6 +2,12 @@
 
 WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data, making it significantly harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government tries to block or throttle WireGuard traffic.
 
+What it's **NOT**:
+* **Not a standalone solution**: You need to use this tool on both ends. You must run the obfuscator on both the WireGuard client and server sides to ensure proper obfuscation and deobfuscation of traffic. So, you can't use it with 3rd-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., on a VPS) and connect to it using WireGuard.
+* **Not HTTPS imitation**: It does not try to imitate HTTPS or any other protocol. It simply obfuscates WireGuard packets to make them look like a totally random UDP data. If your ISP allows only whitelisted protocols (like HTTPS), this tool will not help you. It does not try to bypass protocol restrictions or make traffic look like something else.
+* **Not a VPN**: This is not a VPN service or a WireGuard client/server. It only obfuscates WireGuard traffic.
+
+Table of Contents:
 - [Feature overview](#feature-overview)
 - [Basic Concept](#basic-concept)
 - [Configuration](#configuration)
