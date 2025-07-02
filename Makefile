@@ -1,7 +1,7 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-HEADERS      = wg-obfuscator.h
+HEADERS      = wg-obfuscator.h obfuscation.h uthash.h
 
 RELEASE ?= 0
 
