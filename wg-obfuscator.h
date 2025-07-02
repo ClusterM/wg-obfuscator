@@ -26,6 +26,8 @@
 #define LL_DEBUG        3
 #define LL_TRACE        4
 
+#define LL_DEFAULT      LL_INFO  // default logging level
+
 // Main parameters
 // TODO: make these configurable via command line arguments or config file
 #define BUFFER_SIZE             8*1024  // size of the buffer for receiving data from the clients and server
@@ -50,7 +52,21 @@
 
 // Current obfuscation version
 #define OBFUSCATION_VERSION     1
+
+// Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
+
+// Structure to hold obfuscator configuration
+struct obfuscator_config {
+    char section_name[256];                     // Section name (for multiple instances)
+    int listen_port;                            // Listening port for the obfuscator
+    char forward_host_port[256];                // Host and port to forward the data to
+    char xor_key[256];                          // Key for obfuscation
+    char client_interface[256];                 // Client interface as a string
+    char static_bindings[2048];                 // Static bindings as a string
+    char verbose_str[256];                      // Verbosity level as a string
+    int verbose;                                // Verbosity level
+};
 
 // Structure to hold client connection information
 typedef struct {

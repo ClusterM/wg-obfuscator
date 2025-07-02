@@ -12,8 +12,8 @@
 #include "obfuscation.h"
 #include "uthash.h"
 
-#define log(level, fmt, ...) { if (verbose >= (level))          \
-    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,         \
+#define log(level, fmt, ...) { if (config.verbose >= (level))          \
+    fprintf(stderr, "[%s][%c] " fmt "\n", config.section_name,         \
     (                                                           \
           (level) == LL_ERROR ? 'E'                               \
         : (level) == LL_WARN  ? 'W'                               \
@@ -23,7 +23,7 @@
         : '?'                                                   \
     ), ##__VA_ARGS__);                                          \
 }
-#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define trace(fmt, ...) if (config.verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
 
 // Listening socket for receiving data from the clients
 static int listen_sock = 0;
@@ -34,21 +34,16 @@ static client_entry_t *conn_table = NULL;
     static int epfd = 0;
 #endif
 
-// Main parameters (TODO: IPv6?)
-static char section_name[256] = DEFAULT_INSTANCE_NAME;
-// Listening port for the obfuscator
-static int listen_port = -1;
-// Host and port to forward the data to
-static char forward_host_port[256] = {0};
-// Key for obfuscation
-static char xor_key[256] = {0};
-// Client interface
-static char client_interface[256] = {0};
-// Static bindings for two-way mode
-static char static_bindings[2048] = {0};
-// Verbosity level
-static char verbose_str[256] = {0};
-static int verbose = LL_INFO;
+struct obfuscator_config config = {
+    .section_name = DEFAULT_INSTANCE_NAME,
+    .listen_port = -1,
+    .forward_host_port = {0},
+    .xor_key = {0},
+    .client_interface = {0},
+    .static_bindings = {0},
+    .verbose_str = {0},
+    .verbose = LL_DEFAULT
+};
 
 /**
  * @brief Prints an error message related to a specific section.
@@ -73,7 +68,7 @@ static void perror_sect(char *str, char* section, ...)
     perror(msg);
 }
 
-#define serror(x, ...) perror_sect(x, section_name, ##__VA_ARGS__)
+#define serror(x, ...) perror_sect(x, config.section_name, ##__VA_ARGS__)
 
 
 /**
@@ -147,20 +142,20 @@ static void read_config_file(char *filename)
                 }
             }
             size_t len = strlen(line) - 2;
-            if (len > sizeof(section_name) - 1) {
-                len = sizeof(section_name) - 1;
+            if (len > sizeof(config.section_name) - 1) {
+                len = sizeof(config.section_name) - 1;
             }
-            strncpy(section_name, line + 1, len);
-            section_name[len] = 0;
+            strncpy(config.section_name, line + 1, len);
+            config.section_name[len] = 0;
 
             // Reset all the parameters
-            listen_port = -1;
-            memset(forward_host_port, 0, sizeof(forward_host_port));
-            memset(xor_key, 0, sizeof(xor_key));
-            memset(client_interface, 0, sizeof(client_interface));
-            memset(static_bindings, 0, sizeof(static_bindings));
-            memset(verbose_str, 0, sizeof(verbose_str));
-            verbose = 2;
+            config.listen_port = -1;
+            memset(config.forward_host_port, 0, sizeof(config.forward_host_port));
+            memset(config.xor_key, 0, sizeof(config.xor_key));
+            memset(config.client_interface, 0, sizeof(config.client_interface));
+            memset(config.static_bindings, 0, sizeof(config.static_bindings));
+            memset(config.verbose_str, 0, sizeof(config.verbose_str));
+            config.verbose = LL_DEFAULT;
             listen_port_set = 0;
             forward_host_port_set = 0;
             xor_key_set = 0;
@@ -186,22 +181,22 @@ static void read_config_file(char *filename)
         }
 
         if (strcmp(key, "source-lport") == 0) {
-            listen_port = atoi(value);
+            config.listen_port = atoi(value);
             listen_port_set = 1;
             something_set = 1;
         } else if (strcmp(key, "target") == 0) {
-            strncpy(forward_host_port, value, sizeof(forward_host_port) - 1);
-            forward_host_port[sizeof(forward_host_port) - 1] = 0; // Ensure null-termination
+            strncpy(config.forward_host_port, value, sizeof(config.forward_host_port) - 1);
+            config.forward_host_port[sizeof(config.forward_host_port) - 1] = 0; // Ensure null-termination
             forward_host_port_set = 1;
             something_set = 1;
         } else if (strcmp(key, "key") == 0) {
-            strncpy(xor_key, value, sizeof(xor_key) - 1);
-            xor_key[sizeof(xor_key) - 1] = 0; // Ensure null-termination
+            strncpy(config.xor_key, value, sizeof(config.xor_key) - 1);
+            config.xor_key[sizeof(config.xor_key) - 1] = 0; // Ensure null-termination
             xor_key_set = 1;
             something_set = 1;
         } else if (strcmp(key, "source-if") == 0) {
-            strncpy(client_interface, value, sizeof(client_interface) - 1);
-            client_interface[sizeof(client_interface) - 1] = 0; // Ensure null-termination
+            strncpy(config.client_interface, value, sizeof(config.client_interface) - 1);
+            config.client_interface[sizeof(config.client_interface) - 1] = 0; // Ensure null-termination
             something_set = 1;
         }
          else if (strcmp(key, "target-if") == 0) {
@@ -218,13 +213,13 @@ static void read_config_file(char *filename)
             something_set = 1;
         }
         else if (strcmp(key, "static-bindings") == 0) {
-            strncpy(static_bindings, value, sizeof(static_bindings) - 1);
-            static_bindings[sizeof(static_bindings) - 1] = 0; // Ensure null-termination
+            strncpy(config.static_bindings, value, sizeof(config.static_bindings) - 1);
+            config.static_bindings[sizeof(config.static_bindings) - 1] = 0; // Ensure null-termination
             something_set = 1;
         }
         else if (strcmp(key, "verbose") == 0) {
-            strncpy(verbose_str, value, sizeof(verbose_str) - 1);
-            verbose_str[sizeof(verbose_str) - 1] = 0; // Ensure null-termination
+            strncpy(config.verbose_str, value, sizeof(config.verbose_str) - 1);
+            config.verbose_str[sizeof(config.verbose_str) - 1] = 0; // Ensure null-termination
             something_set = 1;
         } else {
             log(LL_ERROR, "Unknown configuration key: %s", key);
@@ -256,36 +251,36 @@ parse_opt (int key, char *arg, struct argp_state *state)
             read_config_file(arg);
             break;
         case 'i':
-            strncpy(client_interface, arg, sizeof(client_interface) - 1);
-            client_interface[sizeof(client_interface) - 1] = 0; // Ensure null-termination
+            strncpy(config.client_interface, arg, sizeof(config.client_interface) - 1);
+            config.client_interface[sizeof(config.client_interface) - 1] = 0; // Ensure null-termination
             break;
         case 's':
             log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
             break;
         case 'p':
-            listen_port = atoi(arg);
+            config.listen_port = atoi(arg);
             break;
         case 'o':
             log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.");
             break;
         case 't':
-            strncpy(forward_host_port, arg, sizeof(forward_host_port) - 1);
-            forward_host_port[sizeof(forward_host_port) - 1] = 0; // Ensure null-termination
+            strncpy(config.forward_host_port, arg, sizeof(config.forward_host_port) - 1);
+            config.forward_host_port[sizeof(config.forward_host_port) - 1] = 0; // Ensure null-termination
             break;
         case 'r':
             log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
             break;
         case 'b':
-            strncpy(static_bindings, arg, sizeof(static_bindings) - 1);
-            static_bindings[sizeof(static_bindings) - 1] = 0; // Ensure null-termination
+            strncpy(config.static_bindings, arg, sizeof(config.static_bindings) - 1);
+            config.static_bindings[sizeof(config.static_bindings) - 1] = 0; // Ensure null-termination
             break;
         case 'k':
-            strncpy(xor_key, arg, sizeof(xor_key));
-            xor_key[sizeof(xor_key) - 1] = 0; // Ensure null-termination
+            strncpy(config.xor_key, arg, sizeof(config.xor_key));
+            config.xor_key[sizeof(config.xor_key) - 1] = 0; // Ensure null-termination
             break;
         case 'v':
-            strncpy(verbose_str, arg, sizeof(verbose_str) - 1);
-            verbose_str[sizeof(verbose_str) - 1] = 0; // Ensure null-termination
+            strncpy(config.verbose_str, arg, sizeof(config.verbose_str) - 1);
+            config.verbose_str[sizeof(config.verbose_str) - 1] = 0; // Ensure null-termination
             break;
         default:
             return ARGP_ERR_UNKNOWN;
@@ -535,7 +530,7 @@ int main(int argc, char *argv[]) {
     struct pollfd pollfds[MAX_CLIENTS + 1];
 #endif
 
-    if (verbose >= LL_WARN) {
+    if (config.verbose >= LL_WARN) {
 #ifdef COMMIT
         fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
@@ -556,23 +551,23 @@ int main(int argc, char *argv[]) {
     /* Check the parameters */
 
     // Check the listening port
-    if (listen_port < 0) {
+    if (config.listen_port < 0) {
         log(LL_ERROR, "'source-lport' is not set");
         exit(EXIT_FAILURE);
     }
  
     // Check the target host and port
-    if (!forward_host_port[0]) {
+    if (!config.forward_host_port[0]) {
         log(LL_ERROR, "'target' is not set");
         exit(EXIT_FAILURE);
     } else {
-        char *port_delimiter = strchr(forward_host_port, ':');
+        char *port_delimiter = strchr(config.forward_host_port, ':');
         if (port_delimiter == NULL) {
-            log(LL_ERROR, "Invalid target host:port format: %s", forward_host_port);
+            log(LL_ERROR, "Invalid target host:port format: %s", config.forward_host_port);
             exit(EXIT_FAILURE);
         }
         *port_delimiter = 0;
-        strncpy(target_host, forward_host_port, sizeof(target_host) - 1);
+        strncpy(target_host, config.forward_host_port, sizeof(target_host) - 1);
         target_host[sizeof(target_host) - 1] = 0; // Ensure null-termination
         target_port = atoi(port_delimiter + 1);
         if (target_port <= 0) {
@@ -582,19 +577,19 @@ int main(int argc, char *argv[]) {
     }
 
     // Check the key
-    key_length = strlen(xor_key);
+    key_length = strlen(config.xor_key);
     if (key_length == 0) {
         log(LL_ERROR, "Key is not set");
         exit(EXIT_FAILURE);
     }
 
     // Check the client interface
-    if (client_interface[0]) {
-        s_listen_addr_client = inet_addr(client_interface);
+    if (config.client_interface[0]) {
+        s_listen_addr_client = inet_addr(config.client_interface);
         if (s_listen_addr_client == INADDR_NONE) {
             err = getaddrinfo(target_host, NULL, &hints, &addr);
             if (err != 0 || addr == NULL) {
-                log(LL_ERROR, "Invalid source interface '%s': %s", client_interface, gai_strerror(err));
+                log(LL_ERROR, "Invalid source interface '%s': %s", config.client_interface, gai_strerror(err));
                 exit(EXIT_FAILURE);
             }
             s_listen_addr_client = ((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
@@ -603,10 +598,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Check and set the verbosity level
-    if (verbose_str[0]) {
-        verbose = atoi(verbose_str);
-        if (verbose < 0 || verbose > 4) {
-            log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", verbose_str);
+    if (config.verbose_str[0]) {
+        config.verbose = atoi(config.verbose_str);
+        if (config.verbose < 0 || config.verbose > 4) {
+            log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", config.verbose_str);
             exit(EXIT_FAILURE);
         }
     }
@@ -625,7 +620,7 @@ int main(int argc, char *argv[]) {
     memset(&listen_addr, 0, sizeof(listen_addr));
     listen_addr.sin_family = AF_INET;
     listen_addr.sin_addr.s_addr = s_listen_addr_client;
-    listen_addr.sin_port = htons(listen_port);
+    listen_addr.sin_port = htons(config.listen_port);
     if (bind(listen_sock, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
         serror("Failed to bind source socket to %s:%d", 
             inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
@@ -671,9 +666,9 @@ int main(int argc, char *argv[]) {
     log(LL_WARN, "Target: %s:%d", target_host, target_port);
 
     /* Add static bindings if provided */
-    if (static_bindings[0]) {
+    if (config.static_bindings[0]) {
         // Parse static bindings
-        char *binding = strtok(static_bindings, ",");
+        char *binding = strtok(config.static_bindings, ",");
         while (binding) {
             // Trim leading and trailing spaces
             binding = trim(binding);
@@ -722,7 +717,7 @@ int main(int argc, char *argv[]) {
             }
 
             log(LL_WARN, "Added static binding: %s:%d <-> %d:obfuscator:%d <-> %s:%d", 
-                binding, remote_port, listen_port,
+                binding, remote_port, config.listen_port,
                 local_port, target_host, target_port);
 
             binding = strtok(NULL, ",");
@@ -794,7 +789,7 @@ int main(int argc, char *argv[]) {
                 uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry ? client_entry->version : OBFUSCATION_VERSION;
 
-                if (verbose >= LL_TRACE) {
+                if (config.verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)",
                         length,
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
@@ -813,7 +808,7 @@ int main(int argc, char *argv[]) {
 
                 if (obfuscated) {
                     // decode
-                    length = decode(buffer, length, xor_key, key_length, &version);
+                    length = decode(buffer, length, config.xor_key, key_length, &version);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to decode packet from %s:%d (too short, length=%d)",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
@@ -888,7 +883,7 @@ int main(int argc, char *argv[]) {
 
                 if (!obfuscated) {
                     // If the packet is not obfuscated, we need to encode it
-                    length = encode(buffer, length, xor_key, key_length, client_entry->version);
+                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d (too short, length=%d)",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
@@ -896,7 +891,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (verbose >= LL_TRACE) {
+                if (config.verbose >= LL_TRACE) {
                     if (!obfuscated) {
                         trace("X->: ");
                     } else {
@@ -930,7 +925,7 @@ int main(int argc, char *argv[]) {
                 uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry->version;
 
-                if (verbose >= LL_TRACE) {
+                if (config.verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)",
                         length,
                         target_host, target_port, 
@@ -949,7 +944,7 @@ int main(int argc, char *argv[]) {
 
                 if (obfuscated) {
                     // decode
-                    length = decode(buffer, length, xor_key, key_length, &version);
+                    length = decode(buffer, length, config.xor_key, key_length, &version);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to decode packet from %s:%d", target_host, target_port);
                         continue;
@@ -1010,14 +1005,14 @@ int main(int argc, char *argv[]) {
 
                 if (!obfuscated) {
                     // If the packet is not obfuscated, we need to encode it
-                    length = encode(buffer, length, xor_key, key_length, client_entry->version);
+                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
                     }
                 }
                 
-                if (verbose >= LL_TRACE) {
+                if (config.verbose >= LL_TRACE) {
                     if (!obfuscated) {
                         trace("<-X: ");
                     } else {
