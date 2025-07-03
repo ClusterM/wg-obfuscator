@@ -587,7 +587,7 @@ int main(int argc, char *argv[]) {
     if (config.client_interface[0]) {
         s_listen_addr_client = inet_addr(config.client_interface);
         if (s_listen_addr_client == INADDR_NONE) {
-            err = getaddrinfo(target_host, NULL, &hints, &addr);
+            err = getaddrinfo(config.client_interface, NULL, &hints, &addr);
             if (err != 0 || addr == NULL) {
                 log(LL_ERROR, "Invalid source interface '%s': %s", config.client_interface, gai_strerror(err));
                 exit(EXIT_FAILURE);
