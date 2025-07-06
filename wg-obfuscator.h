@@ -1,6 +1,8 @@
 #ifndef _WG_OBFUSCATOR_H_
 #define _WG_OBFUSCATOR_H_
 
+#include <arpa/inet.h>
+
 // on Linux, use epoll for better performance
 #ifdef __linux__
 #define USE_EPOLL
@@ -18,13 +20,6 @@
 
 #define WG_OBFUSCATOR_VERSION "1.1"
 #define WG_OBFUSCATOR_GIT_REPO "https://github.com/ClusterM/wg-obfuscator"
-
-// Logging levels
-#define LL_ERROR        0
-#define LL_WARN         1
-#define LL_INFO         2
-#define LL_DEBUG        3
-#define LL_TRACE        4
 
 #define LL_DEFAULT      LL_INFO  // default logging level
 
@@ -56,6 +51,26 @@
 // Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
 
+// Logging levels
+#define LL_ERROR        0
+#define LL_WARN         1
+#define LL_INFO         2
+#define LL_DEBUG        3
+#define LL_TRACE        4
+
+#define log(level, fmt, ...) { if (verbose >= (level))       \
+    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,      \
+    (                                                               \
+          (level) == LL_ERROR ? 'E'                                 \
+        : (level) == LL_WARN  ? 'W'                                 \
+        : (level) == LL_INFO  ? 'I'                                 \
+        : (level) == LL_DEBUG ? 'D'                                 \
+        : (level) == LL_TRACE ? 'T'                                 \
+        : '?'                                                       \
+    ), ##__VA_ARGS__);                                              \
+}
+#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+
 // Structure to hold obfuscator configuration
 struct obfuscator_config {
     int listen_port;                            // Listening port for the obfuscator
@@ -84,5 +99,10 @@ typedef struct {
     uint8_t is_static           : 1;            // 1 if this is a static binding entry, 0 otherwise
     UT_hash_handle hh;
 } client_entry_t;
+
+// Verbosity level
+extern int verbose;
+// Section name (for multiple instances)
+extern char section_name[256];
 
 #endif

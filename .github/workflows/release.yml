@@ -387,9 +387,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Install argp
-        run: brew install argp-standalone
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -443,7 +440,6 @@ jobs:
             base-devel
             gcc
             git
-            libargp-devel
             zip
 
       - name: Checkout

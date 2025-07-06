@@ -109,8 +109,6 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - name: Install argp
-        run: brew install argp-standalone
       - name: Checkout
         uses: actions/checkout@v4
       - name: make clean all
@@ -134,7 +132,6 @@ jobs:
             base-devel
             gcc
             git
-            libargp-devel
       - name: Checkout
         uses: actions/checkout@v4
       - name: make clean all

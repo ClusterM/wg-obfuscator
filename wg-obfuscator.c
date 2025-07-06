@@ -8,25 +8,10 @@
 #include <time.h>
 #include <stdarg.h>
 #include "wg-obfuscator.h"
+#include "config.h"
 #include "obfuscation.h"
-#include "mini_argp.h"
 #include "uthash.h"
 
-#define log(level, fmt, ...) { if (verbose >= (level))       \
-    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,      \
-    (                                                               \
-          (level) == LL_ERROR ? 'E'                                 \
-        : (level) == LL_WARN  ? 'W'                                 \
-        : (level) == LL_INFO  ? 'I'                                 \
-        : (level) == LL_DEBUG ? 'D'                                 \
-        : (level) == LL_TRACE ? 'T'                                 \
-        : '?'                                                       \
-    ), ##__VA_ARGS__);                                              \
-}
-#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
-
-// Executable name
-const char *arg0;
 // Verbosity level
 int verbose = LL_DEFAULT;
 // Section name (for multiple instances)
@@ -47,250 +32,20 @@ static client_entry_t *conn_table = NULL;
  * Additional arguments can be provided for formatted output.
  *
  * @param str      The error message prefix.
- * @param section  The name of the section related to the error.
  * @param ...      Additional arguments for formatting the error message.
  */
-static void perror_sect(char *str, char* section, ...)
+static void serror(char *str, ...)
 {
     char buf[512];
     va_list args;
-    va_start(args, section);
+    va_start(args, str);
     vsnprintf(buf, sizeof(buf), str, args);
     va_end(args);
 
     char msg[1024];
-    snprintf(msg, sizeof(msg), "[%s][E] %s", section, buf);
+    snprintf(msg, sizeof(msg), "[%s][E] %s", section_name, buf);
     perror(msg);
 }
-
-#define serror(x, ...) perror_sect(x, section_name, ##__VA_ARGS__)
-
-
-/**
- * @brief Removes leading and trailing whitespace characters from the input string.
- *
- * This function modifies the input string in place by trimming any whitespace
- * characters (such as spaces, tabs, or newlines) from both the beginning and end.
- *
- * @param s Pointer to the null-terminated string to be trimmed.
- * @return Pointer to the trimmed string (same as input pointer).
- */
-static char *trim(char *s) {
-    char *end;
-    // Trim leading spaces, tabs, carriage returns and newlines
-    while (*s && (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n')) s++;
-    if (!*s) return s;
-    // Trim trailing spaces, tabs, carriage returns and newlines
-    end = s + strlen(s) - 1;
-    while (end > s && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) *end-- = 0;
-    return s;
-}
-
-/* The options we understand. */
-static const mini_argp_opt options[] = {
-    { "help", '?', 0 },
-    { "config", 'c', 1 },
-    { "source-if", 'i', 1 },
-    { "source", 's', 1 },
-    { "source-lport", 'p', 1 },
-    { "target-if", 'o', 1 },
-    { "target", 't', 1 },
-    { "target-lport", 'r', 1 },
-    { "key", 'k', 1 },
-    { "static-bindings", 'b', 1 },
-    { "verbose", 'v', 1 },
-    { 0 }
-};
-
-static int parse_opt (const char *lname, char sname, const char *val, void *ctx);
-
-static void reset_config(struct obfuscator_config *config)
-{
-    memset(config, 0, sizeof(struct obfuscator_config));
-    verbose = LL_DEFAULT;
-}
-
-/**
- * @brief Reads and processes the configuration file.
- *
- * This function opens the specified configuration file and parses its contents
- * to initialize or update the application's configuration settings.
- *
- * @param filename The path to the configuration file to be read.
- */
-static void read_config_file(const char *filename, struct obfuscator_config *config)
-{
-    // Read configuration from the file
-    uint8_t first_section = 1; // Flag to indicate if this is the first section being processed
-    char line[256];
-
-    FILE *config_file = fopen(filename, "r");
-    if (config_file == NULL) {
-        perror("Can't open config file");
-        exit(EXIT_FAILURE);
-    }
-
-    while (fgets(line, sizeof(line), config_file)) {
-        // Remove trailing newlines, carriage returns, spaces and tabs
-        while (strlen(line) && (line[strlen(line) - 1] == '\n' || line[strlen(line) - 1] == '\r' 
-            || line[strlen(line) - 1] == ' ' || line[strlen(line) - 1] == '\t')) {
-            line[strlen(line) - 1] = 0;
-        }
-        // Remove leading spaces and tabs
-        while (strlen(line) && (line[0] == ' ' || line[0] == '\t')) {
-            memmove(line, line + 1, strlen(line));
-        }
-        // Ignore comments
-        char *comment_index = strstr(line, "#");
-        if (comment_index != NULL) {
-            *comment_index = 0;
-        }
-        // Skip empty lines or with spaces only
-        if (strspn(line, " \t\r\n") == strlen(line)) {
-            continue;
-        }
-
-        // It can be new section
-        if (line[0] == '[' && line[strlen(line) - 1] == ']') {
-            if (!first_section) {
-                // new config, need to fork the process
-                if (fork() == 0) {
-                    return;
-                }
-            }
-            size_t len = strlen(line) - 2;
-            if (len > sizeof(section_name) - 1) {
-                len = sizeof(section_name) - 1;
-            }
-            strncpy(section_name, line + 1, len);
-            section_name[len] = 0;
-
-            // Reset all the parameters
-            reset_config(config);
-
-            first_section = 0; // We have processed the first section
-            continue;
-        }
-
-        // Parse key-value pairs
-        char *key = strtok(line, "=");
-        key = trim(key);
-        while (strlen(key) && (key[strlen(key) - 1] == ' ' || key[strlen(key) - 1] == '\t' || key[strlen(key) - 1] == '\r' || key[strlen(key) - 1] == '\n')) {
-            key[strlen(key) - 1] = 0;
-        }
-        char *value = strtok(NULL, "=");
-        if (value == NULL) {
-            log(LL_ERROR, "Invalid configuration line: %s", line);
-            exit(EXIT_FAILURE);
-        }
-        value = trim(value);
-        if (!*value) {
-            log(LL_ERROR, "Invalid configuration line: %s", line);
-            exit(EXIT_FAILURE);
-        }
-        const mini_argp_opt *o = margp_find(options, key, 0);
-        if (o == NULL) {
-            log(LL_ERROR, "Unknown configuration key: %s", key);
-            exit(EXIT_FAILURE);
-        }
-        parse_opt(o->long_name, o->short_name, value, config);
-    }
-    fclose(config_file);
-}
-
-static void show_usage(void)
-{
-    printf("Usage: %s [options]\n%s", arg0,
-        "  -c, --config=<config_file> Read configuration from file (can be used instead\n"
-        "                             of the rest arguments\n"
-        "  -i, --source-if=<ip>       Source interface to listen on (optional, default -\n"
-        "                             0.0.0.0, e.g. all\n"
-        "  -p, --source-lport=<port>  Source port to listen\n"
-        "  -t, --target=<ip>:<port>   Target IP and port\n"
-        "  -k, --key=<key>            Obfuscation key (required, must be 1-255\n"
-        "                             characters long)\n"
-        "  -b, --static-bindings=<ip>:<port>:<port>,...\n"
-        "                             Comma-separated static bindings for two-way mode\n"
-        "                             as <client_ip>:<client_port>:<forward_port>\n"
-        "  -v, --verbose=<0-4>        Verbosity level (optional, default - 2)\n"
-        "                             0 - ERRORS (critical errors only)\n"
-        "                             1 - WARNINGS (important messages: startup and\n"
-        "                             shutdown messages)\n"
-        "                             2 - INFO (informational messages: status messages,\n"
-        "                             connection established, etc.)\n"
-        "                             3 - DEBUG (detailed debug messages)\n"
-        "                             4 - TRACE (very detailed debug messages, including\n"
-        "                             packet dumps)\n"
-        "  -?, --help                 Give this help list\n");
-}
-
-/* Parse a single option. */
-static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
-{
-    struct obfuscator_config *config = (struct obfuscator_config *)ctx;
-
-    switch (sname)
-    {
-        case '?':
-            show_usage();
-            exit(EXIT_SUCCESS);
-        case 'c':
-            read_config_file(val, config);
-            break;
-        case 'i':
-            strncpy(config->client_interface, val, sizeof(config->client_interface) - 1);
-            config->client_interface[sizeof(config->client_interface) - 1] = 0; // Ensure null-termination
-            config->client_interface_set = 1;
-            break;
-        case 'p':
-            config->listen_port = atoi(val);
-            if (config->listen_port <= 0 || config->listen_port > 65535) {
-                log(LL_ERROR, "Invalid listen port: %s (must be between 1 and 65535)", val);
-                exit(EXIT_FAILURE);
-            }
-            config->listen_port_set = 1;
-            break;
-        case 't':
-            strncpy(config->forward_host_port, val, sizeof(config->forward_host_port) - 1);
-            config->forward_host_port[sizeof(config->forward_host_port) - 1] = 0; // Ensure null-termination
-            config->forward_host_port_set = 1;
-            break;
-        case 'b':
-            strncpy(config->static_bindings, val, sizeof(config->static_bindings) - 1);
-            config->static_bindings[sizeof(config->static_bindings) - 1] = 0; // Ensure null-termination
-            config->static_bindings_set = 1;
-            break;
-        case 'k':
-            strncpy(config->xor_key, val, sizeof(config->xor_key));
-            config->xor_key[sizeof(config->xor_key) - 1] = 0; // Ensure null-termination
-            if (strlen(config->xor_key) == 0) {
-                log(LL_ERROR, "XOR key cannot be empty");
-                exit(EXIT_FAILURE);
-            }
-            config->xor_key_set = 1;
-            break;
-        case 'v':
-            // TODO: parse verbosity level from string
-            verbose = atoi(val);
-            if (verbose < 0 || verbose > 4) {
-                log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", val);
-                exit(EXIT_FAILURE);
-            }            
-            break;
-        default:
-            // should never happen
-            return -1;
-    }
-    return 0;
-}
-
-/* Our argp parser. */
-const char *app_name =
-#ifdef COMMIT
-    "WireGuard Obfuscator\n(commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")";
-#else
-	"WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION;
-#endif
 
 /**
  * @brief Handles incoming signals for the application.
@@ -303,29 +58,23 @@ const char *app_name =
 static void signal_handler(int signal) {
     client_entry_t *current_entry, *tmp;
 
-    switch (signal) {
-        case -1:
-        case SIGINT:
-        case SIGTERM:
-            // Close all connections and clean up
-            if (listen_sock) {
-                close(listen_sock);
-            }
-            HASH_ITER(hh, conn_table, current_entry, tmp) {
-                if (current_entry->server_sock) {
-                    close(current_entry->server_sock);
-                }
-                HASH_DEL(conn_table, current_entry);
-                free(current_entry);
-            }
-#ifdef USE_EPOLL
-            if (epfd) {
-                close(epfd);
-            }
-#endif
-            log(LL_WARN, "Stopped.");
-            break;
+    // Close all connections and clean up
+    if (listen_sock) {
+        close(listen_sock);
     }
+    HASH_ITER(hh, conn_table, current_entry, tmp) {
+        if (current_entry->server_sock) {
+            close(current_entry->server_sock);
+        }
+        HASH_DEL(conn_table, current_entry);
+        free(current_entry);
+    }
+#ifdef USE_EPOLL
+    if (epfd) {
+        close(epfd);
+    }
+#endif
+    log(LL_WARN, "Stopped.");
     exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 #define FAILURE() signal_handler(-1)
@@ -503,27 +252,17 @@ int main(int argc, char *argv[]) {
     struct pollfd pollfds[MAX_CLIENTS + 1];
 #endif
 
-    if (verbose >= LL_WARN) {
+
 #ifdef COMMIT
-        fprintf(stderr, "WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
-        fprintf(stderr, "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
 #endif
-    }
 
-    reset_config(&config); // Initialize the configuration structure
-
-    /* Parse command line arguments */
-    arg0 = argv[0]; // Save the executable name
-    if (argc == 1) {
-        fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
+    if (parse_config(argc, argv, &config) != 0) {
         exit(EXIT_FAILURE);
     }
-    if (mini_argp_parse(argc, argv, options, &config, parse_opt) != 0) {
-        fprintf(stderr, "Failed to parse command line arguments\n");
-        exit(EXIT_FAILURE);
-    }
-  
+
     /* Check the parameters */
     // Check the listening port
     if (!config.listen_port_set) {

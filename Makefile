@@ -1,7 +1,7 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-HEADERS      = wg-obfuscator.h obfuscation.h uthash.h mini_argp.h
+HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h
 
 RELEASE ?= 0
 
@@ -12,7 +12,7 @@ ifdef DEBUG
 else
   CFLAGS   = -O2 -Wall
 endif
-OBJS = wg-obfuscator.o
+OBJS = wg-obfuscator.o config.o
 EXEDIR = .
 
 LDFLAGS +=
@@ -85,10 +85,10 @@ endif
 
 $(OBJS): 
 
-%.o : %.c
+%.o : %.c $(HEADERS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(TARGET): $(OBJS) $(HEADERS)
+$(TARGET): $(OBJS)
 	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
 ifeq ($(OS),Windows_NT)
 	@for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do if [ ! -f "$(EXEDIR)/`basename $$f`" ] ; then cp -vf `cygpath "$$f"` $(EXEDIR)/ ; fi ; done

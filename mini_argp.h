@@ -1,8 +1,8 @@
 /* mini_argp.h
  * Tiny callback-based CLI parser */
 
-#ifndef MINI_ARGP_H
-#define MINI_ARGP_H
+#ifndef _MINI_ARGP_H_
+#define _MINI_ARGP_H_
 #include <stdio.h>
 #include <string.h>
 
@@ -79,4 +79,4 @@ static int mini_argp_parse(int argc, char **argv,
     return 0;
 }
 
-#endif/* MINI_ARGP_H */
+#endif/* _MINI_ARGP_H_ */
