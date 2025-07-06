@@ -58,14 +58,16 @@
 
 // Structure to hold obfuscator configuration
 struct obfuscator_config {
-    char section_name[256];                     // Section name (for multiple instances)
     int listen_port;                            // Listening port for the obfuscator
+    uint8_t listen_port_set;                    // 1 if the listen port is set, 0 otherwise
     char forward_host_port[256];                // Host and port to forward the data to
+    uint8_t forward_host_port_set;              // 1 if the forward host and port are set, 0 otherwise
     char xor_key[256];                          // Key for obfuscation
+    uint8_t xor_key_set;                        // 1 if the XOR key is set, 0 otherwise
     char client_interface[256];                 // Client interface as a string
+    uint8_t client_interface_set;               // 1 if the client interface is set, 0 otherwise
     char static_bindings[2048];                 // Static bindings as a string
-    char verbose_str[256];                      // Verbosity level as a string
-    int verbose;                                // Verbosity level
+    uint8_t static_bindings_set;                // 1 if the static bindings are set, 0 otherwise
 };
 
 // Structure to hold client connection information

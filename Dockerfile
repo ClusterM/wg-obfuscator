@@ -1,9 +1,9 @@
 # Stage 1: Build
 FROM alpine:latest AS build
 WORKDIR /src
-RUN apk add --no-cache build-base argp-standalone git
+RUN apk add --no-cache build-base git
 COPY ./. ./
-RUN make clean && make LDFLAGS="-largp -static"
+RUN make clean && make LDFLAGS="-static"
 
 # Stage 2: Runtime
 FROM scratch

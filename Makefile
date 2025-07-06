@@ -1,7 +1,7 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-HEADERS      = wg-obfuscator.h obfuscation.h uthash.h
+HEADERS      = wg-obfuscator.h obfuscation.h uthash.h mini_argp.h
 
 RELEASE ?= 0
 
@@ -38,14 +38,12 @@ endif
 
 ifeq ($(OS),Windows_NT)
   CFLAGS += -Wno-stringop-truncation
-  LDFLAGS += -largp
   TARGET = $(EXEDIR)/$(PROG_NAME).exe  
 else
   TARGET = $(EXEDIR)/$(PROG_NAME)
   # build on macos(arm) support
   UNAME_S := $(shell uname -s)
   ifeq ($(UNAME_S),Darwin)
-    LDFLAGS += -largp
     ifeq ($(IS_MACARM), 1)
       LDFLAGS += -L$(shell brew --prefix)/lib
     endif

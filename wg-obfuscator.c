@@ -6,25 +6,31 @@
 #include <netdb.h>
 #include <signal.h>
 #include <time.h>
-#include <argp.h>
 #include <stdarg.h>
 #include "wg-obfuscator.h"
 #include "obfuscation.h"
+#include "mini_argp.h"
 #include "uthash.h"
 
-#define log(level, fmt, ...) { if (config.verbose >= (level))          \
-    fprintf(stderr, "[%s][%c] " fmt "\n", config.section_name,         \
-    (                                                           \
-          (level) == LL_ERROR ? 'E'                               \
-        : (level) == LL_WARN  ? 'W'                               \
-        : (level) == LL_INFO  ? 'I'                               \
-        : (level) == LL_DEBUG ? 'D'                               \
-        : (level) == LL_TRACE ? 'T'                               \
-        : '?'                                                   \
-    ), ##__VA_ARGS__);                                          \
+#define log(level, fmt, ...) { if (verbose >= (level))       \
+    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,      \
+    (                                                               \
+          (level) == LL_ERROR ? 'E'                                 \
+        : (level) == LL_WARN  ? 'W'                                 \
+        : (level) == LL_INFO  ? 'I'                                 \
+        : (level) == LL_DEBUG ? 'D'                                 \
+        : (level) == LL_TRACE ? 'T'                                 \
+        : '?'                                                       \
+    ), ##__VA_ARGS__);                                              \
 }
-#define trace(fmt, ...) if (config.verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
 
+// Executable name
+const char *arg0;
+// Verbosity level
+int verbose = LL_DEFAULT;
+// Section name (for multiple instances)
+char section_name[256] = DEFAULT_INSTANCE_NAME;
 // Listening socket for receiving data from the clients
 static int listen_sock = 0;
 // Hash table for client connections
@@ -33,17 +39,6 @@ static client_entry_t *conn_table = NULL;
 #ifdef USE_EPOLL
     static int epfd = 0;
 #endif
-
-struct obfuscator_config config = {
-    .section_name = DEFAULT_INSTANCE_NAME,
-    .listen_port = -1,
-    .forward_host_port = {0},
-    .xor_key = {0},
-    .client_interface = {0},
-    .static_bindings = {0},
-    .verbose_str = {0},
-    .verbose = LL_DEFAULT
-};
 
 /**
  * @brief Prints an error message related to a specific section.
@@ -68,7 +63,7 @@ static void perror_sect(char *str, char* section, ...)
     perror(msg);
 }
 
-#define serror(x, ...) perror_sect(x, config.section_name, ##__VA_ARGS__)
+#define serror(x, ...) perror_sect(x, section_name, ##__VA_ARGS__)
 
 
 /**
@@ -91,6 +86,30 @@ static char *trim(char *s) {
     return s;
 }
 
+/* The options we understand. */
+static const mini_argp_opt options[] = {
+    { "help", '?', 0 },
+    { "config", 'c', 1 },
+    { "source-if", 'i', 1 },
+    { "source", 's', 1 },
+    { "source-lport", 'p', 1 },
+    { "target-if", 'o', 1 },
+    { "target", 't', 1 },
+    { "target-lport", 'r', 1 },
+    { "key", 'k', 1 },
+    { "static-bindings", 'b', 1 },
+    { "verbose", 'v', 1 },
+    { 0 }
+};
+
+static int parse_opt (const char *lname, char sname, const char *val, void *ctx);
+
+static void reset_config(struct obfuscator_config *config)
+{
+    memset(config, 0, sizeof(struct obfuscator_config));
+    verbose = LL_DEFAULT;
+}
+
 /**
  * @brief Reads and processes the configuration file.
  *
@@ -99,19 +118,17 @@ static char *trim(char *s) {
  *
  * @param filename The path to the configuration file to be read.
  */
-static void read_config_file(char *filename)
+static void read_config_file(const char *filename, struct obfuscator_config *config)
 {
     // Read configuration from the file
+    uint8_t first_section = 1; // Flag to indicate if this is the first section being processed
     char line[256];
+
     FILE *config_file = fopen(filename, "r");
     if (config_file == NULL) {
         perror("Can't open config file");
         exit(EXIT_FAILURE);
     }
-    int listen_port_set = 0;
-    int forward_host_port_set = 0;
-    int xor_key_set = 0;
-    int something_set = 0;
 
     while (fgets(line, sizeof(line), config_file)) {
         // Remove trailing newlines, carriage returns, spaces and tabs
@@ -135,31 +152,23 @@ static void read_config_file(char *filename)
 
         // It can be new section
         if (line[0] == '[' && line[strlen(line) - 1] == ']') {
-            if (something_set) {
+            if (!first_section) {
                 // new config, need to fork the process
                 if (fork() == 0) {
                     return;
                 }
             }
             size_t len = strlen(line) - 2;
-            if (len > sizeof(config.section_name) - 1) {
-                len = sizeof(config.section_name) - 1;
+            if (len > sizeof(section_name) - 1) {
+                len = sizeof(section_name) - 1;
             }
-            strncpy(config.section_name, line + 1, len);
-            config.section_name[len] = 0;
+            strncpy(section_name, line + 1, len);
+            section_name[len] = 0;
 
             // Reset all the parameters
-            config.listen_port = -1;
-            memset(config.forward_host_port, 0, sizeof(config.forward_host_port));
-            memset(config.xor_key, 0, sizeof(config.xor_key));
-            memset(config.client_interface, 0, sizeof(config.client_interface));
-            memset(config.static_bindings, 0, sizeof(config.static_bindings));
-            memset(config.verbose_str, 0, sizeof(config.verbose_str));
-            config.verbose = LL_DEFAULT;
-            listen_port_set = 0;
-            forward_host_port_set = 0;
-            xor_key_set = 0;
-            something_set = 0;
+            reset_config(config);
+
+            first_section = 0; // We have processed the first section
             continue;
         }
 
@@ -179,146 +188,109 @@ static void read_config_file(char *filename)
             log(LL_ERROR, "Invalid configuration line: %s", line);
             exit(EXIT_FAILURE);
         }
-
-        if (strcmp(key, "source-lport") == 0) {
-            config.listen_port = atoi(value);
-            listen_port_set = 1;
-            something_set = 1;
-        } else if (strcmp(key, "target") == 0) {
-            strncpy(config.forward_host_port, value, sizeof(config.forward_host_port) - 1);
-            config.forward_host_port[sizeof(config.forward_host_port) - 1] = 0; // Ensure null-termination
-            forward_host_port_set = 1;
-            something_set = 1;
-        } else if (strcmp(key, "key") == 0) {
-            strncpy(config.xor_key, value, sizeof(config.xor_key) - 1);
-            config.xor_key[sizeof(config.xor_key) - 1] = 0; // Ensure null-termination
-            xor_key_set = 1;
-            something_set = 1;
-        } else if (strcmp(key, "source-if") == 0) {
-            strncpy(config.client_interface, value, sizeof(config.client_interface) - 1);
-            config.client_interface[sizeof(config.client_interface) - 1] = 0; // Ensure null-termination
-            something_set = 1;
-        }
-         else if (strcmp(key, "target-if") == 0) {
-            //strncpy(forward_interface, value, sizeof(forward_interface) - 1);
-            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.");
-            something_set = 1;
-        } else if (strcmp(key, "source") == 0) {
-            //strncpy(client_fixed_addr_port, value, sizeof(client_fixed_addr_port) - 1);
-            log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
-            something_set = 1;
-        } else if (strcmp(key, "target-lport") == 0) {
-            //server_local_port = atoi(value);
-            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
-            something_set = 1;
-        }
-        else if (strcmp(key, "static-bindings") == 0) {
-            strncpy(config.static_bindings, value, sizeof(config.static_bindings) - 1);
-            config.static_bindings[sizeof(config.static_bindings) - 1] = 0; // Ensure null-termination
-            something_set = 1;
-        }
-        else if (strcmp(key, "verbose") == 0) {
-            strncpy(config.verbose_str, value, sizeof(config.verbose_str) - 1);
-            config.verbose_str[sizeof(config.verbose_str) - 1] = 0; // Ensure null-termination
-            something_set = 1;
-        } else {
+        const mini_argp_opt *o = margp_find(options, key, 0);
+        if (o == NULL) {
             log(LL_ERROR, "Unknown configuration key: %s", key);
             exit(EXIT_FAILURE);
         }
+        parse_opt(o->long_name, o->short_name, value, config);
     }
     fclose(config_file);
-    if (!listen_port_set) {
-        log(LL_ERROR, "'source-lport' is not set in the configuration file");
-        exit(EXIT_FAILURE);
-    }
-    if (!forward_host_port_set) {
-        log(LL_ERROR, "'target' is not set in the configuration file");
-        exit(EXIT_FAILURE);
-    }
-    if (!xor_key_set) {
-        log(LL_ERROR, "'key' is not set in the configuration file");
-        exit(EXIT_FAILURE);
-    }    
+}
+
+static void show_usage(void)
+{
+    printf("Usage: %s [options]\n%s", arg0,
+        "  -c, --config=<config_file> Read configuration from file (can be used instead\n"
+        "                             of the rest arguments\n"
+        "  -i, --source-if=<ip>       Source interface to listen on (optional, default -\n"
+        "                             0.0.0.0, e.g. all\n"
+        "  -p, --source-lport=<port>  Source port to listen\n"
+        "  -t, --target=<ip>:<port>   Target IP and port\n"
+        "  -k, --key=<key>            Obfuscation key (required, must be 1-255\n"
+        "                             characters long)\n"
+        "  -b, --static-bindings=<ip>:<port>:<port>,...\n"
+        "                             Comma-separated static bindings for two-way mode\n"
+        "                             as <client_ip>:<client_port>:<forward_port>\n"
+        "  -v, --verbose=<0-4>        Verbosity level (optional, default - 2)\n"
+        "                             0 - ERRORS (critical errors only)\n"
+        "                             1 - WARNINGS (important messages: startup and\n"
+        "                             shutdown messages)\n"
+        "                             2 - INFO (informational messages: status messages,\n"
+        "                             connection established, etc.)\n"
+        "                             3 - DEBUG (detailed debug messages)\n"
+        "                             4 - TRACE (very detailed debug messages, including\n"
+        "                             packet dumps)\n"
+        "  -?, --help                 Give this help list\n");
 }
 
 /* Parse a single option. */
-static error_t
-parse_opt (int key, char *arg, struct argp_state *state)
+static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
 {
-    switch (key)
+    struct obfuscator_config *config = (struct obfuscator_config *)ctx;
+
+    switch (sname)
     {
+        case '?':
+            show_usage();
+            exit(EXIT_SUCCESS);
         case 'c':
-            read_config_file(arg);
+            read_config_file(val, config);
             break;
         case 'i':
-            strncpy(config.client_interface, arg, sizeof(config.client_interface) - 1);
-            config.client_interface[sizeof(config.client_interface) - 1] = 0; // Ensure null-termination
-            break;
-        case 's':
-            log(LL_WARN, "The 'source' option is deprecated and will be ignored.");
+            strncpy(config->client_interface, val, sizeof(config->client_interface) - 1);
+            config->client_interface[sizeof(config->client_interface) - 1] = 0; // Ensure null-termination
+            config->client_interface_set = 1;
             break;
         case 'p':
-            config.listen_port = atoi(arg);
-            break;
-        case 'o':
-            log(LL_WARN, "The 'target-if' option is deprecated and will be ignored.");
+            config->listen_port = atoi(val);
+            if (config->listen_port <= 0 || config->listen_port > 65535) {
+                log(LL_ERROR, "Invalid listen port: %s (must be between 1 and 65535)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->listen_port_set = 1;
             break;
         case 't':
-            strncpy(config.forward_host_port, arg, sizeof(config.forward_host_port) - 1);
-            config.forward_host_port[sizeof(config.forward_host_port) - 1] = 0; // Ensure null-termination
-            break;
-        case 'r':
-            log(LL_WARN, "The 'target-lport' option is deprecated and will be ignored.");
+            strncpy(config->forward_host_port, val, sizeof(config->forward_host_port) - 1);
+            config->forward_host_port[sizeof(config->forward_host_port) - 1] = 0; // Ensure null-termination
+            config->forward_host_port_set = 1;
             break;
         case 'b':
-            strncpy(config.static_bindings, arg, sizeof(config.static_bindings) - 1);
-            config.static_bindings[sizeof(config.static_bindings) - 1] = 0; // Ensure null-termination
+            strncpy(config->static_bindings, val, sizeof(config->static_bindings) - 1);
+            config->static_bindings[sizeof(config->static_bindings) - 1] = 0; // Ensure null-termination
+            config->static_bindings_set = 1;
             break;
         case 'k':
-            strncpy(config.xor_key, arg, sizeof(config.xor_key));
-            config.xor_key[sizeof(config.xor_key) - 1] = 0; // Ensure null-termination
+            strncpy(config->xor_key, val, sizeof(config->xor_key));
+            config->xor_key[sizeof(config->xor_key) - 1] = 0; // Ensure null-termination
+            if (strlen(config->xor_key) == 0) {
+                log(LL_ERROR, "XOR key cannot be empty");
+                exit(EXIT_FAILURE);
+            }
+            config->xor_key_set = 1;
             break;
         case 'v':
-            strncpy(config.verbose_str, arg, sizeof(config.verbose_str) - 1);
-            config.verbose_str[sizeof(config.verbose_str) - 1] = 0; // Ensure null-termination
+            // TODO: parse verbosity level from string
+            verbose = atoi(val);
+            if (verbose < 0 || verbose > 4) {
+                log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", val);
+                exit(EXIT_FAILURE);
+            }            
             break;
         default:
-            return ARGP_ERR_UNKNOWN;
+            // should never happen
+            return -1;
     }
     return 0;
 }
 
-/* The options we understand. */
-static const struct argp_option options[] = {
-    { "config", 'c', "<config_file>", 0, "Read configuration from file (can be used instead of the rest arguments)", .group = 0 },
-    { "source-if", 'i', "<ip>", 0, "Source interface to listen on (optional, default - 0.0.0.0, e.g. all)", .group = 1 },
-    { "source", 's', "<ip>:<port>", OPTION_HIDDEN, "Source client address and port (optional, default - auto, dynamic)", .group = 2 },
-    { "source-lport", 'p', "<port>", 0, "Source port to listen", .group = 3 },
-    { "target-if", 'o', "<ip>", OPTION_HIDDEN, "Target interface to use (optional, default - 0.0.0.0, e.g. all)", .group = 4 },
-    { "target", 't', "<ip>:<port>", 0, "Target IP and port", .group = 5 },
-    { "target-lport", 'r', "<port>", OPTION_HIDDEN, "Target port to listen (optional, default - random)", .group = 6 },
-    { "key", 'k', "<key>", 0, "Obfuscation key (required, must be 1-255 characters long)", .group = 7 },
-    { "static-bindings", 'b', "<ip>:<port>:<port>,...", 0, "Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>", .group = 8 },
-    { "verbose", 'v', "<0-4>", 0, "Verbosity level (optional, default - 2)", .group = 9 },
-    { " ", 0, 0, OPTION_DOC , "0 - ERRORS (critical errors only)", .group = 9 },
-    { " ", 0, 0, OPTION_DOC , "1 - WARNINGS (important messages: startup and shutdown messages)", .group = 9 },
-    { " ", 0, 0, OPTION_DOC , "2 - INFO (informational messages: status messages, connection established, etc.)", .group = 9 },
-    { " ", 0, 0, OPTION_DOC , "3 - DEBUG (detailed debug messages)", .group = 9 },
-    { " ", 0, 0, OPTION_DOC , "4 - TRACE (very detailed debug messages, including packet dumps)", .group = 9 },
-    { 0 }
-};
-
 /* Our argp parser. */
-static struct argp argp = {
-    .options = options,
-    .parser = parse_opt,
-    .args_doc = NULL,
+const char *app_name =
 #ifdef COMMIT
-    .doc = "WireGuard Obfuscator\n(commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")"
+    "WireGuard Obfuscator\n(commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")";
 #else
-	.doc = "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION
+	"WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION;
 #endif
-};
 
 /**
  * @brief Handles incoming signals for the application.
@@ -508,6 +480,7 @@ static client_entry_t *find_by_server_sock(int fd) {
 #endif
 
 int main(int argc, char *argv[]) {
+    struct obfuscator_config config;
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
@@ -530,34 +503,54 @@ int main(int argc, char *argv[]) {
     struct pollfd pollfds[MAX_CLIENTS + 1];
 #endif
 
-    if (config.verbose >= LL_WARN) {
+    if (verbose >= LL_WARN) {
 #ifdef COMMIT
-        fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+        fprintf(stderr, "WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
-        fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+        fprintf(stderr, "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
 #endif
     }
 
+    reset_config(&config); // Initialize the configuration structure
+
     /* Parse command line arguments */
+    arg0 = argv[0]; // Save the executable name
     if (argc == 1) {
         fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-    if (argp_parse(&argp, argc, argv, 0, 0, 0) != 0) {
+    if (mini_argp_parse(argc, argv, options, &config, parse_opt) != 0) {
         fprintf(stderr, "Failed to parse command line arguments\n");
         exit(EXIT_FAILURE);
     }
   
     /* Check the parameters */
+    // Check the listening port
+    if (!config.listen_port_set) {
+        log(LL_ERROR, "'source-lport' is not set in the configuration file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Check the target host and port
+    if (!config.forward_host_port_set) {
+        log(LL_ERROR, "'target' is not set in the configuration file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Check the XOR key
+    if (!config.xor_key_set) {
+        log(LL_ERROR, "'key' is not set in the configuration file");
+        exit(EXIT_FAILURE);
+    } 
 
     // Check the listening port
-    if (config.listen_port < 0) {
+    if (!config.listen_port_set) {
         log(LL_ERROR, "'source-lport' is not set");
         exit(EXIT_FAILURE);
     }
  
     // Check the target host and port
-    if (!config.forward_host_port[0]) {
+    if (!config.forward_host_port_set) {
         log(LL_ERROR, "'target' is not set");
         exit(EXIT_FAILURE);
     } else {
@@ -578,13 +571,13 @@ int main(int argc, char *argv[]) {
 
     // Check the key
     key_length = strlen(config.xor_key);
-    if (key_length == 0) {
+    if (!config.xor_key_set || key_length == 0) {
         log(LL_ERROR, "Key is not set");
         exit(EXIT_FAILURE);
     }
 
     // Check the client interface
-    if (config.client_interface[0]) {
+    if (config.client_interface_set) {
         s_listen_addr_client = inet_addr(config.client_interface);
         if (s_listen_addr_client == INADDR_NONE) {
             err = getaddrinfo(config.client_interface, NULL, &hints, &addr);
@@ -594,15 +587,6 @@ int main(int argc, char *argv[]) {
             }
             s_listen_addr_client = ((struct sockaddr_in *)addr->ai_addr)->sin_addr.s_addr;
             freeaddrinfo(addr);
-        }
-    }
-
-    // Check and set the verbosity level
-    if (config.verbose_str[0]) {
-        config.verbose = atoi(config.verbose_str);
-        if (config.verbose < 0 || config.verbose > 4) {
-            log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", config.verbose_str);
-            exit(EXIT_FAILURE);
         }
     }
 
@@ -789,7 +773,7 @@ int main(int argc, char *argv[]) {
                 uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry ? client_entry->version : OBFUSCATION_VERSION;
 
-                if (config.verbose >= LL_TRACE) {
+                if (verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (known=%s, obfuscated=%s)",
                         length,
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
@@ -891,7 +875,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                if (config.verbose >= LL_TRACE) {
+                if (verbose >= LL_TRACE) {
                     if (!obfuscated) {
                         trace("X->: ");
                     } else {
@@ -925,7 +909,7 @@ int main(int argc, char *argv[]) {
                 uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry->version;
 
-                if (config.verbose >= LL_TRACE) {
+                if (verbose >= LL_TRACE) {
                     log(LL_TRACE, "Received %d bytes from %s:%d to %s:%d (obfuscated=%s)",
                         length,
                         target_host, target_port, 
@@ -1012,7 +996,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 
-                if (config.verbose >= LL_TRACE) {
+                if (verbose >= LL_TRACE) {
                     if (!obfuscated) {
                         trace("<-X: ");
                     } else {
