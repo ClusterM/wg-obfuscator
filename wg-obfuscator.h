@@ -25,7 +25,7 @@
 
 // Main parameters
 // TODO: make these configurable via command line arguments or config file
-#define BUFFER_SIZE             8*1024  // size of the buffer for receiving data from the clients and server
+#define BUFFER_SIZE             65535   // size of the buffer for receiving data from the clients and server
 #define POLL_TIMEOUT            5000    // in milliseconds
 #define HANDSHAKE_TIMEOUT       5000    // in milliseconds
 #define MAX_CLIENTS             1024    // maximum number of clients
