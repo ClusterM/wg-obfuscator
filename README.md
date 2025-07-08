@@ -14,6 +14,7 @@ Table of Contents:
   - [Two-Way Mode](#two-way-mode)
 - [How to Build and Install](#how-to-build-and-install)
   - [Linux](#linux)
+    - [Third-party packages](#)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
@@ -343,6 +344,10 @@ sudo systemctl start wg-obfuscator
 
 The configuration file is located at:  
 `/etc/wg-obfuscator.conf`
+
+#### Third-party packages
+
+- **`ALT Linux`** *apt-rpm package* in [**Sisyphus**](https://packages.altlinux.org/en/sisyphus/srpms/wg-obfuscator)
 
 ### Windows
 To build on Windows, you need [MSYS2](https://www.msys2.org/) and the following packages:
