@@ -34,7 +34,7 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 * **Key-based obfuscation**  
   Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
 * **Symmetric operation**  
-  You can use the obfuscator on both ends of a WireGuard tunnel, or just one—it will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
+  This tool will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
 * **Packet salting**  
   Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
 * **Handshake randomization**  
