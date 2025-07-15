@@ -50,88 +50,67 @@ jobs:
           name: ${{ env.IMAGE_NAME }}-docker-${{ steps.prep.outputs.safe_platform }}.tar
           path: ${{ env.IMAGE_NAME }}-docker-${{ steps.prep.outputs.safe_platform }}.tar
 
+
   build-linux:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build:
+          #  name       compiler                  static
+          - [x64,       gcc,                      ""]
+          - [arm,       arm-linux-gnueabihf-gcc,  ""]
+          - [arm64,     aarch64-linux-gnu-gcc,    ""]
+          - [mipsel,    mipsel-linux-gnu-gcc,     ""]
+          - [x64-static,gcc,                      "-static"]
+          - [arm-static,arm-linux-gnueabihf-gcc,  "-static"]
+          - [arm64-static,aarch64-linux-gnu-gcc,  "-static"]
+          - [mipsel-static,mipsel-linux-gnu-gcc,  "-static"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: make clean all x64
-        run: make clean all
+
+      - name: Install toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-mipsel-linux-gnu
+
+      - name: Clean and build ${{ matrix.build[0] }}
+        run: |
+          make clean
+          make all CC=${{ matrix.build[1] }} LDFLAGS='${{ matrix.build[2] }}'
+
+      - name: Prepare files
+        run: |
+          mkdir -p output
+          cp LICENSE *.md ${{ env.IMAGE_NAME }} *.conf output/
+    
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wg-obfuscator-linux-x64.zip
-          path: .
-      - name: apt update
-        run: sudo apt-get update
-      - name: Get toolchains
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-mipsel-linux-gnu
-      - name: make clean all arm
-        run: make clean all CC=arm-linux-gnueabihf-gcc
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wg-obfuscator-linux-arm.zip
-          path: .
-      - name: make clean all arm64
-        run: make clean all CC=aarch64-linux-gnu-gcc
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-linux-arm64.zip
-          path: .
-      - name: make clean all mipsel
-        run: make clean all CC=mipsel-linux-gnu-gcc
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wg-obfuscator-linux-mipsel.zip
-          path: .
-      - name: make clean all x64 static
-        run: make clean all LDFLAGS=-static
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wg-obfuscator-linux-x64-static.zip
-          path: .
-      - name: apt update
-        run: sudo apt-get update
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-      - name: make clean all arm
-        run: make clean all CC=arm-linux-gnueabihf-gcc LDFLAGS=-static
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wg-obfuscator-linux-arm-static.zip
-          path: .
-      - name: make clean all arm64 static
-        run: make clean all CC=aarch64-linux-gnu-gcc LDFLAGS=-static
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-linux-arm64-static.zip
-          path: .
-      - name: make clean all mipsel static
-        run: make clean all CC=mipsel-linux-gnu-gcc LDFLAGS=-static
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wg-obfuscator-linux-mipsel-static.zip
-          path: .
+          name: ${{ env.IMAGE_NAME }}-linux-${{ matrix.build[0] }}.zip
+          path: output/
+
 
   build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: make clean all
         run: make clean all
+
+      - name: Prepare files
+        run: |
+          mkdir -p output
+          cp LICENSE *.md ${{ env.IMAGE_NAME }} *.conf output/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_NAME }}-macos.zip
-          path: .
+          path: output/
+
 
   build-windows:
     runs-on: windows-latest
@@ -146,12 +125,21 @@ jobs:
             base-devel
             gcc
             git
+            zip
+
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: make clean all
         run: make clean all
+
+      - name: Prepare files
+        run: |
+          mkdir -p output
+          cp LICENSE *.md *.dll *.exe *.conf output/
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.IMAGE_NAME }}-windows.zip
-          path: .
+          name: ${{ env.IMAGE_NAME }}-windows-x64.zip
+          path: output/

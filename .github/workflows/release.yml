@@ -101,17 +101,35 @@ jobs:
           asset_content_type: tar
 
 
-  build-linux-x64:
+  build-linux:
     needs: create-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      matrix:
+        target:
+          #  arch       cc                              static
+          - [x64,       gcc,                            ""]
+          - [arm,       arm-linux-gnueabihf-gcc,        ""]
+          - [arm64,     aarch64-linux-gnu-gcc,          ""]
+          - [mipsel,    mipsel-linux-gnu-gcc,           ""]
+          - [x64-static,gcc,                            "-static"]
+          - [arm-static,arm-linux-gnueabihf-gcc,        "-static"]
+          - [arm64-static,aarch64-linux-gnu-gcc,        "-static"]
+          - [mipsel-static,mipsel-linux-gnu-gcc,        "-static"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: make x64
-        run: make clean all RELEASE=1
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-mipsel-linux-gnu
+
+      - name: Make ${{ matrix.target[0] }}
+        run: |
+          make clean all CC=${{ matrix.target[1] }} LDFLAGS='${{ matrix.target[2] }}' RELEASE=1
 
       - name: Prepare version
         id: prep
@@ -119,11 +137,12 @@ jobs:
           VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64.zip LICENSE *.md ${{ env.IMAGE_NAME }}
+      - name: Zip artifact
+        run: |
+          zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-${{ matrix.target[0] }}.zip LICENSE *.md ${{ env.IMAGE_NAME }} *.conf
 
       - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@v4
         with:
           name: release_url
 
@@ -139,337 +158,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64.zip
-          asset_content_type: zip
-
-
-  build-linux-arm:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: apt update
-        run: sudo apt-get update
-
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-
-      - name: make arm
-        run: make all CC=arm-linux-gnueabihf-gcc RELEASE=1
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm.zip
-          asset_content_type: zip
-
-
-  build-linux-arm64:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: apt update
-        run: sudo apt-get update
-
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-
-      - name: make all arm64
-        run: make all CC=aarch64-linux-gnu-gcc RELEASE=1
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64.zip
-          asset_content_type: zip
-
-  
-  build-linux-mipsel:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: apt update
-        run: sudo apt-get update
-
-      - name: Get mipsel toolchain
-        run: sudo apt-get install gcc-mipsel-linux-gnu
-
-      - name: make clean all mipsel
-        run: make clean all CC=mipsel-linux-gnu-gcc RELEASE=1
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel.zip
-          asset_content_type: zip
-
-  
-  build-linux-x64-static:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: make x64
-        run: make clean all RELEASE=1 LDFLAGS=-static
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64-static.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64-static.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-x64-static.zip
-          asset_content_type: zip
-
-
-  build-linux-arm-static:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: apt update
-        run: sudo apt-get update
-
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-
-      - name: make arm
-        run: make all CC=arm-linux-gnueabihf-gcc RELEASE=1 LDFLAGS=-static
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm-static.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm-static.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm-static.zip
-          asset_content_type: zip
-
-
-  build-linux-arm64-static:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: apt update
-        run: sudo apt-get update
-
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-
-      - name: make all arm64
-        run: make all CC=aarch64-linux-gnu-gcc RELEASE=1 LDFLAGS=-static
-
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64-static.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64-static.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-arm64-static.zip
-          asset_content_type: zip
-
-
-  build-linux-mipsel-static:
-    needs: create-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: apt update
-        run: sudo apt-get update
-      - name: Get mipsel toolchain
-        run: sudo apt-get install gcc-mipsel-linux-gnu
-      - name: make clean all mipsel static
-        run: make clean all CC=mipsel-linux-gnu-gcc LDFLAGS=-static RELEASE=1
-      - name: Prepare version
-        id: prep
-        run: |
-          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel-static.zip LICENSE *.md ${{ env.IMAGE_NAME }}
-      - name: Load Release URL File from release job
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: release_url
-      - name: Get Release File Name & Upload URL
-        id: get_release_info
-        run: |
-          value=`cat release_url.txt`
-          echo upload_url=$value >> $GITHUB_OUTPUT
-      - name: Upload to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel-static.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-mipsel-static.zip
+          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-${{ matrix.target[0] }}.zip
+          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-linux-${{ matrix.target[0] }}.zip
           asset_content_type: zip
 
 
@@ -492,7 +182,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos.zip LICENSE *.md ${{ env.IMAGE_NAME }}
+        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos.zip LICENSE *.md ${{ env.IMAGE_NAME }} *.conf
 
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v4.1.7
@@ -547,7 +237,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-windows-x64.zip LICENSE *.md *.dll *.exe
+        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-windows-x64.zip LICENSE *.md *.dll *.exe *.conf
 
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v4.1.7
