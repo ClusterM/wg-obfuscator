@@ -64,8 +64,8 @@ jobs:
           path: .
       - name: apt update
         run: sudo apt-get update
-      - name: Get ARM toolchain
-        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+      - name: Get toolchains
+        run: sudo apt-get install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-mipsel-linux-gnu
       - name: make clean all arm
         run: make clean all CC=arm-linux-gnueabihf-gcc
       - name: Upload artifact
@@ -79,6 +79,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_NAME }}-linux-arm64.zip
+          path: .
+      - name: make clean all mipsel
+        run: make clean all CC=mipsel-linux-gnu-gcc
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-mipsel.zip
           path: .
       - name: make clean all x64 static
         run: make clean all LDFLAGS=-static
@@ -104,6 +111,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.IMAGE_NAME }}-linux-arm64-static.zip
+          path: .
+      - name: make clean all mipsel static
+        run: make clean all CC=mipsel-linux-gnu-gcc LDFLAGS=-static
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-obfuscator-linux-mipsel-static.zip
           path: .
 
   build-macos:
