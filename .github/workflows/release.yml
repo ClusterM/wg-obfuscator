@@ -109,15 +109,11 @@ jobs:
     strategy:
       matrix:
         target:
-          #  arch       cc                              static
-          - [x64,       gcc,                            ""]
-          - [arm,       arm-linux-gnueabihf-gcc,        ""]
-          - [arm64,     aarch64-linux-gnu-gcc,          ""]
-          - [mipsel,    mipsel-linux-gnu-gcc,           ""]
-          - [x64-static,gcc,                            "-static"]
-          - [arm-static,arm-linux-gnueabihf-gcc,        "-static"]
-          - [arm64-static,aarch64-linux-gnu-gcc,        "-static"]
-          - [mipsel-static,mipsel-linux-gnu-gcc,        "-static"]
+          #  name       CC                              LDFLAGS
+          - [x64,       gcc,                            "-static"]
+          - [arm,       arm-linux-gnueabihf-gcc,        "-static"]
+          - [arm64,     aarch64-linux-gnu-gcc,          "-static"]
+          - [mipsel,    mipsel-linux-gnu-gcc,           "-static"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
