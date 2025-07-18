@@ -1,11 +1,12 @@
 # Stage 1: Build
 FROM alpine:latest AS build
+ARG TARGETPLATFORM
 WORKDIR /src
 RUN apk add --no-cache build-base git
 COPY ./. ./
 RUN make clean && \
     if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
-      make all CFLAGS="-march=armv7-a -mfpu=vfp -mfloat-abi=hard" LDFLAGS="-static"; \
+      make all CFLAGS="-march=armv7-a -mfpu=vfp -mfloat-abi=hard -O2 -Wall" LDFLAGS="-static"; \
     else \
       make all LDFLAGS="-static"; \
     fi

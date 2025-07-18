@@ -15,6 +15,7 @@ endif
 OBJS = wg-obfuscator.o config.o
 EXEDIR = .
 
+EXTRA_CFLAGS =
 LDFLAGS +=
 
 ifeq ($(OS),Windows_NT)
@@ -37,7 +38,7 @@ ifneq ($(OS),Windows_NT)
 endif
 
 ifeq ($(OS),Windows_NT)
-  CFLAGS += -Wno-stringop-truncation
+  EXTRA_CFLAGS += -Wno-stringop-truncation
   TARGET = $(EXEDIR)/$(PROG_NAME).exe  
 else
   TARGET = $(EXEDIR)/$(PROG_NAME)
@@ -48,7 +49,7 @@ else
       LDFLAGS += -L$(shell brew --prefix)/lib
     endif
   else
-    CFLAGS += -Wno-stringop-truncation
+    EXTRA_CFLAGS += -Wno-stringop-truncation
   endif
 endif
 
@@ -73,7 +74,7 @@ ifeq ($(RELEASE),0)
   COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
   DIRTY := $(shell if ! git diff-index --quiet HEAD --; then echo " (dirty)"; fi)
   COMMIT := $(COMMIT)$(DIRTY)
-  CFLAGS += -DCOMMIT="\"$(COMMIT)\""
+  EXTRA_CFLAGS += -DCOMMIT="\"$(COMMIT)\""
 endif
 
 clean:
@@ -86,7 +87,7 @@ endif
 $(OBJS): 
 
 %.o : %.c $(HEADERS)
-	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ -c $<
 
 $(TARGET): $(OBJS)
 	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
