@@ -254,9 +254,17 @@ int main(int argc, char *argv[]) {
 
 
 #ifdef COMMIT
+#ifndef ARCH
     fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
+    fprintf(stderr, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+#endif
+#else
+#ifndef ARCH
     fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+#else
+    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")\n");
+#endif
 #endif
 
     if (parse_config(argc, argv, &config) != 0) {

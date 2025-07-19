@@ -77,6 +77,12 @@ ifeq ($(RELEASE),0)
   EXTRA_CFLAGS += -DCOMMIT="\"$(COMMIT)\""
 endif
 
+# Pass architecture information to the program, for Docker
+TARGETPLATFORM ?=
+ifneq ($(TARGETPLATFORM),)
+  EXTRA_CFLAGS += -DARCH="\"$(TARGETPLATFORM)\""
+endif
+
 clean:
 	$(RM) *.o
 ifeq ($(OS),Windows_NT)
