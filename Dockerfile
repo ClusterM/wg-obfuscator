@@ -1,8 +1,8 @@
 # Stage 1: Build
-FROM alpine:latest AS build
+FROM debian:latest AS build
 ARG TARGETPLATFORM
 WORKDIR /src
-RUN apk add --no-cache build-base git
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 COPY ./. ./
 RUN make clean && \
     if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \

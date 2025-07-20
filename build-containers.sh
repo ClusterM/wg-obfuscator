@@ -11,11 +11,11 @@ PLATFORMS_LIST=$(echo "$PLATFORMS" | tr ',' ' ')
 
 for PLATFORM in $PLATFORMS_LIST; do
     ARCH=$(echo "$PLATFORM" | sed 's|linux/||;s|/|-|g')
-    IMAGE_NAME="wg-obfuscator:$ARCH"
+    IMAGE_NAME="clustermeerkat/wg-obfuscator:$ARCH"
     TAR_NAME="wg-obfuscator-$ARCH.tar"
 
     echo "===== Building for $PLATFORM ====="
-    docker buildx build --platform $PLATFORM -t clustermeerkat/$IMAGE_NAME --output type=docker .
+    docker buildx build --platform $PLATFORM -t $IMAGE_NAME --output type=docker .
     docker save $IMAGE_NAME -o "$TARGET_DIR/$TAR_NAME"
     echo "===== Done: $TARGET_DIR/$TAR_NAME ====="
 done
