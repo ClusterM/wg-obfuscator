@@ -4,12 +4,7 @@ ARG TARGETPLATFORM
 WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 COPY ./. ./
-RUN make clean && \
-    if [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
-      make all CFLAGS="-march=armv7-a -mfpu=vfp -mfloat-abi=hard -O2 -Wall" LDFLAGS="-static"; \
-    else \
-      make all LDFLAGS="-static"; \
-    fi
+RUN make clean && make all LDFLAGS="-static"
 
 # Stage 2: Runtime
 FROM scratch

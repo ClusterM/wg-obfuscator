@@ -10,7 +10,14 @@
  * @return uint8_t Returns a non-zero value if the data is obfuscated, 0 otherwise.
  */
 static inline uint8_t is_obfuscated(uint8_t *data) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    uint32_t packet_type = __builtin_bswap32(*((uint32_t*)data));
+    return !(packet_type >= 1 && packet_type <= 4);
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     return !(*((uint32_t*)data) >= 1 && *((uint32_t*)data) <= 4);
+#else
+    #error "Cannot determine endianness!"
+#endif
 }
 
 /**
@@ -62,7 +69,13 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  */
 static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
     if (version >= 1) {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        uint32_t packet_type = __builtin_bswap32(*((uint32_t*)buffer));
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         uint32_t packet_type = *((uint32_t*)buffer);
+#else
+    #error "Cannot determine endianness!"
+#endif
         // Add some randomness to the packet
         uint8_t rnd = 1 + (rand() % 255);
         buffer[0] ^= rnd; // Xor the first byte to a random value
@@ -90,7 +103,13 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
             if (length + dummy_length > MAX_DUMMY_LENGTH_TOTAL) {
                 dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
             }
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            *((uint16_t*)(buffer+2)) = __builtin_bswap16(dummy_length); // Set the dummy length in the packet
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
             *((uint16_t*)(buffer+2)) = dummy_length; // Set the dummy length in the packet
+#else
+    #error "Cannot determine endianness!"
+#endif
             if (dummy_length > 0) {
                 int i = length;
                 length += dummy_length;
@@ -129,7 +148,13 @@ static inline int decode(uint8_t *buffer, int length, char *key, int key_length,
 
     buffer[0] ^= buffer[1]; // Restore the first byte by XORing it with the second byte
     buffer[1] = 0; // Set the second byte to 0
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    length -= __builtin_bswap16(*((uint16_t*)(buffer+2))); // Remove dummy data length from the packet
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     length -= *((uint16_t*)(buffer+2)); // Remove dummy data length from the packet
+#else
+    #error "Cannot determine endianness!"
+#endif
     *((uint16_t*)(buffer+2)) = 0; // Reset the dummy length field to 0
     return length;
 }

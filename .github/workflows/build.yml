@@ -9,7 +9,6 @@ on:
 
 env:
   IMAGE_NAME: wg-obfuscator
-  PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/386,linux/ppc64le,linux/s390x
 
 jobs:
 
@@ -18,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/386, linux/ppc64le, linux/s390x]
+        platform: [linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/arm/v5, linux/386, linux/ppc64le, linux/s390x]
       fail-fast: false
 
     steps:
@@ -55,12 +54,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        build:
-          #  name       CC                        LDFLAGS
-          - [x64,       gcc,                      "-static"]
-          - [arm,       arm-linux-gnueabihf-gcc,  "-static"]
-          - [arm64,     aarch64-linux-gnu-gcc,    "-static"]
-          - [mipsel,    mipsel-linux-gnu-gcc,     "-static"]
+        target:
+          #  name       CC                        CFLAGS                                                 LDFLAGS
+          - [x64,       gcc,                      "-O2 -Wall",                                           "-static"]
+          - [armv5,     arm-linux-gnueabi-gcc,    "-O2 -Wall -march=armv5te -mfloat-abi=soft",           "-static"]
+          - [armv6,     arm-linux-gnueabi-gcc,    "-O2 -Wall -march=armv6 -mfpu=vfp -mfloat-abi=softfp", "-static"]
+          - [armv7,     arm-linux-gnueabihf-gcc,  "-O2 -Wall -march=armv7-a -mfpu=vfp -mfloat-abi=hard", "-static"]
+          - [arm64,     aarch64-linux-gnu-gcc,    "-O2 -Wall",                                           "-static"]
+          - [mipsel,    mipsel-linux-gnu-gcc,     "-O2 -Wall",                                           "-static"]
+          - [mips,      mips-linux-gnu-gcc,       "-O2 -Wall",                                           "-static"]
+          - [ppc64le,   powerpc64le-linux-gnu-gcc,"-O2 -Wall",                                           "-static"]
+          - [s390x,     s390x-linux-gnu-gcc,      "-O2 -Wall",                                           "-static"]
+          - [riscv64,   riscv64-linux-gnu-gcc,    "-O2 -Wall",                                           "-static"]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,12 +74,20 @@ jobs:
       - name: Install toolchains
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-mipsel-linux-gnu
+          sudo apt-get install -y \
+            gcc-arm-linux-gnueabi \
+            gcc-arm-linux-gnueabihf \
+            gcc-aarch64-linux-gnu \
+            gcc-mips-linux-gnu \
+            gcc-mipsel-linux-gnu \
+            gcc-powerpc64le-linux-gnu \
+            gcc-s390x-linux-gnu \
+            gcc-riscv64-linux-gnu
 
-      - name: Clean and build ${{ matrix.build[0] }}
+      - name: Clean and build ${{ matrix.target[0] }}
         run: |
           make clean
-          make all CC=${{ matrix.build[1] }} LDFLAGS='${{ matrix.build[2] }}'
+          make all CC=${{ matrix.target[1] }} CFLAGS='${{ matrix.target[2] }}' LDFLAGS='${{ matrix.target[3] }}'
 
       - name: Prepare files
         run: |
@@ -83,7 +97,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.IMAGE_NAME }}-linux-${{ matrix.build[0] }}.zip
+          name: ${{ env.IMAGE_NAME }}-linux-${{ matrix.target[0] }}.zip
           path: output/
 
 
