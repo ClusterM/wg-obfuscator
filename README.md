@@ -324,8 +324,10 @@ With static bindings, each obfuscator knows in advance how to forward packets be
 
 ## How to build and install
 
-You can always find the latest release (source code and ready-to-use binaries for Linux, Windows, and macOS) at:
+You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:
 https://github.com/ClusterM/wg-obfuscator/releases
+
+Also, you can download automatic CI builds at https://clusterm.github.io/wg-obfuscator/ - if you want to test some unreleased features. Can be buggy!
 
 ### Linux
 On Linux, the obfuscator can be installed as a systemd service for automatic startup and management.

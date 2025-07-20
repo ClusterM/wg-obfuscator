@@ -10,6 +10,12 @@ on:
 env:
   IMAGE_NAME: wg-obfuscator
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
 
   build-docker:
@@ -153,3 +159,50 @@ jobs:
         with:
           name: ${{ env.IMAGE_NAME }}-windows-x64.zip
           path: output/
+
+  upload-to-pages:
+    needs:
+      - build-docker
+      - build-linux
+      - build-macos
+      - build-windows
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Install zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Process docker images
+        run: |
+          for d in *.tar; do
+            [ -d "$d" ] || continue
+            mv "$d" "${d}-tmp"
+            mv "${d}-tmp"/* .
+            rm -rf "${d}-tmp"
+          done
+
+      - name: Process binaries
+        run: |
+          for d in *.zip; do
+            [ -d "$d" ] || continue
+            mv "$d" "wg-obfuscator"
+            FN="${d%.*}.zip"
+            zip -r9m "$FN" "wg-obfuscator"
+          done
+
+      - name: Generate index.html
+        run: "(echo \"<html><head><title>WireGuard Obfuscator</title></head><body><h1>WireGuard Obfuscator</h1>This is automatic CI builds: binaries and Docker images. Install those builds only if you want to test some unreleased features. Can be buggy.<br/><br/>Updated: `date`<br/><br/>Binaries:<br/>\" ; for file in *.zip ; do echo \"<a href='$file'>$file</a><br/>\" ; done ; echo \"<br/>Docker images:<br/>\" ; for file in *.tar ; do echo \"<a href='$file'>$file</a><br/>\" ; done ; echo \"</body></html>\") > index.html"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
