@@ -192,7 +192,6 @@ Type `wg-obfuscator.exe --help` for more information.
 
 Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
 
-
 ### Two-Way Mode
 (for advanced users)
 
@@ -382,7 +381,7 @@ Android support is planned.
 ### Running Docker Container on Linux
 
 WireGuard Obfuscator is available as a multi-architecture Docker image:
-**[clustermeerkat/wg-obfuscator on Docker Hub](https://hub.docker.com/repository/docker/clustermeerkat/wg-obfuscator)**
+**[clustermeerkat/wg-obfuscator on Docker Hub](https://hub.docker.com/r/clustermeerkat/wg-obfuscator)**
 
 **Supported tags:**
 
@@ -396,6 +395,7 @@ WireGuard Obfuscator is available as a multi-architecture Docker image:
 * `linux/arm64`
 * `linux/arm/v7`
 * `linux/arm/v6`
+* `linux/arm/v5`
 * `linux/386`
 * `linux/ppc64le`
 * `linux/s390x`
@@ -592,5 +592,6 @@ You should see logs indicating the container has started successfully and is rea
 
 * [GitHub Sponsors](https://github.com/sponsors/ClusterM)
 * [Buy Me A Coffee](https://www.buymeacoffee.com/cluster)
+* [Sber](https://messenger.online.sberbank.ru/sl/Lnb2OLE4JsyiEhQgC)
 * [Donation Alerts](https://www.donationalerts.com/r/clustermeerkat)
 * [Boosty](https://boosty.to/cluster)
