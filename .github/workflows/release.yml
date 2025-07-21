@@ -109,17 +109,26 @@ jobs:
     strategy:
       matrix:
         target:
-          #  name       CC                        CFLAGS                                                 LDFLAGS
-          - [x64,       gcc,                      "-O2 -Wall",                                           "-static"]
-          - [armv5,     arm-linux-gnueabi-gcc,    "-O2 -Wall -march=armv5te -mfloat-abi=soft",           "-static"]
-          - [armv6,     arm-linux-gnueabi-gcc,    "-O2 -Wall -march=armv6 -mfpu=vfp -mfloat-abi=softfp", "-static"]
-          - [armv7,     arm-linux-gnueabihf-gcc,  "-O2 -Wall -march=armv7-a -mfpu=vfp -mfloat-abi=hard", "-static"]
-          - [arm64,     aarch64-linux-gnu-gcc,    "-O2 -Wall",                                           "-static"]
-          - [mipsel,    mipsel-linux-gnu-gcc,     "-O2 -Wall -march=mips1 -mabi=32 -mfp32",              "-static"]
-          - [mips,      mips-linux-gnu-gcc,       "-O2 -Wall -march=mips1 -mabi=32 -mfp32",              "-static"]
-          - [ppc64le,   powerpc64le-linux-gnu-gcc,"-O2 -Wall",                                           "-static"]
-          - [s390x,     s390x-linux-gnu-gcc,      "-O2 -Wall",                                           "-static"]
-          - [riscv64,   riscv64-linux-gnu-gcc,    "-O2 -Wall",                                           "-static"]
+          #  name                 CC                            CFLAGS                                                  LDFLAGS
+          - [x64,                 gcc,                          "-O2 -Wall",                                            "-static"]
+          - [armv5,               arm-linux-gnueabi-gcc,        "-O2 -Wall -march=armv5te -mfloat-abi=soft",            "-static"]
+          - [armv6,               arm-linux-gnueabi-gcc,        "-O2 -Wall -march=armv6 -mfpu=vfp -mfloat-abi=softfp",  "-static"]
+          - [armv7,               arm-linux-gnueabihf-gcc,      "-O2 -Wall -march=armv7-a -mfpu=vfp -mfloat-abi=hard",  "-static"]
+          - [arm64,               aarch64-linux-gnu-gcc,        "-O2 -Wall",                                            "-static"]
+          - [mipsel-mips1,        mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips1 -mabi=32 -mfp32",               "-static"]
+          - [mipsel-mips32,       mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips32 -mabi=32",                     "-static"]
+          - [mipsel-mips32r2,     mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips32r2 -mabi=32",                   "-static"]
+          - [mips-mips1,          mips-linux-gnu-gcc,           "-O2 -Wall -march=mips1 -mabi=32 -mfp32",               "-static"]
+          - [mips-mips32,         mips-linux-gnu-gcc,           "-O2 -Wall -march=mips32 -mabi=32",                     "-static"]
+          - [mips-mips32r2,       mips-linux-gnu-gcc,           "-O2 -Wall -march=mips32r2 -mabi=32",                   "-static"]
+          - [mips64el-mips64,     mips64el-linux-gnuabi64-gcc,  "-O2 -Wall -march=mips64 -mabi=64",                     "-static"]
+          - [mips64el-mips64r2,   mips64el-linux-gnuabi64-gcc,  "-O2 -Wall -march=mips64r2 -mabi=64",                   "-static"]
+          - [mips64-mips64,       mips64-linux-gnuabi64-gcc,    "-O2 -Wall -march=mips64 -mabi=64",                     "-static"]
+          - [mips64-mips64r2,     mips64-linux-gnuabi64-gcc,    "-O2 -Wall -march=mips64r2 -mabi=64",                   "-static"]
+          - [ppc64le,             powerpc64le-linux-gnu-gcc,    "-O2 -Wall",                                            "-static"]
+          - [s390x,               s390x-linux-gnu-gcc,          "-O2 -Wall",                                            "-static"]
+          - [riscv64,             riscv64-linux-gnu-gcc,        "-O2 -Wall",                                            "-static"]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,6 +142,8 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-mips-linux-gnu \
             gcc-mipsel-linux-gnu \
+            gcc-mips64-linux-gnuabi64 \
+            gcc-mips64el-linux-gnuabi64 \
             gcc-powerpc64le-linux-gnu \
             gcc-s390x-linux-gnu \
             gcc-riscv64-linux-gnu
