@@ -109,9 +109,17 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         free(client_entry);
         return NULL;
     }
+    // Set "Don't Fragment" flag
+    int optval = 1;
+    if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
+        serror("Failed to set socket options for client");
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
+    }    
     // Set the server address to the specified one
     connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
-    // Get the assigned port number    
+    // Get the assigned port number
     socklen_t our_addr_len = sizeof(client_entry->our_addr);
     if (getsockname(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, &our_addr_len) == -1) {
         serror("Failed to get socket port number");
@@ -192,6 +200,15 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
     if (bind(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, sizeof(client_entry->our_addr)) < 0) {
         serror("Failed to bind server socket to %s:%d", 
             inet_ntoa(client_entry->our_addr.sin_addr), local_port);
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
+    }
+    // Set "Don't Fragment" flag
+    int optval = 1;
+    if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
+        serror("Failed to set socket options for client %s:%d", 
+            inet_ntoa(client_entry->client_addr.sin_addr), local_port);
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
@@ -346,6 +363,13 @@ int main(int argc, char *argv[]) {
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         serror("Can't create source socket to listen");
         exit(EXIT_FAILURE);
+    }
+
+    /* Set "Don't Fragment" flag */
+    int optval = 1;
+    if (setsockopt(listen_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
+        serror("Failed to set socket options for listen socket");
+        FAILURE();
     }
 
     /* Bind the listening socket to the specified address and port */
