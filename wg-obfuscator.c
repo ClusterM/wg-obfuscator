@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <time.h>
 #include <stdarg.h>
+#include <errno.h>
 #include "wg-obfuscator.h"
 #include "config.h"
 #include "obfuscation.h"
@@ -43,7 +44,7 @@ static void serror(char *str, ...)
     va_end(args);
 
     char msg[1024];
-    snprintf(msg, sizeof(msg), "[%s][E] %s", section_name, buf);
+    snprintf(msg, sizeof(msg), "[%s][E] %s - error %d", section_name, buf, errno);
     perror(msg);
 }
 
