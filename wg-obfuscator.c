@@ -504,9 +504,14 @@ int main(int argc, char *argv[]) {
                 /* *** Handle incoming data from the clients *** */
                 struct sockaddr_in sender_addr = {0};
                 socklen_t sender_addr_len = sizeof(sender_addr);
-                int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
+                int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
                     serror("recvfrom client");
+                    continue;
+                }
+                if (length > BUFFER_SIZE) {
+                    log(LL_WARN, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
+                        inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, BUFFER_SIZE);
                     continue;
                 }
                 if (length < 4) {
@@ -643,9 +648,14 @@ int main(int argc, char *argv[]) {
 #else
                 client_entry_t *client_entry = find_by_server_sock(pollfds[e].fd);
 #endif
-                int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, 0);
+                int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC);
                 if (length < 0) {
                     serror("recv from server");
+                    continue;
+                }
+                if (length > BUFFER_SIZE) {
+                    log(LL_WARN, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
+                        target_host, target_port, length, BUFFER_SIZE);
                     continue;
                 }
                 if (length < 4) {
