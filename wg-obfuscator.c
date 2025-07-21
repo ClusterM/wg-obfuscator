@@ -123,7 +123,9 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
     socklen_t our_addr_len = sizeof(client_entry->our_addr);
     if (getsockname(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, &our_addr_len) == -1) {
         serror("Failed to get socket port number");
-        FAILURE();
+        close(client_entry->server_sock);
+        free(client_entry);
+        return NULL;
     }
 
 #ifdef USE_EPOLL    
