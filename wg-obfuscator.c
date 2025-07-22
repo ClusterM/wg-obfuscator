@@ -87,6 +87,7 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         free(client_entry);
         return NULL;
     }
+#ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
     if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
@@ -94,7 +95,8 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
-    }    
+    }
+#endif
     // Set the server address to the specified one
     connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
     // Get the assigned port number
@@ -184,6 +186,7 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
         free(client_entry);
         return NULL;
     }
+#ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
     if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
@@ -193,6 +196,7 @@ static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr,
         free(client_entry);
         return NULL;
     }
+#endif
     // Set the server address to the specified one
     connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
 
@@ -345,12 +349,14 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+#ifdef __linux__
     /* Set "Don't Fragment" flag */
     int optval = 1;
     if (setsockopt(listen_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
         serror("Failed to set socket options for listen socket");
         FAILURE();
     }
+#endif
 
     /* Bind the listening socket to the specified address and port */
     memset(&listen_addr, 0, sizeof(listen_addr));
