@@ -27,28 +27,6 @@ static client_entry_t *conn_table = NULL;
 #endif
 
 /**
- * @brief Prints an error message related to a specific section.
- *
- * This function prints an error message prefixed by the provided string and section name.
- * Additional arguments can be provided for formatted output.
- *
- * @param str      The error message prefix.
- * @param ...      Additional arguments for formatting the error message.
- */
-static void serror(char *str, ...)
-{
-    char buf[512];
-    va_list args;
-    va_start(args, str);
-    vsnprintf(buf, sizeof(buf), str, args);
-    va_end(args);
-
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "[%s][E] %s - error %d", section_name, buf, errno);
-    perror(msg);
-}
-
-/**
  * @brief Handles incoming signals for the application.
  *
  * This function is registered as a signal handler and is invoked when the process
@@ -533,11 +511,11 @@ int main(int argc, char *argv[]) {
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
-                    serror("recvfrom client");
+                    serror_level(LL_DEBUG, "recvfrom client");
                     continue;
                 }
                 if (length > BUFFER_SIZE) {
-                    log(LL_WARN, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
+                    log(LL_DEBUG, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, BUFFER_SIZE);
                     continue;
                 }
@@ -666,7 +644,11 @@ int main(int argc, char *argv[]) {
                     trace("\n");
                 }
 
-                sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+                length = sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+                if (length < 0) {
+                    serror_level(LL_DEBUG, "sendto %s:%d", target_host, target_port);
+                    continue;
+                }
                 client_entry->last_activity_time = now;
             } else { // if (event->data.fd == listen_sock)
                 /* *** Handle data from the server *** */
@@ -677,11 +659,11 @@ int main(int argc, char *argv[]) {
 #endif
                 int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC);
                 if (length < 0) {
-                    serror("recv from server");
+                    serror_level(LL_DEBUG, "recv from server");
                     continue;
                 }
                 if (length > BUFFER_SIZE) {
-                    log(LL_WARN, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
+                    log(LL_DEBUG, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
                         target_host, target_port, length, BUFFER_SIZE);
                     continue;
                 }
@@ -793,7 +775,11 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Send the response back to the original client
-                sendto(listen_sock, buffer, length, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));
+                length = sendto(listen_sock, buffer, length, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));
+                if (length < 0) {
+                    serror_level(LL_DEBUG, "sendto %s:%d", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                    continue;
+                }
                 client_entry->last_activity_time = now;
             } // if (event->data.fd != listen_sock)
         } // for (int e = 0; e < events_n; e++)

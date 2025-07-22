@@ -70,6 +70,8 @@
     ), ##__VA_ARGS__);                                              \
 }
 #define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+#define serror_level(level, fmt, ...) log(level, fmt " - %s (%d)", ##__VA_ARGS__, strerror(errno), errno)
+#define serror(fmt, ...) serror_level(LL_ERROR, fmt, ##__VA_ARGS__)
 
 // Structure to hold obfuscator configuration
 struct obfuscator_config {
