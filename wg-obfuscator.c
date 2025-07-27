@@ -564,7 +564,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Is it handshake?
-                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
+                if (WG_TYPE(buffer) == WG_TYPE_HANDSHAKE) {
                     log(LL_DEBUG, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port,
@@ -582,7 +582,7 @@ int main(int argc, char *argv[]) {
                     client_entry->last_handshake_request_time = now;
                 }
                 // Is it handshake response?
-                else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
+                else if (WG_TYPE(buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     if (!client_entry) {
                         log(LL_DEBUG, "Received WireGuard handshake response from %s:%d, but no connection entry found for this client",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
@@ -708,7 +708,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Is it handshake?
-                if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE) {
+                if (WG_TYPE(buffer) == WG_TYPE_HANDSHAKE) {
                     log(LL_DEBUG, "Received WireGuard handshake from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         target_host, target_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
@@ -719,7 +719,7 @@ int main(int argc, char *argv[]) {
                     client_entry->last_handshake_request_time = now;
                 }
                 // Is it handshake response?
-                else if (*((uint32_t*)buffer) == WG_TYPE_HANDSHAKE_RESP) {
+                else if (WG_TYPE(buffer) == WG_TYPE_HANDSHAKE_RESP) {
                     log(LL_DEBUG, "Received WireGuard handshake response from %s:%d to %s:%d (%d bytes, obfuscated=%s)",
                         target_host, target_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),

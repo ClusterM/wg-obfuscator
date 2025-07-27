@@ -3,6 +3,23 @@
 
 #include <stdint.h>
 
+// Current obfuscation version
+#define OBFUSCATION_VERSION     1
+
+// WireGuard packet types
+#define WG_TYPE_HANDSHAKE       0x01
+#define WG_TYPE_HANDSHAKE_RESP  0x02
+#define WG_TYPE_COOKIE          0x03
+#define WG_TYPE_DATA            0x04
+
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define WG_TYPE(data) __builtin_bswap32(*((uint32_t*)(data)))
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define WG_TYPE(data) (*((uint32_t*)(data)))
+#else
+#error "Cannot determine endianness!"
+#endif
+
 /**
  * Checks if the given data is obfuscated.
  *
@@ -10,14 +27,8 @@
  * @return uint8_t Returns a non-zero value if the data is obfuscated, 0 otherwise.
  */
 static inline uint8_t is_obfuscated(uint8_t *data) {
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    uint32_t packet_type = __builtin_bswap32(*((uint32_t*)data));
+    uint32_t packet_type = WG_TYPE(data);
     return !(packet_type >= 1 && packet_type <= 4);
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return !(*((uint32_t*)data) >= 1 && *((uint32_t*)data) <= 4);
-#else
-    #error "Cannot determine endianness!"
-#endif
 }
 
 /**
@@ -69,13 +80,7 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  */
 static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
     if (version >= 1) {
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-        uint32_t packet_type = __builtin_bswap32(*((uint32_t*)buffer));
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        uint32_t packet_type = *((uint32_t*)buffer);
-#else
-    #error "Cannot determine endianness!"
-#endif
+        uint32_t packet_type = WG_TYPE(buffer);
         // Add some randomness to the packet
         uint8_t rnd = 1 + (rand() % 255);
         buffer[0] ^= rnd; // Xor the first byte to a random value

@@ -35,18 +35,9 @@
 #define MAX_DUMMY_LENGTH_HANDSHAKE  512 // maximum length of dummy data for handshake packets
 #define MAX_DUMMY_LENGTH_DATA   4       // maximum length of dummy data for data packets
 
-// WireGuard packet types
-#define WG_TYPE_HANDSHAKE       0x01
-#define WG_TYPE_HANDSHAKE_RESP  0x02
-#define WG_TYPE_COOKIE          0x03
-#define WG_TYPE_DATA            0x04
-
 // Handshake directions
 #define HANDSHAKE_DIRECTION_CLIENT_TO_SERVER 0
 #define HANDSHAKE_DIRECTION_SERVER_TO_CLIENT 1
-
-// Current obfuscation version
-#define OBFUSCATION_VERSION     1
 
 // Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
