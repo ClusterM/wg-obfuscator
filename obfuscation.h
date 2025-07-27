@@ -12,13 +12,7 @@
 #define WG_TYPE_COOKIE          0x03
 #define WG_TYPE_DATA            0x04
 
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#define WG_TYPE(data) __builtin_bswap32(*((uint32_t*)(data)))
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define WG_TYPE(data) (*((uint32_t*)(data)))
-#else
-#error "Cannot determine endianness!"
-#endif
+#define WG_TYPE(data) ((uint32_t)(data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)))
 
 /**
  * Checks if the given data is obfuscated.
@@ -152,15 +146,8 @@ static inline int decode(uint8_t *buffer, int length, char *key, int key_length,
     }
 
     buffer[0] ^= buffer[1]; // Restore the first byte by XORing it with the second byte
-    buffer[1] = 0; // Set the second byte to 0
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    length -= __builtin_bswap16(*((uint16_t*)(buffer+2))); // Remove dummy data length from the packet
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    length -= *((uint16_t*)(buffer+2)); // Remove dummy data length from the packet
-#else
-    #error "Cannot determine endianness!"
-#endif
-    *((uint16_t*)(buffer+2)) = 0; // Reset the dummy length field to 0
+    length -= (uint16_t)(buffer[2] | (buffer[3] << 8)); // Remove dummy data length from the packet
+    buffer[1] = buffer[2] = buffer[3] = 0; // Reset the dummy length field to 0
     return length;
 }
 

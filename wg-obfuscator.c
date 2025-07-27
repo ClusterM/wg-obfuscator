@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
-    uint8_t buffer[BUFFER_SIZE] __attribute__((aligned(4)));
+    uint8_t buffer[BUFFER_SIZE];
     char target_host[256] = {0};
     int target_port = -1;
     int key_length = 0;
@@ -615,7 +615,8 @@ int main(int argc, char *argv[]) {
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
                 else if (!client_entry || !client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring data from %s:%d to %s:%d until the handshake is completed",
+                    log(LL_DEBUG, "Ignoring data (packet type #%u) from %s:%d to %s:%d until the handshake is completed",
+                        WG_TYPE(buffer),
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port);
                     continue;
@@ -746,7 +747,8 @@ int main(int argc, char *argv[]) {
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
                 else if (!client_entry->handshaked) {
-                    log(LL_DEBUG, "Ignoring response from %s:%d to %s:%d until the handshake is completed",
+                    log(LL_DEBUG, "Ignoring response (packet type #%u) from %s:%d to %s:%d until the handshake is completed",
+                        WG_TYPE(buffer),
                         target_host, target_port,
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
                     continue;
