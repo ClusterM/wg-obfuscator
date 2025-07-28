@@ -641,9 +641,9 @@ int main(int argc, char *argv[]) {
 
                 if (verbose >= LL_TRACE) {
                     if (!obfuscated) {
-                        trace("X-<: ");
+                        trace("X->: ");
                     } else {
-                        trace("O<-: ");
+                        trace("O->: ");
                     }
                     for (int i = 0; i < length; ++i) {
                         trace("%02X ", buffer[i]);
