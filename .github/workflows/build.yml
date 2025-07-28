@@ -9,6 +9,7 @@ on:
 
 env:
   IMAGE_NAME: wg-obfuscator
+  MUSL_RELEASE: https://github.com/cross-tools/musl-cross/releases/download/20250520/
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -61,49 +62,83 @@ jobs:
     strategy:
       matrix:
         target:
-          #  name                 CC                            CFLAGS                                                  LDFLAGS
-          - [x64,                 gcc,                          "-O2 -Wall",                                            "-static"]
-          - [armv5,               arm-linux-gnueabi-gcc,        "-O2 -Wall -march=armv5te -mfloat-abi=soft",            "-static"]
-          - [armv6,               arm-linux-gnueabi-gcc,        "-O2 -Wall -march=armv6 -mfpu=vfp -mfloat-abi=softfp",  "-static"]
-          - [armv7,               arm-linux-gnueabihf-gcc,      "-O2 -Wall -march=armv7-a -mfpu=vfp -mfloat-abi=hard",  "-static"]
-          - [arm64,               aarch64-linux-gnu-gcc,        "-O2 -Wall",                                            "-static"]
-          - [mipsel-mips1,        mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips1 -mabi=32 -mfp32",               "-static"]
-          - [mipsel-mips32,       mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips32 -mabi=32",                     "-static"]
-          - [mipsel-mips32r2,     mipsel-linux-gnu-gcc,         "-O2 -Wall -march=mips32r2 -mabi=32",                   "-static"]
-          - [mips-mips1,          mips-linux-gnu-gcc,           "-O2 -Wall -march=mips1 -mabi=32 -mfp32",               "-static"]
-          - [mips-mips32,         mips-linux-gnu-gcc,           "-O2 -Wall -march=mips32 -mabi=32",                     "-static"]
-          - [mips-mips32r2,       mips-linux-gnu-gcc,           "-O2 -Wall -march=mips32r2 -mabi=32",                   "-static"]
-          - [mips64el-mips64,     mips64el-linux-gnuabi64-gcc,  "-O2 -Wall -march=mips64 -mabi=64",                     "-static"]
-          - [mips64el-mips64r2,   mips64el-linux-gnuabi64-gcc,  "-O2 -Wall -march=mips64r2 -mabi=64",                   "-static"]
-          - [mips64-mips64,       mips64-linux-gnuabi64-gcc,    "-O2 -Wall -march=mips64 -mabi=64",                     "-static"]
-          - [mips64-mips64r2,     mips64-linux-gnuabi64-gcc,    "-O2 -Wall -march=mips64r2 -mabi=64",                   "-static"]
-          - [ppc64le,             powerpc64le-linux-gnu-gcc,    "-O2 -Wall",                                            "-static"]
-          - [s390x,               s390x-linux-gnu-gcc,          "-O2 -Wall",                                            "-static"]
-          - [riscv64,             riscv64-linux-gnu-gcc,        "-O2 -Wall",                                            "-static"]
+          #  name                      packages                          musl                               CC                                       CFLAGS                                                  LDFLAGS
+          # ======================== x86_64 / x86 ========================
+          - [x86,                      gcc-i686-linux-gnu,               "",                                i686-linux-gnu-gcc,                      "",                                                     "-static"]
+           #[x86,                      "",                               i686-unknown-linux-musl,           i686-unknown-linux-musl-gcc,             "",                                                     "-static"]
+          - [x64,                      "",                               "",                                gcc,                                     "",                                                     "-static"]
+           #[x64-musl,                 "",                               x86_64-unknown-linux-musl,         x86_64-unknown-linux-musl-gcc,           "",                                                     "-static"]
+          # ======================== ARM (32-bit) =========================
+          - [armv5-sf,                 gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv5te -mfloat-abi=soft",                      "-static"]
+           #[armv5-musl-sf,            "",                               arm-unknown-linux-musleabi,        arm-unknown-linux-musleabi-gcc,          "-march=armv5te -mfloat-abi=soft",                      "-static"]
+          - [armv6-softfp,             gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv6 -mfpu=vfp -mfloat-abi=softfp",            "-static"]
+           #[armv6-musl-softfp,        "",                               arm-unknown-linux-musleabi,        arm-unknown-linux-musleabi-gcc,          "-march=armv6 -mfpu=vfp -mfloat-abi=softfp",            "-static"]
+           #[armv7-sf,                 gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv7-a -mfloat-abi=soft",                      "-static"]
+           #[armv7-sf,                 "",                               armv7-unknown-linux-musleabi,      armv7-unknown-linux-musleabi-gcc,        "-march=armv7-a -mfloat-abi=soft",                      "-static"]
+          - [armv7-softfp,             gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv7-a -mfpu=vfp -mfloat-abi=softfp",          "-static"]
+           #[armv7-softfp,             "",                               armv7-unknown-linux-musleabi,      armv7-unknown-linux-musleabi-gcc,        "-march=armv7-a -mfpu=vfp -mfloat-abi=softfp",          "-static"]
+          - [armv7-hf,                 gcc-arm-linux-gnueabihf,          "",                                arm-linux-gnueabihf-gcc,                 "-march=armv7-a -mfpu=vfp -mfloat-abi=hard",            "-static"]
+           #[armv7-hf,                 "",                               armv7-unknown-linux-musleabihf,    armv7-unknown-linux-musleabihf-gcc,      "-march=armv7-a -mfpu=vfp -mfloat-abi=hard",            "-static"]
+          - [arm64,                    gcc-aarch64-linux-gnu,            "",                                aarch64-linux-gnu-gcc,                   "",                                                     "-static"]
+           #[arm64,                    "",                               aarch64-unknown-linux-musl,        aarch64-unknown-linux-musl-gcc,          "",                                                     "-static"]
+          # ======================== MIPS little-endian ====================
+          - [mipsel-mips1,             gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips1 -mabi=32 -mfp32",                         "-static"]
+          - [mipsel-mips32,            gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips32 -mabi=32",                               "-static"]
+           #[mipsel-mips32,            "",                               mipsel-unknown-linux-musl,         mipsel-unknown-linux-musl-gcc,           "-march=mips32 -mabi=32",                               "-static"]
+          - [mipsel-mips32r2,          gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips32r2 -mabi=32",                             "-static"]
+           #[mipsel-mips32r2,          "",                               mipsel-unknown-linux-musl,         mipsel-unknown-linux-musl-gcc,           "-march=mips32r2 -mabi=32",                             "-static"]
+          - [mips64el,                 gcc-mips64el-linux-gnuabi64,      "",                                mips64el-linux-gnuabi64-gcc,             "-march=mips64 -mabi=64",                               "-static"]
+           #[mips64el,                 "",                               mips64el-unknown-linux-musl,       mips64el-unknown-linux-musl-gcc,         "-march=mips64 -mabi=64",                               "-static"]
+          - [mips64elr2,               gcc-mips64el-linux-gnuabi64,      "",                                mips64el-linux-gnuabi64-gcc,             "-march=mips64r2 -mabi=64",                             "-static"]
+           #[mips64elr2,               "",                               mips64el-unknown-linux-musl,       mips64el-unknown-linux-musl-gcc,         "-march=mips64r2 -mabi=64",                             "-static"]
+          - [mipsel-mips32-sf,         "",                               mipsel-unknown-linux-muslsf,       mipsel-unknown-linux-muslsf-gcc,         "-march=mips32 -mabi=32",                               "-static"]
+          # ======================== MIPS big-endian =======================
+          - [mips-mips1,               gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips1 -mabi=32 -mfp32",                         "-static"]
+          - [mips-mips32,              gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips32 -mabi=32",                               "-static"]
+           #[mips-mips32,              "",                               mips-unknown-linux-musl,           mips-unknown-linux-musl-gcc,             "-march=mips32 -mabi=32",                               "-static"]
+          - [mips-mips32r2,            gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips32r2 -mabi=32",                             "-static"]
+           #[mips-mips32r2,            "",                               mips-unknown-linux-musl,           mips-unknown-linux-musl-gcc,             "-march=mips32r2 -mabi=32",                             "-static"]
+          - [mips64,                   gcc-mips64-linux-gnuabi64,        "",                                mips64-linux-gnuabi64-gcc,               "-march=mips64 -mabi=64",                               "-static"]
+           #[mips64,                   "",                               mips64-unknown-linux-musl,         mips64-unknown-linux-musl-gcc,           "-march=mips64 -mabi=64",                               "-static"]
+          - [mips64r2,                 gcc-mips64-linux-gnuabi64,        "",                                mips64-linux-gnuabi64-gcc,               "-march=mips64r2 -mabi=64",                             "-static"]
+          - [mips-mips32-sf,           "",                               mips-unknown-linux-muslsf,         mips-unknown-linux-muslsf-gcc,           "-march=mips32 -mabi=32",                               "-static"]
+          # ======================== other architectures =================
+          - [ppc64le,                  gcc-powerpc64le-linux-gnu,        "",                                powerpc64le-linux-gnu-gcc,               "",                                                     "-static"]
+           #[ppc64le-musl,             "",                               powerpc64-unknown-linux-musl,      powerpc64-unknown-linux-musl-gcc,        "",                                                     "-static"]
+          - [powerpc,                  gcc-powerpc-linux-gnu,            "",                                powerpc-linux-gnu-gcc,                   "",                                                     "-static"]
+           #[powerpc,                  "",                               powerpc-unknown-linux-musl,        powerpc-unknown-linux-musl-gcc,          "",                                                     "-static"]
+          - [s390x,                    gcc-s390x-linux-gnu,              "",                                s390x-linux-gnu-gcc,                     "",                                                     "-static"]
+           #[s390x,                    "",                               s390x-ibm-linux-musl,              s390x-ibm-linux-musl-gcc,                "",                                                     "-static"]
+           #[riscv32,                  gcc-riscv64-linux-gnu,            "",                                riscv64-linux-gnu-gcc,                   "-march=rv32gc -mabi=ilp32",                            "-static"]
+          - [riscv32,                  "",                               riscv32-unknown-linux-musl,        riscv32-unknown-linux-musl-gcc,          "",                                                     "-static"]
+          - [riscv64,                  gcc-riscv64-linux-gnu,            "",                                riscv64-linux-gnu-gcc,                   "",                                                     "-static"]
+           #[riscv64-musl,             "",                               riscv64-unknown-linux-musl,        riscv64-unknown-linux-musl-gcc,          "",                                                     "-static"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install toolchains
+      - name: Install ${{ matrix.target[1] }}
+        if: matrix.target[1] != ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            gcc-arm-linux-gnueabi \
-            gcc-arm-linux-gnueabihf \
-            gcc-aarch64-linux-gnu \
-            gcc-mips-linux-gnu \
-            gcc-mipsel-linux-gnu \
-            gcc-mips64-linux-gnuabi64 \
-            gcc-mips64el-linux-gnuabi64 \
-            gcc-powerpc64le-linux-gnu \
-            gcc-s390x-linux-gnu \
-            gcc-riscv64-linux-gnu
+          sudo apt-get install -y ${{ matrix.target[1] }}
+
+      - name: Install musl ${{ matrix.target[2] }} toolchain
+        if: matrix.target[2] != ''
+        run: |
+          #LATEST=$(curl -s https://api.github.com/repos/cross-tools/musl-cross/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          #MUSL_RELEASE=https://github.com/cross-tools/musl-cross/releases/download/${LATEST}/
+          URL=${{ env.MUSL_RELEASE }}${{ matrix.target[2] }}.tar.xz
+          echo "Downloading musl toolchain from $URL"
+          wget $URL
+          tar -xJvf ${{ matrix.target[2] }}.tar.xz
+          echo "$(pwd)/${{ matrix.target[2] }}/bin" >> $GITHUB_PATH
 
       - name: Clean and build ${{ matrix.target[0] }}
         run: |
           make clean
-          make all CC=${{ matrix.target[1] }} CFLAGS='${{ matrix.target[2] }}' LDFLAGS='${{ matrix.target[3] }}'
+          make all CC=${{ matrix.target[3] }} CFLAGS='-O2 -Wall ${{ matrix.target[4] }}' LDFLAGS='${{ matrix.target[5] }}'
 
       - name: Prepare files
         run: |
