@@ -804,7 +804,8 @@ int main(int argc, char *argv[]) {
                         || (!current_entry->handshaked && (now - current_entry->last_handshake_request_time >= HANDSHAKE_TIMEOUT))
                     ) && !current_entry->is_static // Do not remove static entries
                 ) {
-                    log(LL_INFO, "Removing idle client %s:%d", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    log(current_entry->handshaked ? LL_INFO : LL_DEBUG, "Removing idle client %s:%d (handshaked=%s)", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port), 
+                        current_entry->handshaked ? "yes" : "no");
 #ifdef USE_EPOLL
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
 #endif
