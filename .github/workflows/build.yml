@@ -152,7 +152,7 @@ jobs:
           path: output/
 
 
-  build-macos:
+  build-macos-arm64:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -169,7 +169,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.IMAGE_NAME }}-macos.zip
+          name: ${{ env.IMAGE_NAME }}-macos-arm64.zip
           path: output/
 
 
@@ -209,7 +209,7 @@ jobs:
     needs:
       - build-docker
       - build-linux
-      - build-macos
+      - build-macos-arm64
       - build-windows
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'

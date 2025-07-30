@@ -6,6 +6,7 @@ on:
 env:
   IMAGE_NAME: wg-obfuscator
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/arm/v5,linux/386,linux/ppc64le,linux/s390x
+  MUSL_RELEASE: https://github.com/cross-tools/musl-cross/releases/download/20250520/
 
 jobs:
 
@@ -133,24 +134,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install toolchains
+      - name: Install ${{ matrix.target[1] }}
+        if: matrix.target[1] != ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            gcc-arm-linux-gnueabi \
-            gcc-arm-linux-gnueabihf \
-            gcc-aarch64-linux-gnu \
-            gcc-mips-linux-gnu \
-            gcc-mipsel-linux-gnu \
-            gcc-mips64-linux-gnuabi64 \
-            gcc-mips64el-linux-gnuabi64 \
-            gcc-powerpc64le-linux-gnu \
-            gcc-s390x-linux-gnu \
-            gcc-riscv64-linux-gnu
+          sudo apt-get install -y ${{ matrix.target[1] }}
 
-      - name: Make ${{ matrix.target[0] }}
+      - name: Install musl ${{ matrix.target[2] }} toolchain
+        if: matrix.target[2] != ''
         run: |
-          make clean all CC=${{ matrix.target[1] }} CFLAGS='${{ matrix.target[2] }}' LDFLAGS='${{ matrix.target[3] }}' RELEASE=1
+          #LATEST=$(curl -s https://api.github.com/repos/cross-tools/musl-cross/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          #MUSL_RELEASE=https://github.com/cross-tools/musl-cross/releases/download/${LATEST}/
+          URL=${{ env.MUSL_RELEASE }}${{ matrix.target[2] }}.tar.xz
+          echo "Downloading musl toolchain from $URL"
+          wget $URL
+          tar -xJvf ${{ matrix.target[2] }}.tar.xz
+          echo "$(pwd)/${{ matrix.target[2] }}/bin" >> $GITHUB_PATH
+
+      - name: Clean and build ${{ matrix.target[0] }}
+        run: |
+          make clean
+          make all CC=${{ matrix.target[3] }} CFLAGS='-O2 -Wall ${{ matrix.target[4] }}' LDFLAGS='${{ matrix.target[5] }}' RELEASE=1
 
       - name: Prepare version
         id: prep
@@ -184,7 +188,7 @@ jobs:
           asset_content_type: zip
 
 
-  build-macos:
+  build-macos-arm64:
     needs: create-release
     runs-on: macos-latest
     permissions:
@@ -203,7 +207,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: zip
-        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos.zip LICENSE *.md ${{ env.IMAGE_NAME }} *.conf
+        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-arm64.zip LICENSE *.md ${{ env.IMAGE_NAME }} *.conf
 
       - name: Load Release URL File from release job
         uses: actions/download-artifact@v4.1.7
@@ -222,8 +226,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.get_release_info.outputs.upload_url }}
-          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos.zip
-          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos.zip
+          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-arm64.zip
+          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-arm64.zip
           asset_content_type: zip
 
 
