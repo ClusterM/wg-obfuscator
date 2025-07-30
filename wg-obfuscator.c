@@ -555,10 +555,11 @@ int main(int argc, char *argv[]) {
 
                 if (obfuscated) {
                     // decode
+                    int original_length = length;
                     length = decode(buffer, length, config.xor_key, key_length, &version);
-                    if (length < 4) {
-                        log(LL_ERROR, "Failed to decode packet from %s:%d (too short, length=%d)",
-                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
+                    if (length < 4 || length > original_length) {
+                        log(LL_DEBUG, "Failed to decode packet from %s:%d (original_length=%d, decoded_length=%d)",
+                            inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), original_length, length);
                         continue;
                     }
                 }
@@ -701,9 +702,10 @@ int main(int argc, char *argv[]) {
 
                 if (obfuscated) {
                     // decode
+                    int original_length = length;
                     length = decode(buffer, length, config.xor_key, key_length, &version);
-                    if (length < 4) {
-                        log(LL_ERROR, "Failed to decode packet from %s:%d", target_host, target_port);
+                    if (length < 4 || length > original_length) {
+                        log(LL_DEBUG, "Failed to decode packet from %s:%d (original_length=%d, decoded_length=%d)", target_host, target_port, original_length, length);
                         continue;
                     }
                 }
