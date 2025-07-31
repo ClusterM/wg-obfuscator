@@ -65,14 +65,15 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
  * This function applies an encoding algorithm to the input buffer using the provided key and version.
  * WARNING: buffer must be at least 4 bytes long and aligned to 4 bytes.
  *
- * @param buffer      Pointer to the data buffer to encode.
- * @param length      Length of the data buffer in bytes.
- * @param key         Pointer to the key used for encoding.
- * @param key_length  Length of the key in bytes.
- * @param version     Encoding version to use.
- * @return            0 on success, or a negative value on error.
+ * @param buffer                    Pointer to the data buffer to encode.
+ * @param length                    Length of the data buffer in bytes.
+ * @param key                       Pointer to the key used for encoding.
+ * @param key_length                Length of the key in bytes.
+ * @param version                   Encoding version to use.
+ * @param max_dummy_length_data     Maximum length of dummy data for data packets.
+ * @return                          0 on success, or a negative value on error.
  */
-static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version) {
+static inline int encode(uint8_t *buffer, int length, char *key, int key_length, uint8_t version, int max_dummy_length_data) {
     if (version >= 1) {
         uint32_t packet_type = WG_TYPE(buffer);
         // Add some randomness to the packet

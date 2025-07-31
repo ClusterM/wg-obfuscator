@@ -137,27 +137,42 @@ The obfuscator automatically determines the direction (obfuscation or deobfuscat
 
 ## Configuration
 
-You can pass parameters to the obfuscator using a configuration file or command line arguments. Available parameters are:
-* `source-if`  
+### Command line parameters and configuration file
+The obfuscator can be run with a command line configuration or using a configuration file. Available command line arguments are:
+* `-?` or `--help`  
+  Show help message about command line arguments and exit.
+* `-V` or `--version`  
+  Print version information and exit.
+* `-c <filename>` or `--config=<filename>`  
+  Path to the configuration file, can be used instead of the rest arguments.
+* `-i <interface>` or `--source-if=<interface>`  
   Source interface to listen on. Optional, default is `0.0.0.0`, e.g. all interfaces. Can be used to listen only on a specific interface.
-* `source-lport`  
+* `-p <port>` or `--source-lport=<port>`  
   Source port to listen. Source client should connect to this port. Required.
-* `target`  
+* `-t <address:port>` or `--target=<address:port>`  
   Target address and port in `address:port` format. Obfuscated/deobfuscated data will be forwarded to this address. Required.
-* `key`  
+* `-k <key>` or `--key=<key>`  
   Obfuscation key. Just string. Longer - better. Required, must be 1-255 characters long.
-* `static-bindings`  
+* `-b <bindings>` or `--static-bindings=<bindings>`  
   Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
   (see ["Two-way mode"](#two-way-mode))
-* `verbose`  
- Verbosity level, 0-4. Optional, default is 2.  
- 0 - ERRORS (critical errors only)  
- 1 - WARNINGS (important messages: startup and shutdown messages)  
- 2 - INFO (informational messages: status messages, connection established, etc.)  
- 3 - DEBUG (detailed debug messages)  
- 4 - TRACE (very detailed debug messages, including packet dumps)  
+* `-v <level>` or `--verbose=<level>`  
+  Verbosity level, Optional, default is INFO. Accepted values are:  
+    ERRORS (critical errors only)  
+    WARNINGS (important messages)  
+    INFO (informational messages: status messages, connection established, etc.)  
+    DEBUG (detailed debug messages)  
+    TRACE (very detailed debug messages, including packet dumps)  
 
-You can use configuration file with those parameters in `key=value` format. For example:
+Additional arguments for advanced users:
+* `-m <max_clients>` or `--max-clients=<max_clients>`  
+  Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is 1024.
+* `-l <timeout>` or `--idle-timeout=<timeout>`  
+  Maximum idle timeout in milliseconds. This is the maximum time in milliseconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is 300 seconds (5 minutes).
+* `-d <length>` or `--max-dummy-length-data=<length>`  
+  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. This is used to obfuscate the traffic and make it harder to detect. The value must be between 0 and 1024. If set to 0, no dummy data will be added.Default is 4. Note: total packet size with dummy bytes will be limited to 1024 bytes.
+
+You can use `--config` argument to specify a configuration file, which allows you to set all these parameters in `key=value` format. For example:
 ```
 # Instance name
 [main]
@@ -178,17 +193,6 @@ verbose = 4
 ```
 
 As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single configuration file.
-
-You can pass the configuration file to the obfuscator using `--config` argument. For example:
-```bash
-wg-obfuscator --config /etc/wg-obfuscator.conf
-```
-
-You can also pass parameters using command line arguments. For example:
-```bash
-wg-obfuscator --source-lport 13255 --target 10.13.1.100:13255 --key test
-```
-Type `wg-obfuscator.exe --help` for more information.
 
 Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
 
@@ -578,6 +582,8 @@ You should see logs indicating the container has started successfully and is rea
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
+* **MTU Settings:**  
+  If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings.
 * **IPv6 Support:**  
   The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
 

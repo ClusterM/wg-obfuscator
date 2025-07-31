@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "config.h"
 #include "wg-obfuscator.h"
 #include "mini_argp.h"
@@ -20,34 +21,46 @@ static const mini_argp_opt options[] = {
     { "target-lport", 'r', 1 },
     { "key", 'k', 1 },
     { "static-bindings", 'b', 1 },
+    { "max_client" , 'm', 1 },
+    { "idle-timeout", 'l', 1 },
+    { "max-dummy", 'd', 1 },
     { "verbose", 'v', 1 },
+    { "version", 'V', 0 },
     { 0 }
 };
 
 static void show_usage(void)
 {
     printf("Usage: %s [options]\n%s", arg0,
-        "  -c, --config=<config_file> Read configuration from file (can be used instead\n"
-        "                             of the rest arguments\n"
-        "  -i, --source-if=<ip>       Source interface to listen on (optional, default -\n"
-        "                             0.0.0.0, e.g. all\n"
+        "  -?, --help                 Give this help list\n"
+        "  -V, --version              Print version information and exit\n"
+        "\n"
+        "Main options:\n"
+        "  -c, --config=<config_file> Read configuration from file\n"
+        "                             (can be used instead of the rest arguments)\n"
+        "  -i, --source-if=<ip>       Source interface to listen on\n"
+        "                             (optional, default - 0.0.0.0, e.g. all)\n"
         "  -p, --source-lport=<port>  Source port to listen\n"
         "  -t, --target=<ip>:<port>   Target IP and port\n"
-        "  -k, --key=<key>            Obfuscation key (required, must be 1-255\n"
-        "                             characters long)\n"
+        "  -k, --key=<key>            Obfuscation key \n"
+        "                             (required, must be 1-255 characters long)\n"
         "  -b, --static-bindings=<ip>:<port>:<port>,...\n"
         "                             Comma-separated static bindings for two-way mode\n"
         "                             as <client_ip>:<client_port>:<forward_port>\n"
-        "  -v, --verbose=<0-4>        Verbosity level (optional, default - 2)\n"
-        "                             0 - ERRORS (critical errors only)\n"
-        "                             1 - WARNINGS (important messages: startup and\n"
-        "                             shutdown messages)\n"
+        "  -v, --verbose=<level>      Verbosity level (optional, default - INFO)\n"
+        "                             ERRORS (critical errors only)\n"
+        "                             WARNINGS (important messages)\n"
         "                             2 - INFO (informational messages: status messages,\n"
-        "                             connection established, etc.)\n"
+        "                                      connection established, etc.)\n"
         "                             3 - DEBUG (detailed debug messages)\n"
         "                             4 - TRACE (very detailed debug messages, including\n"
-        "                             packet dumps)\n"
-        "  -?, --help                 Give this help list\n");
+        "                                       packet dumps)\n"
+        "\n"
+        "Additional options:\n"
+        "  -m, --max-client=<number>  Maximum number of clients (default: 1024)\n"
+        "  -l, --idle-timeout=<sec>   Idle timeout in milliseconds (default: 300)\n"
+        "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
+        "                             (default: 4)\n");
 }
 
 static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
@@ -63,7 +76,30 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
 static void reset_config(struct obfuscator_config *config)
 {
     memset(config, 0, sizeof(*config));
+    config->max_clients = MAX_CLIENTS_DEFAULT;
+    config->idle_timeout = IDLE_TIMEOUT_DEFAULT;
+    config->max_dummy_length_data = MAX_DUMMY_LENGTH_DATA_DEFAULT;
     verbose = LL_DEFAULT;
+}
+
+/**
+ * Checks if the given string represents a valid integer.
+ *
+ * @param str Pointer to the null-terminated string to check.
+ * @return Non-zero value if the string is a valid integer, 0 otherwise.
+ */
+static uint8_t is_integer(const char *str)
+{
+    if (!str || !*str) {
+        return 0; // Empty string is not an integer
+    }
+    while (*str) {
+        if (!isdigit((unsigned char)*str)) {
+            return 0; // Non-digit character found
+        }
+        str++;
+    }
+    return 1; // All characters are digits
 }
 
 /**
@@ -166,12 +202,19 @@ static void read_config_file(const char *filename, struct obfuscator_config *con
 static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
 {
     struct obfuscator_config *config = (struct obfuscator_config *)ctx;
+    char val_lower[16];
 
     switch (sname)
     {
         case '?':
+            // Show usage and exit
             show_usage();
             exit(EXIT_SUCCESS);
+        case 'V':
+            // Print version and exit
+            print_version();
+            exit(EXIT_SUCCESS);
+            break;     
         case 'c':
             read_config_file(val, config);
             break;
@@ -181,6 +224,10 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
             config->client_interface_set = 1;
             break;
         case 'p':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid source port: %s (must be an integer)", val);
+                exit(EXIT_FAILURE);
+            }
             config->listen_port = atoi(val);
             if (config->listen_port <= 0 || config->listen_port > 65535) {
                 log(LL_ERROR, "Invalid listen port: %s (must be between 1 and 65535)", val);
@@ -207,13 +254,61 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
             }
             config->xor_key_set = 1;
             break;
-        case 'v':
-            // TODO: parse verbosity level from string
-            verbose = atoi(val);
-            if (verbose < 0 || verbose > 4) {
-                log(LL_ERROR, "Invalid verbosity level: %s (must be between 0 and 4)", val);
+        case 'm':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid maximum number of clients: %s (must be an integer)", val);
                 exit(EXIT_FAILURE);
-            }            
+            }
+            config->max_clients = atoi(val);
+            if (config->max_clients <= 0) {
+                log(LL_ERROR, "Invalid maximum number of clients: %s (must be greater than 0)", val);
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case 'l':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid idle timeout: %s (must be an integer)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->idle_timeout = atol(val);
+            if (config->idle_timeout <= 0) {
+                log(LL_ERROR, "Invalid idle timeout: %s (must be greater than 0)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->idle_timeout *= 1000; // Convert to milliseconds
+            break;
+        case 'd':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid maximum dummy length for data packets: %s (must be an integer)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->max_dummy_length_data = atoi(val);
+            if (config->max_dummy_length_data < 0 || config->max_dummy_length_data > MAX_DUMMY_LENGTH_TOTAL) {
+                log(LL_ERROR, "Invalid maximum dummy length for data packets: %s (must be between 0 and %d)", val, MAX_DUMMY_LENGTH_TOTAL);
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case 'v':
+            strncpy(val_lower, val, sizeof(val_lower) - 1);
+            val_lower[sizeof(val_lower) - 1] = 0;
+            for (char *p = val_lower; *p; ++p) *p = tolower((unsigned char)*p);
+            if (strcmp(val_lower, "error") == 0) {
+                verbose = LL_ERROR;
+            } else if (strcmp(val_lower, "warn") == 0) {
+                verbose = LL_WARN;
+            } else if (strcmp(val_lower, "info") == 0) {
+                verbose = LL_INFO;
+            } else if (strcmp(val_lower, "debug") == 0) {
+                verbose = LL_DEBUG;
+            } else if (strcmp(val_lower, "trace") == 0) {
+                verbose = LL_TRACE;
+            } else {                
+                verbose = atoi(val);
+                if (verbose < 0 || verbose > 4) {
+                    log(LL_ERROR, "Invalid verbosity level: %s (must be one of 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE')", val);
+                    exit(EXIT_FAILURE);
+                }            
+            }
             break;
         default:
             // should never happen

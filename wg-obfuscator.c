@@ -53,7 +53,7 @@ static void signal_handler(int signal) {
         close(epfd);
     }
 #endif
-    log(LL_WARN, "Stopped.");
+    log(LL_INFO, "Stopped.");
     exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 #define FAILURE() signal_handler(-1)
@@ -61,13 +61,14 @@ static void signal_handler(int signal) {
 /**
  * @brief Creates a new client_entry_t structure and initializes it with the provided client and forward addresses.
  *
+ * @param config Pointer to the obfuscator configuration structure.
  * @param client_addr Pointer to a struct sockaddr_in representing the client's address.
  * @param forward_addr Pointer to a struct sockaddr_in representing the address to which traffic should be forwarded.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
-    if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
-        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", MAX_CLIENTS);
+static client_entry_t * new_client_entry(struct obfuscator_config *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
+    if (HASH_COUNT(conn_table) >= config->max_clients) {
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
     }
     client_entry_t * client_entry = malloc(sizeof(client_entry_t));
@@ -136,14 +137,15 @@ static client_entry_t * new_client_entry(struct sockaddr_in *client_addr, struct
  * This function allocates and initializes a new client_entry_t structure
  * using the provided client and forward addresses, as well as the specified local port.
  *
+ * @param config Pointer to the obfuscator configuration structure.
  * @param client_addr Pointer to a sockaddr_in structure representing the client's address.
  * @param forward_addr Pointer to a sockaddr_in structure representing the address to forward to.
  * @param local_port The local port number to connect to the server.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry_static(struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
-    if (HASH_COUNT(conn_table) >= MAX_CLIENTS) {
-        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", MAX_CLIENTS);
+static client_entry_t * new_client_entry_static(struct obfuscator_config *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
+    if (HASH_COUNT(conn_table) >= config->max_clients) {
+        log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
     }
 
@@ -230,6 +232,28 @@ static client_entry_t *find_by_server_sock(int fd) {
 }
 #endif
 
+/**
+ * @brief Prints the version information of the program.
+ *
+ * This function outputs the current version of the application to the standard output.
+ * Typically used to inform users about the build or release version.
+ */
+void print_version(void) {
+#ifdef COMMIT
+#ifndef ARCH
+    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+#else
+    fprintf(stderr, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+#endif
+#else
+#ifndef ARCH
+    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+#else
+    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")\n");
+#endif
+#endif
+}
+
 int main(int argc, char *argv[]) {
     struct obfuscator_config config;
     struct sockaddr_in 
@@ -248,30 +272,17 @@ int main(int argc, char *argv[]) {
         .ai_socktype = SOCK_DGRAM, // UDP
     };
 
-#ifdef USE_EPOLL
-    struct epoll_event events[MAX_EVENTS];
-#else
-    struct pollfd pollfds[MAX_CLIENTS + 1];
-#endif
-
-
-#ifdef COMMIT
-#ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
-#else
-    fprintf(stderr, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
-#endif
-#else
-#ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
-#else
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")\n");
-#endif
-#endif
+    print_version();
 
     if (parse_config(argc, argv, &config) != 0) {
         exit(EXIT_FAILURE);
     }
+
+#ifdef USE_EPOLL
+    struct epoll_event events[MAX_EVENTS];
+#else
+    struct pollfd pollfds[config.max_clients + 1];
+#endif
 
     /* Check the parameters */
     // Check the listening port
@@ -368,7 +379,7 @@ int main(int argc, char *argv[]) {
             inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
         FAILURE();
     }
-    log(LL_WARN, "Listening on port %s:%d for source", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
+    log(LL_INFO, "Listening on port %s:%d for source", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
 
     /* Use epoll for events if enabled */
 #ifdef USE_EPOLL
@@ -405,7 +416,7 @@ int main(int argc, char *argv[]) {
         FAILURE();
     }
     forward_addr.sin_port = htons(target_port);
-    log(LL_WARN, "Target: %s:%d", target_host, target_port);
+    log(LL_INFO, "Target: %s:%d", target_host, target_port);
 
     /* Add static bindings if provided */
     if (config.static_bindings[0]) {
@@ -452,13 +463,13 @@ int main(int argc, char *argv[]) {
             }
             client_addr.sin_port = htons(remote_port);
 
-            if (!new_client_entry_static(&client_addr, &forward_addr, local_port)) {
+            if (!new_client_entry_static(&config, &client_addr, &forward_addr, local_port)) {
                 log(LL_ERROR, "Failed to create static binding: %s:%s:%s",
                     binding, colon1 + 1, colon2 + 1);
                 FAILURE();
             }
 
-            log(LL_WARN, "Added static binding: %s:%d <-> %d:obfuscator:%d <-> %s:%d", 
+            log(LL_INFO, "Added static binding: %s:%d <-> %d:obfuscator:%d <-> %s:%d", 
                 binding, remote_port, config.listen_port,
                 local_port, target_host, target_port);
 
@@ -466,7 +477,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    log(LL_WARN, "WireGuard obfuscator successfully started");
+    log(LL_INFO, "WireGuard obfuscator successfully started");
 
     /* Main loop */
     while (1) {
@@ -484,7 +495,7 @@ int main(int argc, char *argv[]) {
         nfds++;
         client_entry_t *entry, *tmp;
         HASH_ITER(hh, conn_table, entry, tmp) {
-            if (nfds >= MAX_CLIENTS) {
+            if (nfds >= config.max_clients) {
                 log(LL_DEBUG, "Too many clients, cannot add more");
                 break;
             }
@@ -573,7 +584,7 @@ int main(int argc, char *argv[]) {
                         obfuscated ? "yes" : "no");
 
                     if (!client_entry) {
-                        client_entry = new_client_entry(&sender_addr, &forward_addr);
+                        client_entry = new_client_entry(&config, &sender_addr, &forward_addr);
                         if (!client_entry) {
                             continue;
                         }
@@ -632,7 +643,7 @@ int main(int argc, char *argv[]) {
 
                 if (!obfuscated) {
                     // If the packet is not obfuscated, we need to encode it
-                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version);
+                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version, config.max_dummy_length_data);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d (too short, length=%d)",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
@@ -765,7 +776,7 @@ int main(int argc, char *argv[]) {
 
                 if (!obfuscated) {
                     // If the packet is not obfuscated, we need to encode it
-                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version);
+                    length = encode(buffer, length, config.xor_key, key_length, client_entry->version, config.max_dummy_length_data);
                     if (length < 4) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
@@ -802,7 +813,7 @@ int main(int argc, char *argv[]) {
                 // Check if the entry is idle for too long
                 if (
                     (
-                        (now - current_entry->last_activity_time >= IDLE_TIMEOUT)
+                        (now - current_entry->last_activity_time >= config.idle_timeout)
                         || (!current_entry->handshaked && (now - current_entry->last_handshake_request_time >= HANDSHAKE_TIMEOUT))
                     ) && !current_entry->is_static // Do not remove static entries
                 ) {

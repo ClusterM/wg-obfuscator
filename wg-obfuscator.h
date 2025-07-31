@@ -25,15 +25,16 @@
 
 // Main parameters
 // TODO: make these configurable via command line arguments or config file
-#define BUFFER_SIZE             65535   // size of the buffer for receiving data from the clients and server
-#define POLL_TIMEOUT            5000    // in milliseconds
-#define HANDSHAKE_TIMEOUT       5000    // in milliseconds
-#define MAX_CLIENTS             1024    // maximum number of clients
-#define CLEANUP_INTERVAL        15000   // in milliseconds
-#define IDLE_TIMEOUT            300000  // in milliseconds
-#define MAX_DUMMY_LENGTH_TOTAL  1024    // maximum length of a packet after dummy data extension
-#define MAX_DUMMY_LENGTH_HANDSHAKE  512 // maximum length of dummy data for handshake packets
-#define MAX_DUMMY_LENGTH_DATA   4       // maximum length of dummy data for data packets
+#define BUFFER_SIZE                     65535   // size of the buffer for receiving data from the clients and server
+#define POLL_TIMEOUT                    5000    // in milliseconds
+#define HANDSHAKE_TIMEOUT               5000    // in milliseconds
+#define CLEANUP_INTERVAL                5000    // in milliseconds
+#define MAX_DUMMY_LENGTH_TOTAL          1024    // maximum length of a packet after dummy data extension
+#define MAX_DUMMY_LENGTH_HANDSHAKE      512     // maximum length of dummy data for handshake packets
+
+#define MAX_CLIENTS_DEFAULT             1024    // maximum number of clients
+#define IDLE_TIMEOUT_DEFAULT            300000  // in milliseconds
+#define MAX_DUMMY_LENGTH_DATA_DEFAULT   4       // maximum length of dummy data for data packets
 
 // Handshake directions
 #define HANDSHAKE_DIRECTION_CLIENT_TO_SERVER 0
@@ -76,6 +77,9 @@ struct obfuscator_config {
     uint8_t client_interface_set;               // 1 if the client interface is set, 0 otherwise
     char static_bindings[2048];                 // Static bindings as a string
     uint8_t static_bindings_set;                // 1 if the static bindings are set, 0 otherwise
+    int max_clients;                            // Maximum number of clients
+    long idle_timeout;                          // Idle timeout in milliseconds
+    int max_dummy_length_data;                  // Maximum length of dummy data for data packets
 };
 
 // Structure to hold client connection information
@@ -97,5 +101,7 @@ typedef struct {
 extern int verbose;
 // Section name (for multiple instances)
 extern char section_name[256];
+
+void print_version(void);
 
 #endif
