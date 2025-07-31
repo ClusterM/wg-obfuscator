@@ -9,20 +9,20 @@ What it's **NOT**:
 
 Table of Contents:
 - [Feature overview](#feature-overview)
-- [Basic Concept](#basic-concept)
+- [Basic concept](#basic-concept)
 - [Configuration](#configuration)
-  - [Two-Way Mode](#two-way-mode)
-- [How to Build and Install](#how-to-build-and-install)
+  - [Two-way Mode](#two-way-mode)
+- [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
     - [Third-party packages](#)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
-  - [Running Docker Container on Linux](#running-docker-container-on-linux)
-  - [Running Docker Container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
-- [Caveats and Recommendations](#caveats-and-recommendations)
+  - [Running Docker container on Linux](#running-docker-container-on-linux)
+  - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
+- [Caveats and recommendations](#caveats-and-recommendations)
 - [Credits](#credits)
-- [Support the Developer and the Project](#support-the-developer-and-the-project)
+- [Support the developer and the project](#support-the-developer-and-the-project)
 
 
 ## Feature overview
@@ -325,12 +325,13 @@ When **Peer B** initiates a handshake with **Peer A**, the process is the same b
 With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels—*even if both sides can initiate connections at any time.*
 
 
-## How to build and install
+## How to download, build and install
 
-You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:
-https://github.com/ClusterM/wg-obfuscator/releases
-
-Also, you can download automatic CI builds at https://clusterm.github.io/wg-obfuscator/ - if you want to test some unreleased features. Can be buggy!
+* You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
+  https://github.com/ClusterM/wg-obfuscator/releases
+* Also, you can download automatic CI builds at:  
+  https://clusterm.github.io/wg-obfuscator/  
+  Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
 
 ### Linux
 On Linux, the obfuscator can be installed as a systemd service for automatic startup and management.
