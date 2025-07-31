@@ -25,7 +25,6 @@ static const mini_argp_opt options[] = {
     { "idle-timeout", 'l', 1 },
     { "max-dummy", 'd', 1 },
     { "verbose", 'v', 1 },
-    { "version", 'V', 0 },
     { 0 }
 };
 
@@ -33,9 +32,8 @@ static void show_usage(void)
 {
     printf("Usage: %s [options]\n%s", arg0,
         "  -?, --help                 Give this help list\n"
-        "  -V, --version              Print version information and exit\n"
         "\n"
-        "Main options:\n"
+        "Main settings:\n"
         "  -c, --config=<config_file> Read configuration from file\n"
         "                             (can be used instead of the rest arguments)\n"
         "  -i, --source-if=<ip>       Source interface to listen on\n"
@@ -210,11 +208,6 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
             // Show usage and exit
             show_usage();
             exit(EXIT_SUCCESS);
-        case 'V':
-            // Print version and exit
-            print_version();
-            exit(EXIT_SUCCESS);
-            break;     
         case 'c':
             read_config_file(val, config);
             break;
