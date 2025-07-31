@@ -173,6 +173,28 @@ jobs:
           path: output/
 
 
+
+  build-macos-x64:
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: make clean all
+        run: make clean all
+
+      - name: Prepare files
+        run: |
+          mkdir -p output
+          cp LICENSE *.md ${{ env.IMAGE_NAME }} *.conf output/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-macos-x64.zip
+          path: output/
+
+
   build-windows:
     runs-on: windows-latest
     defaults:

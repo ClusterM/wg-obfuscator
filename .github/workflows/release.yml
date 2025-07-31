@@ -231,6 +231,49 @@ jobs:
           asset_content_type: zip
 
 
+  build-macos-x64:
+    needs: create-release
+    runs-on: macos-13
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: make clean all
+        run: make clean all RELEASE=1
+
+      - name: Prepare version
+        id: prep
+        run: |
+          VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: zip
+        run: zip ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-x64.zip LICENSE *.md ${{ env.IMAGE_NAME }} *.conf
+
+      - name: Load Release URL File from release job
+        uses: actions/download-artifact@v4.1.7
+        with:
+          name: release_url
+
+      - name: Get Release File Name & Upload URL
+        id: get_release_info
+        run: |
+          value=`cat release_url.txt`
+          echo upload_url=$value >> $GITHUB_OUTPUT
+
+      - name: Upload to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+          asset_path: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-x64.zip
+          asset_name: ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-macos-x64.zip
+          asset_content_type: zip
+
+
   build-windows:
     needs: create-release
     runs-on: windows-latest
