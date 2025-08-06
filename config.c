@@ -56,7 +56,7 @@ static void show_usage(void)
         "\n"
         "Additional options:\n"
         "  -m, --max-client=<number>  Maximum number of clients (default: 1024)\n"
-        "  -l, --idle-timeout=<sec>   Idle timeout in milliseconds (default: 300)\n"
+        "  -l, --idle-timeout=<sec>   Idle timeout in seconds (default: 300)\n"
         "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
         "                             (default: 4)\n");
 }
