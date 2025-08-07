@@ -45,7 +45,7 @@ static inline void xor_data(uint8_t *buffer, int length, char *key, int key_leng
     {
         // Get key byte and add the data length and the key length
         uint8_t inbyte = key[i % key_length] + length + key_length;
-        for (j=0; j<8; j++) 
+        for (j = 0; j < 8; j++) 
         {
             uint8_t mix = (crc ^ inbyte) & 0x01;
             crc >>= 1;
@@ -103,13 +103,8 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
             if (length + dummy_length > MAX_DUMMY_LENGTH_TOTAL) {
                 dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
             }
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-            *((uint16_t*)(buffer+2)) = __builtin_bswap16(dummy_length); // Set the dummy length in the packet
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-            *((uint16_t*)(buffer+2)) = dummy_length; // Set the dummy length in the packet
-#else
-    #error "Cannot determine endianness!"
-#endif
+            buffer[2] = dummy_length & 0xFF; // Set the dummy length in the packet
+            buffer[3] = dummy_length >> 8; // Set the dummy length in
             if (dummy_length > 0) {
                 int i = length;
                 length += dummy_length;
