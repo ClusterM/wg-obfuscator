@@ -636,9 +636,9 @@ int main(int argc, char *argv[]) {
 
                 // Version downgrade check
                 if (version < client_entry->version) {
-                    client_entry->version = version;
                     log(LL_WARN, "Client %s:%d uses old obfuscation version, downgrading from %d to %d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), 
                         client_entry->version, version);
+                    client_entry->version = version;
                 }
 
                 if (!obfuscated) {
@@ -769,9 +769,9 @@ int main(int argc, char *argv[]) {
 
                 // Version downgrade check
                 if (version < client_entry->version) {
-                    client_entry->version = version;
                     log(LL_WARN, "Server %s:%d uses old obfuscation version, downgrading from %d to %d", 
                         target_host, target_port, client_entry->version, version);
+                    client_entry->version = version;
                 }
 
                 if (!obfuscated) {
