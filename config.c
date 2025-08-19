@@ -21,7 +21,7 @@ static const mini_argp_opt options[] = {
     { "target-lport", 'r', 1 },
     { "key", 'k', 1 },
     { "static-bindings", 'b', 1 },
-    { "max_client" , 'm', 1 },
+    { "max-clients" , 'm', 1 },
     { "idle-timeout", 'l', 1 },
     { "max-dummy", 'd', 1 },
     { "verbose", 'v', 1 },
@@ -55,7 +55,7 @@ static void show_usage(void)
         "                                       packet dumps)\n"
         "\n"
         "Additional options:\n"
-        "  -m, --max-client=<number>  Maximum number of clients (default: 1024)\n"
+        "  -m, --max-clients=<number> Maximum number of clients (default: 1024)\n"
         "  -l, --idle-timeout=<sec>   Idle timeout in seconds (default: 300)\n"
         "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
         "                             (default: 4)\n");
