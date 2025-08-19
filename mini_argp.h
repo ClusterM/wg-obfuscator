@@ -20,7 +20,7 @@ typedef struct {
 static const mini_argp_opt *
 margp_find(const mini_argp_opt *o, char *lname, char sname)
 {
-    for (; o; ++o)
+    for (; o->long_name || o->short_name; o++)
         if ((lname && o->long_name && !strcmp(lname,o->long_name)) ||
             (sname && o->short_name==sname))
             return o;
