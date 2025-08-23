@@ -53,8 +53,8 @@ What started as a quick-and-dirty solution just for personal use has grown into 
   Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
 * **Very low dependency footprint**  
   No huge libraries or frameworks.
-* **Android client coming soon?**  
-  A native Android version of the obfuscator is planned, allowing you to obfuscate WireGuard traffic directly on Android devices (including phones, tablets, or Android TVs). This will make it possible to use the obfuscator together with mobile WireGuard clients or WireGuard running on smart TVs.
+* **Android client**  
+  A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
 
 ## Basic Concept
@@ -381,7 +381,7 @@ make
 > **Note:** On macOS, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself.
 
 ### Android
-Android support is planned.
+A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
 ### Running Docker Container on Linux
 
