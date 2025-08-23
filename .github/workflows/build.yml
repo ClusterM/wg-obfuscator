@@ -7,6 +7,10 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   IMAGE_NAME: wg-obfuscator
   MUSL_RELEASE: https://github.com/cross-tools/musl-cross/releases/download/20250520/
