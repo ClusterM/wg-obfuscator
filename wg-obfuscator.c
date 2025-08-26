@@ -663,7 +663,7 @@ int main(int argc, char *argv[]) {
                     trace("\n");
                 }
 
-                length = sendto(client_entry->server_sock, buffer, length, 0, (struct sockaddr *)&forward_addr, sizeof(forward_addr));
+                length = send(client_entry->server_sock, buffer, length, 0);
                 if (length < 0) {
                     serror_level(LL_DEBUG, "sendto %s:%d", target_host, target_port);
                     continue;
