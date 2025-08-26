@@ -83,6 +83,7 @@ static client_entry_t * new_client_entry(struct obfuscator_config *config, struc
     memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
     // Create a socket for the server connection
     client_entry->server_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    // TODO: add client address to log
     if (client_entry->server_sock < 0) {
         serror("Failed to create server socket for client");
         free(client_entry);
@@ -92,10 +93,15 @@ static client_entry_t * new_client_entry(struct obfuscator_config *config, struc
     // Set "Don't Fragment" flag
     int optval = 1;
     if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
-        serror("Failed to set socket options for client");
+        serror("Failed to set 'don't fragment' flag for client");
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
+    }
+    if (config->fwmark) {
+        if (setsockopt(client_entry->server_sock, SOL_SOCKET, SO_MARK, &config->fwmark, sizeof(config->fwmark)) < 0) {
+            log(LL_WARN, "Failed to set 'firewall mark' for client: %s", strerror(errno));
+        }
     }
 #endif
     // Set the server address to the specified one
@@ -192,12 +198,19 @@ static client_entry_t * new_client_entry_static(struct obfuscator_config *config
     // Set "Don't Fragment" flag
     int optval = 1;
     if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
-        serror("Failed to set socket options for client %s:%d", 
+        serror("Failed to set 'don't fragment' flag for client %s:%d", 
             inet_ntoa(client_entry->client_addr.sin_addr), local_port);
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
     }
+    if (config->fwmark) {
+        if (setsockopt(client_entry->server_sock, SOL_SOCKET, SO_MARK, &config->fwmark, sizeof(config->fwmark)) < 0) {
+            log(LL_WARN, "Failed to set 'firewall mark' for client %s:%d: %s",
+                inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port), strerror(errno));
+        }
+    }
+
 #endif
     // Set the server address to the specified one
     connect(client_entry->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr));
@@ -364,8 +377,13 @@ int main(int argc, char *argv[]) {
     /* Set "Don't Fragment" flag */
     int optval = 1;
     if (setsockopt(listen_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
-        serror("Failed to set socket options for listen socket");
+        serror("Failed to set 'don't fragment' flag for listening socket");
         FAILURE();
+    }
+    if (config.fwmark) {
+        if (setsockopt(listen_sock, SOL_SOCKET, SO_MARK, &config.fwmark, sizeof(config.fwmark)) < 0) {
+            log(LL_WARN, "Failed to set 'firewall mark' for listening socket: %s", strerror(errno));
+        }
     }
 #endif
 

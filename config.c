@@ -24,6 +24,7 @@ static const mini_argp_opt options[] = {
     { "max-clients" , 'm', 1 },
     { "idle-timeout", 'l', 1 },
     { "max-dummy", 'd', 1 },
+    { "fwmark", 'f', 1 },
     { "verbose", 'v', 1 },
     { 0 }
 };
@@ -45,6 +46,8 @@ static void show_usage(void)
         "  -b, --static-bindings=<ip>:<port>:<port>,...\n"
         "                             Comma-separated static bindings for two-way mode\n"
         "                             as <client_ip>:<client_port>:<forward_port>\n"
+        "  -f, --fwmark=<mark>        Firewall mark to set on all packets\n"
+        "                             (optional, default - 0, e.g. disabled)\n"
         "  -v, --verbose=<level>      Verbosity level (optional, default - INFO)\n"
         "                             ERRORS (critical errors only)\n"
         "                             WARNINGS (important messages)\n"
@@ -281,6 +284,20 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                 exit(EXIT_FAILURE);
             }
             break;
+        case 'f':
+            // parse string with decimal and hexadecimal support
+#ifdef __linux__
+            long int v = strtol(val, NULL, 0);
+            if (v <= 0 || v > UINT16_MAX) {
+                log(LL_ERROR, "Invalid firewall mark: %s", val);
+                exit(EXIT_FAILURE);
+            }
+            config->fwmark = (uint16_t)v;
+#else
+            log(LL_WARN, "Firewall mark is not supported on this platform");
+#endif
+            break;
+
         case 'v':
             strncpy(val_lower, val, sizeof(val_lower) - 1);
             val_lower[sizeof(val_lower) - 1] = 0;

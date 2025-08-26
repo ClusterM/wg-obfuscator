@@ -80,6 +80,7 @@ struct obfuscator_config {
     int max_clients;                            // Maximum number of clients
     long idle_timeout;                          // Idle timeout in milliseconds
     int max_dummy_length_data;                  // Maximum length of dummy data for data packets
+    uint32_t fwmark;                            // Firewall mark
 };
 
 // Structure to hold client connection information
