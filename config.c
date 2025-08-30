@@ -312,9 +312,15 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                 verbose = LL_DEBUG;
             } else if (strcmp(val_lower, "trace") == 0) {
                 verbose = LL_TRACE;
-            } else {                
-                verbose = atoi(val);
-                if (verbose < 0 || verbose > 4) {
+            } else {
+                // check if it's a number
+                if (is_integer(val)) {
+                    verbose = atoi(val);
+                    if (verbose < 0 || verbose > 4) {
+                        log(LL_ERROR, "Invalid verbosity level: %s (must be one of 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE')", val);
+                        exit(EXIT_FAILURE);
+                    }
+                } else {
                     log(LL_ERROR, "Invalid verbosity level: %s (must be one of 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE')", val);
                     exit(EXIT_FAILURE);
                 }            
