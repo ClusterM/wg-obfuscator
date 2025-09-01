@@ -320,6 +320,7 @@ static int stun_attr_xor_mapped_addr(uint8_t *b, const struct sockaddr_in *src){
     return 12; // 4 hdr + 8 val
 }
 
+/*
 static int stun_attr_software(uint8_t *b, const char *s){
     uint16_t n = (uint16_t)strlen(s);
     uint16_t pad = (4 - (n & 3)) & 3;
@@ -333,6 +334,7 @@ static int stun_attr_software(uint8_t *b, const char *s){
     }
     return 4 + n + pad;
 }
+*/
 
 static uint32_t crc32(const uint8_t *p, size_t n){
     uint32_t crc=~0u;
