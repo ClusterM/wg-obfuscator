@@ -94,6 +94,8 @@ typedef struct {
     uint8_t version;                            // obfuscation version
     uint8_t handshaked          : 1;            // 1 if the client has completed the handshake, 0 otherwise
     uint8_t handshake_direction : 1;            // 1 if the handshake is from client to server, 0 if from server to client
+    uint8_t client_obfuscated   : 1;            // 1 if the client is obfuscated, 0 otherwise
+    uint8_t server_obfuscated   : 1;            // 1 if the server is obfuscated, 0 otherwise
     uint8_t is_static           : 1;            // 1 if this is a static binding entry, 0 otherwise
     UT_hash_handle hh;
 } client_entry_t;

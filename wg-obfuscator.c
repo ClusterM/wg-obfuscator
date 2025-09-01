@@ -267,6 +267,181 @@ void print_version(void) {
 #endif
 }
 
+#define STUN_MAGIC_COOKIE 0x2112A442
+static const uint8_t COOKIE_BE[4] = {0x21,0x12,0xA4,0x42};
+#define STUN_TYPE_DATA_IND 0x0115
+#define STUN_ATTR_DATA 0x0013
+#define STUN_BINDING_REQ    0x0001
+#define STUN_BINDING_RESP   0x0101
+#define STUN_ATTR_XORMAPPED 0x0020
+#define STUN_ATTR_SOFTWARE  0x8022
+#define STUN_ATTR_FINGERPR  0x8028
+
+static void rand_bytes(uint8_t* p, size_t n){ for(size_t i=0;i<n;i++) p[i]=rand()&0xFF; }
+
+int is_stun_by_magic(const uint8_t *buf, size_t len) {
+    if (!buf || len < 8) return 0;
+    // uint32_t cookie;
+    // memcpy(&cookie, buf + 4, 4);
+    // return ntohl(cookie) == STUN_MAGIC_COOKIE;
+    return !memcmp(buf+4, COOKIE_BE, 4);
+}
+
+uint16_t stun_peek_type(const uint8_t *buf){
+    return (buf[0] << 8) | buf[1];
+}
+
+static int stun_write_header(uint8_t *b, uint16_t type, uint16_t mlen, const uint8_t txid[12]) {
+    b[0]=type>>8;
+    b[1]=type&0xFF;
+    b[2]=mlen>>8;
+    b[3]=mlen&0xFF;
+    memcpy(b+4, COOKIE_BE, 4);
+    memcpy(b+8,txid,12);
+    return 20;
+}
+
+static int stun_attr_xor_mapped_addr(uint8_t *b, const struct sockaddr_in *src){
+    // type,len
+    b[0]=STUN_ATTR_XORMAPPED>>8;
+    b[1]=STUN_ATTR_XORMAPPED&0xFF;
+    b[2]=0;
+    b[3]=8; // len=8 (family+port+addr)
+    b[4]=0;
+    b[5]=0x01; // family IPv4
+    memcpy(b+6, &src->sin_port, 2);        // network-order bytes
+    ((uint8_t*)b)[6] ^= COOKIE_BE[0];
+    ((uint8_t*)b)[7] ^= COOKIE_BE[1];
+    memcpy(b+8, &src->sin_addr.s_addr, 4); // network-order bytes
+    ((uint8_t*)b)[8]  ^= COOKIE_BE[0];
+    ((uint8_t*)b)[9]  ^= COOKIE_BE[1];
+    ((uint8_t*)b)[10] ^= COOKIE_BE[2];
+    ((uint8_t*)b)[11] ^= COOKIE_BE[3];
+    return 12; // 4 hdr + 8 val
+}
+
+static int stun_attr_software(uint8_t *b, const char *s){
+    uint16_t n = (uint16_t)strlen(s);
+    uint16_t pad = (4 - (n & 3)) & 3;
+    if (b) {
+        b[0] = STUN_ATTR_SOFTWARE >> 8; 
+        b[1] = STUN_ATTR_SOFTWARE&0xFF;
+        b[2] = n>>8;
+        b[3] = n&0xFF;
+        memcpy(b+4,s,n);
+        if (pad) memset(b+4+n,0,pad);
+    }
+    return 4 + n + pad;
+}
+
+static uint32_t crc32(const uint8_t *p, size_t n){
+    uint32_t crc=~0u;
+    for(size_t i=0;i<n;i++){
+        crc ^= p[i];
+        for(int k=0;k<8;k++)
+            crc = (crc>>1) ^ (0xEDB88320u & (-(int)(crc&1)));
+    }
+    return ~crc;
+}
+
+static int stun_attr_fingerprint(uint8_t *pkt, size_t cur_len){
+    uint8_t *b = pkt + cur_len;
+    b[0]=STUN_ATTR_FINGERPR>>8;
+    b[1]=STUN_ATTR_FINGERPR&0xFF;
+    b[2]=0;
+    b[3]=4;
+    uint32_t fp = htonl(crc32(pkt, cur_len) ^ 0x5354554eu);
+    memcpy(b+4, &fp, 4);
+    return 8; // 4 hdr + 4 val
+}
+
+int build_stun_binding_request(uint8_t *out, size_t cap){
+    if (cap < 20) return -1;
+    uint8_t txid[12];
+    rand_bytes(txid,12);
+    stun_write_header(out, STUN_BINDING_REQ, 0, txid);
+    size_t mlen = 0;
+    // optional SOFTWARE
+    //mlen += stun_attr_software(out+20+mlen, "wgo/1.0");
+    mlen += stun_attr_fingerprint(out, 20+mlen);
+    out[2] = (mlen>>8)&0xFF;
+    out[3] = mlen&0xFF;
+    return (int)(20+mlen);
+}
+
+uint8_t stun_binding_request_send(int socket, const struct sockaddr_in *to) {
+    uint8_t buffer[20];
+    int len = build_stun_binding_request(buffer, sizeof(buffer));
+    if (len < 0) return -1;
+
+    ssize_t sent;
+    if (to) {
+        sent = sendto(socket, buffer, len, 0, (const struct sockaddr *)to, sizeof(*to));
+        log(LL_DEBUG, "Sending STUN binding request to %s:%d, result: %s", inet_ntoa(to->sin_addr), ntohs(to->sin_port), (sent == len) ? "success" : "failure");
+    } else {
+        sent = send(socket, buffer, len, 0);
+        log(LL_DEBUG, "Sending STUN binding request to server, result: %s", (sent == len) ? "success" : "failure");
+    }
+    return (sent == len) ? 0 : -1;
+}
+
+int build_stun_binding_success(uint8_t *out, size_t cap,
+                               const uint8_t txid[12],
+                               const struct sockaddr_in *src) {
+    if (cap < 20+12+8) return -1; // header + XOR-MAPPED-ADDRESS + fingerprint
+    stun_write_header(out, STUN_BINDING_RESP, 0, (uint8_t*)txid);
+    size_t mlen = 0;
+    mlen += stun_attr_xor_mapped_addr(out+20+mlen, src);
+    // optional SOFTWARE
+    //mlen += stun_attr_software(out+20+mlen, "wgo/1.0");
+    mlen += stun_attr_fingerprint(out, 20+mlen);
+    out[2] = (mlen>>8)&0xFF;
+    out[3] = mlen&0xFF;
+    return (int)(20+mlen);
+}
+
+int stun_wrap(uint8_t *buf, size_t buf_size, size_t data_len) {
+    const size_t header_size = 20;      // STUN header
+    const size_t attr_header = 4;       // type+length
+    size_t total_add = header_size + attr_header;
+    size_t mlen = 0;
+
+    if (data_len + total_add > buf_size) return -1;
+
+    memmove(buf + total_add, buf, data_len);
+
+    uint8_t txid[12];
+    rand_bytes(txid,12);
+    mlen += stun_write_header(buf, STUN_TYPE_DATA_IND, 0, txid);
+
+    buf[mlen] = STUN_ATTR_DATA >> 8;
+    buf[mlen+1] = STUN_ATTR_DATA & 0xFF;
+    buf[mlen+2] = data_len >> 8;
+    buf[mlen+3] = data_len & 0xFF;
+
+    return header_size + attr_header + data_len;
+}
+
+int stun_unwrap(uint8_t *buf, size_t len) {
+    if (len < 24) return -1; // header+attr
+
+    uint16_t msg_type = (buf[0] << 8) | buf[1];
+    if (msg_type != STUN_TYPE_DATA_IND) return -1;
+
+    uint16_t msg_len = (buf[2] << 8) | buf[3];
+    if (msg_len + 20 > len) return -1;
+
+    uint16_t attr_type = (buf[20] << 8) | buf[21];
+    if (attr_type != STUN_ATTR_DATA) return -1;
+
+    uint16_t data_len = (buf[22] << 8) | buf[23];
+    if (data_len + 24 > len) return -1;
+
+    memmove(buf, buf + 24, data_len);
+
+    return data_len;
+}
+
 int main(int argc, char *argv[]) {
     struct obfuscator_config config;
     struct sockaddr_in 
@@ -554,6 +729,43 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, BUFFER_SIZE);
                     continue;
                 }
+                if (is_stun_by_magic(buffer, length)) {
+                    uint16_t stun_type = stun_peek_type(buffer);
+                    switch (stun_type) {
+                        case STUN_BINDING_REQ: {
+                            // Received STUN Binding Request from client, send Binding Success Response
+                            log(LL_DEBUG, "Received STUN Binding Request from %s:%d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                            uint8_t txid[12];
+                            memcpy(txid, buffer + 8, 12);
+                            int resp_len = build_stun_binding_success(buffer, BUFFER_SIZE, txid, &sender_addr);
+                            if (resp_len > 0) {
+                                int sent = sendto(listen_sock, buffer, resp_len, 0, (struct sockaddr *)&sender_addr, sizeof(sender_addr));
+                                if (sent != resp_len) {
+                                    serror_level(LL_DEBUG, "sendto STUN response to %s:%d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                                } else {
+                                    log(LL_DEBUG, "Sent STUN Binding Success Response (%d bytes) to %s:%d", resp_len, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                                }
+                            } else {
+                                log(LL_DEBUG, "Failed to build STUN Binding Success Response");
+                            }
+                            continue;
+                        }
+                        case STUN_BINDING_RESP:
+                            log(LL_DEBUG, "Received STUN Binding Success Response from %s:%d, ignoring", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                            continue;
+                        case STUN_TYPE_DATA_IND:
+                            length = stun_unwrap(buffer, length);
+                            if (length < 0) {
+                                log(LL_DEBUG, "Failed to unwrap STUN Data Indication from %s:%d", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                                continue;
+                            }
+                            log(LL_DEBUG, "Unwrapped STUN Data Indication from %s:%d (%d bytes)", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
+                            break;
+                        default:
+                            log(LL_DEBUG, "Received unknown STUN type %04X from %s:%d, ignoring", stun_type, inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                            continue;
+                    }
+                }
                 if (length < 4) {
                     log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                     continue;
@@ -607,7 +819,10 @@ int main(int argc, char *argv[]) {
                             continue;
                         }
                     }
-
+                    if (!obfuscated) {
+                        // Send STUN binding request before the obfuscated handshake
+                        stun_binding_request_send(client_entry->server_sock, NULL);
+                    }
                     client_entry->handshake_direction = HANDSHAKE_DIRECTION_CLIENT_TO_SERVER;
                     client_entry->last_handshake_request_time = now;
                 }
@@ -641,6 +856,8 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port);
                     client_entry->handshaked = 1;
+                    client_entry->client_obfuscated = obfuscated;
+                    client_entry->server_obfuscated = !obfuscated;
                     client_entry->last_handshake_time = now;
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
@@ -667,6 +884,7 @@ int main(int argc, char *argv[]) {
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
+                    length = stun_wrap(buffer, sizeof(buffer), length);
                 }
 
                 if (verbose >= LL_TRACE) {
@@ -703,6 +921,43 @@ int main(int argc, char *argv[]) {
                     log(LL_DEBUG, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
                         target_host, target_port, length, BUFFER_SIZE);
                     continue;
+                }
+                if (is_stun_by_magic(buffer, length)) {
+                    uint16_t stun_type = stun_peek_type(buffer);
+                    switch (stun_type) {
+                        case STUN_BINDING_REQ: {
+                            // Received STUN Binding Request from client, send Binding Success Response
+                            log(LL_DEBUG, "Received STUN Binding Request to %s:%d", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                            uint8_t txid[12];
+                            memcpy(txid, buffer + 8, 12);
+                            int resp_len = build_stun_binding_success(buffer, BUFFER_SIZE, txid, &forward_addr);
+                            if (resp_len > 0) {
+                                int sent = send(client_entry->server_sock, buffer, resp_len, 0);
+                                if (sent != resp_len) {
+                                    serror_level(LL_DEBUG, "sendto STUN response to %s:%d", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                                } else {
+                                    log(LL_DEBUG, "Sent STUN Binding Success Response (%d bytes) to %s:%d", resp_len, inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                                }
+                            } else {
+                                log(LL_DEBUG, "Failed to build STUN Binding Success Response");
+                            }
+                            continue;
+                        }
+                        case STUN_BINDING_RESP:
+                            log(LL_DEBUG, "Received STUN Binding Success Response to %s:%d, ignoring", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                            continue;
+                        case STUN_TYPE_DATA_IND:
+                            length = stun_unwrap(buffer, length);
+                            if (length < 0) {
+                                log(LL_DEBUG, "Failed to unwrap STUN Data Indication to %s:%d", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                                continue;
+                            }
+                            log(LL_DEBUG, "Unwrapped STUN Data Indication to %s:%d (%d bytes)", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port), length);
+                            break;
+                        default:
+                            log(LL_DEBUG, "Received unknown STUN type %04X to %s:%d, ignoring", stun_type, inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
+                            continue;
+                    }
                 }
                 if (length < 4) {
                     log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", target_host, target_port, length);
@@ -746,7 +1001,10 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, 
                         obfuscated ? "yes" : "no");
-
+                    if (!obfuscated) {
+                        // Send STUN binding request before the obfuscated handshake
+                        stun_binding_request_send(listen_sock, &client_entry->client_addr);
+                    }
                     client_entry->handshake_direction = HANDSHAKE_DIRECTION_SERVER_TO_CLIENT;
                     client_entry->last_handshake_request_time = now;
                 }
@@ -774,6 +1032,8 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         target_host, target_port);
                     client_entry->handshaked = 1;
+                    client_entry->client_obfuscated = !obfuscated;
+                    client_entry->server_obfuscated = obfuscated;
                     client_entry->last_handshake_time = now;
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
@@ -799,6 +1059,7 @@ int main(int argc, char *argv[]) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
                     }
+                    length = stun_wrap(buffer, sizeof(buffer), length);
                 }
                 
                 if (verbose >= LL_TRACE) {
@@ -843,6 +1104,14 @@ int main(int argc, char *argv[]) {
                     close(current_entry->server_sock);
                     HASH_DEL(conn_table, current_entry);
                     free(current_entry);
+                }
+
+                // Periodically send STUN binding request to obfuscated connections
+                if (current_entry->client_obfuscated) {
+                    stun_binding_request_send(listen_sock, &current_entry->client_addr);
+                }
+                if (current_entry->server_obfuscated) {
+                    stun_binding_request_send(current_entry->server_sock, NULL);
                 }
             }
             // Update the last cleanup time
