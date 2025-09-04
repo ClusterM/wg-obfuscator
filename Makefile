@@ -1,7 +1,7 @@
 PROG_NAME    = wg-obfuscator
 CONFIG       = wg-obfuscator.conf
 SERVICE_FILE = wg-obfuscator.service
-HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h
+HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h stun.h
 
 RELEASE ?= 0
 
@@ -12,7 +12,7 @@ ifdef DEBUG
 else
   CFLAGS   = -O2 -Wall
 endif
-OBJS = wg-obfuscator.o config.o
+OBJS = wg-obfuscator.o config.o stun.o
 EXEDIR = .
 
 EXTRA_CFLAGS =

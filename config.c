@@ -74,12 +74,13 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
  *
  * @param config Pointer to the obfuscator_config structure to be reset.
  */
-static void reset_config(struct obfuscator_config *config)
+static void reset_config(obfuscator_config_t *config)
 {
     memset(config, 0, sizeof(*config));
     config->max_clients = MAX_CLIENTS_DEFAULT;
     config->idle_timeout = IDLE_TIMEOUT_DEFAULT;
     config->max_dummy_length_data = MAX_DUMMY_LENGTH_DATA_DEFAULT;
+    config->masking_type = MASKING_NONE;
     verbose = LL_DEFAULT;
 }
 
@@ -112,7 +113,7 @@ static uint8_t is_integer(const char *str)
  * @param filename The path to the configuration file to be read.
  * @param config Pointer to the obfuscator_config structure where the parsed settings will be stored.
  */
-static void read_config_file(const char *filename, struct obfuscator_config *config)
+static void read_config_file(const char *filename, obfuscator_config_t *config)
 {
     // Read configuration from the file
     uint8_t first_section = 1; // Flag to indicate if this is the first section being processed
@@ -202,7 +203,7 @@ static void read_config_file(const char *filename, struct obfuscator_config *con
 /* Parse a single option. */
 static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
 {
-    struct obfuscator_config *config = (struct obfuscator_config *)ctx;
+    obfuscator_config_t *config = (obfuscator_config_t *)ctx;
     char val_lower[16];
 
     switch (sname)
@@ -327,7 +328,7 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
     return 0;
 }
 
-int parse_config(int argc, char **argv, struct obfuscator_config *config)
+int parse_config(int argc, char **argv, obfuscator_config_t *config)
 {
     /* Parse command line arguments */
     reset_config(config);

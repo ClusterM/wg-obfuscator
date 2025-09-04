@@ -4,6 +4,6 @@
 #include "wg-obfuscator.h"
 
 char *trim(char *s);
-int parse_config(int argc, char **argv, struct obfuscator_config *config);
+int parse_config(int argc, char **argv, obfuscator_config_t *config);
 
 #endif // _CONFIG_H_

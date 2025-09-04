@@ -2,6 +2,7 @@
 #define _WG_OBFUSCATOR_H_
 
 #include <arpa/inet.h>
+#include <errno.h>
 
 // on Linux, use epoll for better performance
 #ifdef __linux__
@@ -36,10 +37,6 @@
 #define IDLE_TIMEOUT_DEFAULT            300000  // in milliseconds
 #define MAX_DUMMY_LENGTH_DATA_DEFAULT   4       // maximum length of dummy data for data packets
 
-// Handshake directions
-#define HANDSHAKE_DIRECTION_CLIENT_TO_SERVER 0
-#define HANDSHAKE_DIRECTION_SERVER_TO_CLIENT 1
-
 // Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
 
@@ -65,8 +62,19 @@
 #define serror_level(level, fmt, ...) log(level, fmt " - %s (%d)", ##__VA_ARGS__, strerror(errno), errno)
 #define serror(fmt, ...) serror_level(LL_ERROR, fmt, ##__VA_ARGS__)
 
+// Masking types
+typedef enum {
+    MASKING_NONE,
+    MASKING_STUN,
+} masking_type_t;
+
+typedef enum {
+    DIR_CLIENT_TO_SERVER = 0,
+    DIR_SERVER_TO_CLIENT = 1,
+} direction_t;
+
 // Structure to hold obfuscator configuration
-struct obfuscator_config {
+typedef struct {
     int listen_port;                            // Listening port for the obfuscator
     uint8_t listen_port_set;                    // 1 if the listen port is set, 0 otherwise
     char forward_host_port[256];                // Host and port to forward the data to
@@ -81,7 +89,8 @@ struct obfuscator_config {
     long idle_timeout;                          // Idle timeout in milliseconds
     int max_dummy_length_data;                  // Maximum length of dummy data for data packets
     uint32_t fwmark;                            // Firewall mark
-};
+    masking_type_t masking_type;                // method to mask traffic
+} obfuscator_config_t;
 
 // Structure to hold client connection information
 typedef struct {
@@ -92,7 +101,8 @@ typedef struct {
     long last_handshake_time;                   // last time we received a handshake response from/to this client
     int server_sock;                            // socket for the connection to the server    
     uint8_t version;                            // obfuscation version
-    uint8_t handshaked          : 1;            // 1 if the client has completed the handshake, 0 otherwise
+    masking_type_t masking_type;                // method to mask traffic
+    uint8_t handshaked          : 1;            // 1 if the handshake is complete, 0 otherwise
     uint8_t handshake_direction : 1;            // 1 if the handshake is from client to server, 0 if from server to client
     uint8_t client_obfuscated   : 1;            // 1 if the client is obfuscated, 0 otherwise
     uint8_t server_obfuscated   : 1;            // 1 if the server is obfuscated, 0 otherwise
