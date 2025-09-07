@@ -1,10 +1,14 @@
 # WireGuard Obfuscator
 
-WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data, making it significantly harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government tries to block or throttle WireGuard traffic.
+WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data or some other protocol, making it much harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government attempts to block or throttle WireGuard traffic.
+
+Project Goals:
+* **Compact and dependency-free**: The application is designed to be as lightweight as possible, with absolutely no external dependencies. This makes it suitable even for installation on minimal hardware such as basic home routers.
+* **Independent obfuscator**: Instead of maintaining a separate fork of WireGuard, the obfuscator is built to be fully independent of the VPN client/server. This allows seamless integration into an existing network architecture, or even running the obfuscator on a separate device if the device running the WireGuard client cannot support additional applications.
+* **Preserve bandwidth efficiency**: The obfuscator continues to use only UDP and introduces minimal overhead to the size of original packets, ensuring maximum throughput is maintained.
 
 What it's **NOT**:
 * **Not a standalone solution**: You need to use this tool on both ends. You must run the obfuscator on both the WireGuard client and server sides to ensure proper obfuscation and deobfuscation of traffic. So, you can't use it with 3rd-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., on a VPS) and connect to it using WireGuard.
-* **Not HTTPS imitation**: It does not try to imitate HTTPS or any other protocol. It simply obfuscates WireGuard packets to make them look like a totally random UDP data. If your ISP allows only whitelisted protocols (like HTTPS), this tool will not help you. It does not try to bypass protocol restrictions or make traffic look like something else.
 * **Not a VPN**: This is not a VPN service or a WireGuard client/server. It only obfuscates WireGuard traffic.
 
 Table of Contents:
