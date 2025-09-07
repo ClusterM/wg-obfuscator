@@ -43,6 +43,7 @@ What started as a quick-and-dirty solution just for personal use has grown into 
   Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
 * **Handshake randomization**  
   WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
+* **Masking**  Starting from version 1.4, the project introduces masking support — the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
 * **Very fast and efficient**  
   The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
 * **Built-in NAT table**  
