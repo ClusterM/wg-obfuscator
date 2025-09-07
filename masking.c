@@ -91,7 +91,9 @@ int masking_unwrap_from_client(uint8_t *buffer, int length,
         }
 
         // No matching masking handler found
-        *masking_handler_out = NULL;
+        if (masking_handler_out) {
+            *masking_handler_out = NULL;
+        }
         return length;
     }
 

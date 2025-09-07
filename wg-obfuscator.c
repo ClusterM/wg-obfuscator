@@ -652,7 +652,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
 
-                    if (client_entry->handshake_direction != DIR_CLIENT_TO_SERVER) {
+                    if (client_entry->handshake_direction != DIR_SERVER_TO_CLIENT) {
                         log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to server-to-client",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                             target_host, target_port);
@@ -691,7 +691,6 @@ int main(int argc, char *argv[]) {
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
-                    //length = stun_wrap(buffer, sizeof(buffer), length);
                     length = masking_data_wrap_to_server(buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
 
@@ -783,7 +782,6 @@ int main(int argc, char *argv[]) {
                         obfuscated ? "yes" : "no");
                     if (!obfuscated) {
                         // Send STUN binding request before the obfuscated handshake
-                        //stun_binding_request_send(listen_sock, &client_entry->client_addr);
                         masking_on_handshake_req_from_server(&config, client_entry, listen_sock, &client_entry->client_addr, &forward_addr);
                     }
                     client_entry->handshake_direction = DIR_SERVER_TO_CLIENT;
@@ -840,7 +838,6 @@ int main(int argc, char *argv[]) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
                     }
-                    //length = stun_wrap(buffer, sizeof(buffer), length);
                     length = masking_data_wrap_to_client(buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
                 
