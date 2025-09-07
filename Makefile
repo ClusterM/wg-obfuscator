@@ -16,7 +16,7 @@ OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
 EXEDIR = .
 
 EXTRA_CFLAGS =
-LDFLAGS +=
+LDFLAGS += -s
 
 ifeq ($(OS),Windows_NT)
   TARGET = $(EXEDIR)/$(PROG_NAME).exe
