@@ -9,14 +9,15 @@ RM    = rm -f
 CC    = gcc
 ifdef DEBUG
   CFLAGS   = -g -O0 -Wall -DDEBUG
+  LDFLAGS +=
 else
   CFLAGS   = -O2 -Wall
+  LDFLAGS += -s
 endif
 OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
 EXEDIR = .
 
 EXTRA_CFLAGS =
-LDFLAGS += -s
 
 ifeq ($(OS),Windows_NT)
   TARGET = $(EXEDIR)/$(PROG_NAME).exe
