@@ -350,7 +350,7 @@ jobs:
       - name: Archive
         run: |
           mkdir -p tmp
-          mv ${{ env.IMAGE_NAME }} LICENSE *.md *.conf tmp/
+          mv ${{ env.IMAGE_NAME }} *.dll LICENSE *.md *.conf tmp/
           mv tmp ${{ env.IMAGE_NAME }}
           zip -9 -r ${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-windows-x64.zip ${{ env.IMAGE_NAME }}
 
