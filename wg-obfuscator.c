@@ -7,11 +7,11 @@
 #include <signal.h>
 #include <time.h>
 #include <stdarg.h>
-#include <errno.h>
 #include "wg-obfuscator.h"
 #include "config.h"
 #include "obfuscation.h"
 #include "uthash.h"
+#include "masking.h"
 
 // Verbosity level
 int verbose = LL_DEFAULT;
@@ -66,7 +66,7 @@ static void signal_handler(int signal) {
  * @param forward_addr Pointer to a struct sockaddr_in representing the address to which traffic should be forwarded.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry(struct obfuscator_config *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
+static client_entry_t * new_client_entry(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr) {
     if (HASH_COUNT(conn_table) >= config->max_clients) {
         log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
@@ -149,7 +149,7 @@ static client_entry_t * new_client_entry(struct obfuscator_config *config, struc
  * @param local_port The local port number to connect to the server.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry_static(struct obfuscator_config *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
+static client_entry_t * new_client_entry_static(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
     if (HASH_COUNT(conn_table) >= config->max_clients) {
         log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
@@ -172,6 +172,8 @@ static client_entry_t * new_client_entry_static(struct obfuscator_config *config
     memset(client_entry, 0, sizeof(client_entry_t));
     // Set default version (latest)
     client_entry->version = OBFUSCATION_VERSION;
+    // default masking type
+    client_entry->masking_handler = config->masking_handler;
     // Set the client address
     memcpy(&client_entry->client_addr, client_addr, sizeof(client_entry->client_addr));
     // Create a socket for the server connection
@@ -268,7 +270,7 @@ void print_version(void) {
 }
 
 int main(int argc, char *argv[]) {
-    struct obfuscator_config config;
+    obfuscator_config_t config;
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
@@ -398,6 +400,10 @@ int main(int argc, char *argv[]) {
         FAILURE();
     }
     log(LL_INFO, "Listening on port %s:%d for source", inet_ntoa(listen_addr.sin_addr), ntohs(listen_addr.sin_port));
+
+    if (config.masking_handler_set) {
+        log(LL_INFO, "Using masking type: %s", config.masking_handler ? config.masking_handler->name : "none");
+    }
 
     /* Use epoll for events if enabled */
 #ifdef USE_EPOLL
@@ -554,15 +560,27 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length, BUFFER_SIZE);
                     continue;
                 }
+
+                // Find the client entry if any
+                client_entry_t *client_entry;
+                HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
+
+                uint8_t obfuscated = length >= 4 && is_obfuscated(buffer);
+                // Is it masked packet maybe?
+                masking_handler_t *masking_handler = config.masking_handler;
+                if (obfuscated) {
+                    length = masking_unwrap_from_client(buffer, length, &config, client_entry, listen_sock, &sender_addr, &forward_addr, &masking_handler);
+                    if (length <= 0) {
+                        // Nothing to do
+                        continue;
+                    }
+                }
+                // Check the length
                 if (length < 4) {
                     log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                     continue;
                 }
 
-                client_entry_t *client_entry;
-                HASH_FIND(hh, conn_table, &sender_addr, sizeof(sender_addr), client_entry);
-
-                uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry ? client_entry->version : OBFUSCATION_VERSION;
 
                 if (verbose >= LL_TRACE) {
@@ -606,9 +624,13 @@ int main(int argc, char *argv[]) {
                         if (!client_entry) {
                             continue;
                         }
+                        client_entry->last_activity_time = now;
+                        client_entry->masking_handler = masking_handler;
                     }
-
-                    client_entry->handshake_direction = HANDSHAKE_DIRECTION_CLIENT_TO_SERVER;
+                    if (!obfuscated) {
+                        masking_on_handshake_req_from_client(&config, client_entry, listen_sock, &sender_addr, &forward_addr);
+                    }
+                    client_entry->handshake_direction = DIR_CLIENT_TO_SERVER;
                     client_entry->last_handshake_request_time = now;
                 }
                 // Is it handshake response?
@@ -630,7 +652,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
 
-                    if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_SERVER_TO_CLIENT) {
+                    if (client_entry->handshake_direction != DIR_SERVER_TO_CLIENT) {
                         log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to server-to-client",
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                             target_host, target_port);
@@ -641,6 +663,8 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port);
                     client_entry->handshaked = 1;
+                    client_entry->client_obfuscated = obfuscated;
+                    client_entry->server_obfuscated = !obfuscated;
                     client_entry->last_handshake_time = now;
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
@@ -667,6 +691,7 @@ int main(int argc, char *argv[]) {
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
+                    length = masking_data_wrap_to_server(buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
 
                 if (verbose >= LL_TRACE) {
@@ -704,12 +729,21 @@ int main(int argc, char *argv[]) {
                         target_host, target_port, length, BUFFER_SIZE);
                     continue;
                 }
+                uint8_t obfuscated = length >= 4 && is_obfuscated(buffer);
+                if (obfuscated) {
+                    // Is it masked packet maybe?
+                    length = masking_unwrap_from_server(buffer, length, &config, client_entry, listen_sock, &forward_addr);
+                    if (length <= 0) {
+                        // Nothing to do
+                        continue;
+                    }
+                }
+                // Check the length
                 if (length < 4) {
                     log(LL_DEBUG, "Received too short packet from %s:%d (%d bytes), ignoring", target_host, target_port, length);
                     continue;
                 }
 
-                uint8_t obfuscated = is_obfuscated(buffer);
                 uint8_t version = client_entry->version;
 
                 if (verbose >= LL_TRACE) {
@@ -746,8 +780,11 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, 
                         obfuscated ? "yes" : "no");
-
-                    client_entry->handshake_direction = HANDSHAKE_DIRECTION_SERVER_TO_CLIENT;
+                    if (!obfuscated) {
+                        // Send STUN binding request before the obfuscated handshake
+                        masking_on_handshake_req_from_server(&config, client_entry, listen_sock, &client_entry->client_addr, &forward_addr);
+                    }
+                    client_entry->handshake_direction = DIR_SERVER_TO_CLIENT;
                     client_entry->last_handshake_request_time = now;
                 }
                 // Is it handshake response?
@@ -763,7 +800,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
 
-                    if (client_entry->handshake_direction != HANDSHAKE_DIRECTION_CLIENT_TO_SERVER) {
+                    if (client_entry->handshake_direction != DIR_CLIENT_TO_SERVER) {
                         log(LL_DEBUG, "Received handshake response from %s:%d to %s:%d, but the handshake direction is not set to client-to-server",
                             target_host, target_port,
                             inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port));
@@ -774,6 +811,8 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         target_host, target_port);
                     client_entry->handshaked = 1;
+                    client_entry->client_obfuscated = !obfuscated;
+                    client_entry->server_obfuscated = obfuscated;
                     client_entry->last_handshake_time = now;
                 }
                 // If it's not a handshake or handshake response, connection is not established yet
@@ -799,6 +838,7 @@ int main(int argc, char *argv[]) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
                     }
+                    length = masking_data_wrap_to_client(buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
                 
                 if (verbose >= LL_TRACE) {
@@ -823,8 +863,7 @@ int main(int argc, char *argv[]) {
             } // if (event->data.fd != listen_sock)
         } // for (int e = 0; e < events_n; e++)
 
-        /* *** Cleanup old entries *** */
-        if (now - last_cleanup_time >= CLEANUP_INTERVAL) {
+        if (now - last_cleanup_time >= ITERATE_INTERVAL) {
             client_entry_t *current_entry, *tmp;
             // Iterate over all client entries
             HASH_ITER(hh, conn_table, current_entry, tmp) {
@@ -832,9 +871,10 @@ int main(int argc, char *argv[]) {
                 if (
                     (
                         (now - current_entry->last_activity_time >= config.idle_timeout)
-                        || (!current_entry->handshaked && (now - current_entry->last_handshake_request_time >= HANDSHAKE_TIMEOUT))
+                        || (!current_entry->handshaked && (now - current_entry->last_activity_time >= HANDSHAKE_TIMEOUT))
                     ) && !current_entry->is_static // Do not remove static entries
                 ) {
+                    // Remove old entry
                     log(current_entry->handshaked ? LL_INFO : LL_DEBUG, "Removing idle client %s:%d (handshaked=%s)", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port), 
                         current_entry->handshaked ? "yes" : "no");
 #ifdef USE_EPOLL
@@ -843,6 +883,13 @@ int main(int argc, char *argv[]) {
                     close(current_entry->server_sock);
                     HASH_DEL(conn_table, current_entry);
                     free(current_entry);
+                }
+
+                // Check if we need to call masking timer
+                if (current_entry->masking_handler && current_entry->masking_handler->timer_interval_s > 0
+                    && now - current_entry->last_masking_timer_time >= current_entry->masking_handler->timer_interval_s * 1000) {
+                    current_entry->last_masking_timer_time = now;
+                    masking_on_timer(&config, current_entry, listen_sock, &forward_addr);
                 }
             }
             // Update the last cleanup time
