@@ -15,6 +15,7 @@ Table of Contents:
 - [Feature overview](#feature-overview)
 - [Basic concept](#basic-concept)
 - [Configuration](#configuration)
+  - [Masking](#masking)
   - [Two-way Mode](#two-way-mode)
 - [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
