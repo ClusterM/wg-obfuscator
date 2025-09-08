@@ -591,7 +591,6 @@ You should see logs indicating the container has started successfully and is rea
 
 ## Download
  * You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
-
 https://github.com/ClusterM/wg-obfuscator/releases
 * Also, you can download automatic CI builds at:  
   https://clusterm.github.io/wg-obfuscator/  
