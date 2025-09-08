@@ -163,8 +163,10 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-b <bindings>` or `--static-bindings=<bindings>`  
   Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
   (see ["Two-way mode"](#two-way-mode))
+* `-f <mark>` or `--fwmark=<mark>`  
+  Firewall mark to set on all packets. Optional, default - 0, e.g. disabled. Can be 0-65535 or 0x0000-0xFFFF.
 * `-v <level>` or `--verbose=<level>`  
-  Verbosity level, Optional, default is INFO. Accepted values are:  
+  Verbosity level. Optional, default is INFO. Accepted values are:  
     ERRORS (critical errors only)  
     WARNINGS (important messages)  
     INFO (informational messages: status messages, connection established, etc.)  
