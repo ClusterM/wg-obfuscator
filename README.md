@@ -206,6 +206,17 @@ As you can see, the configuration file allows you to define settings for multipl
 
 Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
 
+### Masking
+Starting from version 1.4, there is masking support - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. You can set masking mode using 	masking	 option in the config file or `--masking` parameter on the command line.
+
+At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked. So, currently supported values are:
+* `NONE` 
+  No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming mask traffic.
+* `AUTO`  
+  The obfuscator will not mask outgoing traffic by default but if the first packet from client (on the 'source-lport' side) is masked, server will autodetect masking type and switch to it. So, client can choose masking on his side.
+* `STUN`  
+  Forces to use STUN protocol fot outgoing traffic and ignore other protocols for incoming one.
+
 ### Two-Way Mode
 (for advanced users)
 
