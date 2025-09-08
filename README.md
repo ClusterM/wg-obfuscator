@@ -160,26 +160,28 @@ The obfuscator can be run with a command line configuration or using a configura
   Target address and port in `address:port` format. Obfuscated/deobfuscated data will be forwarded to this address. Required.
 * `-k <key>` or `--key=<key>`  
   Obfuscation key. Just string. Longer - better. Required, must be 1-255 characters long.
+* `-a <type>` or `--masking=<type>`  
+  Masking type. Optional, default - `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
   Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
-  (see ["Two-way mode"](#two-way-mode))
+  See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
-  Firewall mark to set on all packets. Optional, default - 0, e.g. disabled. Can be 0-65535 or 0x0000-0xFFFF.
+  Firewall mark to set on all packets. Optional, default - 0, e.g. disabled. Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
-  Verbosity level. Optional, default is INFO. Accepted values are:  
-    ERRORS (critical errors only)  
-    WARNINGS (important messages)  
-    INFO (informational messages: status messages, connection established, etc.)  
-    DEBUG (detailed debug messages)  
-    TRACE (very detailed debug messages, including packet dumps)  
+  Verbosity level. Optional, default is `INFO`. Accepted values are:  
+    `ERRORS` (critical errors only)  
+    `WARNINGS` (important messages)  
+    `INFO` (informational messages: status messages, connection established, etc.)  
+    `DEBUG` (detailed debug messages)  
+    `TRACE` (very detailed debug messages, including packet dumps)  
 
 Additional arguments for advanced users:
 * `-m <max_clients>` or `--max-clients=<max_clients>`  
-  Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is 1024.
+  Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is `1024`.
 * `-l <timeout>` or `--idle-timeout=<timeout>`  
-  Maximum idle timeout in seconds. This is the maximum time in milliseconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is 300 seconds (5 minutes).
+  Maximum idle timeout in seconds. This is the maximum time in milliseconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is `300` seconds (5 minutes).
 * `-d <length>` or `--max-dummy-length-data=<length>`  
-  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. This is used to obfuscate the traffic and make it harder to detect. The value must be between 0 and 1024. If set to 0, no dummy data will be added.Default is 4. Note: total packet size with dummy bytes will be limited to 1024 bytes.
+  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. This is used to obfuscate the traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added.Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
 
 You can use `--config` argument to specify a configuration file, which allows you to set all these parameters in `key=value` format. For example:
 ```
