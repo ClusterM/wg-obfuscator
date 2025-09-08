@@ -25,6 +25,7 @@ Table of Contents:
   - [Running Docker container on Linux](#running-docker-container-on-linux)
   - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
 - [Caveats and recommendations](#caveats-and-recommendations)
+- [Download](#download)
 - [Credits](#credits)
 - [Support the developer and the project](#support-the-developer-and-the-project)
 
@@ -332,17 +333,12 @@ With static bindings, each obfuscator knows in advance how to forward packets be
 
 
 ## How to download, build and install
-
-* You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
-  https://github.com/ClusterM/wg-obfuscator/releases
-* Also, you can download automatic CI builds at:  
-  https://clusterm.github.io/wg-obfuscator/  
-  Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
+See [Download](#download) section below for download links.
 
 ### Linux
 On Linux, the obfuscator can be installed as a systemd service for automatic startup and management.
 
-To build and install on Linux, simply run:
+To build and install on Linux from the source code, simply run:
 ```sh
 make
 sudo make install
@@ -362,25 +358,23 @@ The configuration file is located at:
 - **`ALT Linux`** *apt-rpm package* in [**Sisyphus**](https://packages.altlinux.org/en/sisyphus/srpms/wg-obfuscator)
 
 ### Windows
-To build on Windows, you need [MSYS2](https://www.msys2.org/) and the following packages:
+You can download ready-to-run binaries with all required DLL libraries.
+
+If you want to build this tool for Windows from the source code, you need [MSYS2](https://www.msys2.org/) and the following packages:
 * `base-devel`
 * `gcc`
 * `git`
-* `libargp-devel`
 
 Install the required packages, then run:
 ```sh
 make
 ```
-> **Note:** On Windows, the obfuscator is only available as a command-line application. Run it from the MSYS2 terminal and manage startup manually.
+> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself, so it's required to use some additional tools if you want to install it as a system service.
 
 ### macOS
-On macOS, install the `argp-standalone` package via Homebrew:
-```sh
-brew install argp-standalone
-```
+You can download ready-to-run binaries for both x64 and ARM vertions of MAC.
 
-Then build as usual:
+To build Obfuscator from the source code just type:
 ```sh
 make
 ```
@@ -593,6 +587,15 @@ You should see logs indicating the container has started successfully and is rea
   If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings.
 * **IPv6 Support:**  
   The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
+
+
+## Download
+ * You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
+
+https://github.com/ClusterM/wg-obfuscator/releases
+* Also, you can download automatic CI builds at:  
+  https://clusterm.github.io/wg-obfuscator/  
+  Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
 
 
 ## Credits
