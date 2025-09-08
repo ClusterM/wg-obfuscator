@@ -163,8 +163,7 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-a <type>` or `--masking=<type>`  
   Masking type. Optional, default - `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
-  Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
-  See ["Two-way mode"](#two-way-mode) for details.
+  Comma-separated static bindings for two-way mode as `<client_ip>:<client_port>:<forward_port>. See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
   Firewall mark to set on all packets. Optional, default - 0, e.g. disabled. Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
