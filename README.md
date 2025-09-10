@@ -525,7 +525,7 @@ docker run -d \
 
 ### Running Docker Container on MikroTik Routers (RouterOS 7.4+)
 
-WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 7.4+** (ARM64/x86\_64).
+WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 7.4+** (ARM64/x86\_64). Update to the latest RouterOS version to ensure you have all the latest container features and fixes.
 
 #### Quick Setup
 
