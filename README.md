@@ -254,7 +254,7 @@ You can use the following script to calculate the subnet list automatically:
 
 #### Linux-Specific Solution: Using `fwmark`
 
-On Linux, there's a cleaner approach: use the `FwMark` option in the WireGuard config. This is useful **only when `AllowedIPs = 0.0.0.0/0`**, as it allows the system to distinguish between traffic going through the tunnel and traffic required to establish or maintain the tunnel (e.g., handshake packets).
+On Linux, there's a cleaner approach (since version 1.4): use the `FwMark` option in the WireGuard config. This is useful **only when `AllowedIPs = 0.0.0.0/0`**, as it allows the system to distinguish between traffic going through the tunnel and traffic required to establish or maintain the tunnel (e.g., handshake packets).
 
 Example WireGuard config:
 
