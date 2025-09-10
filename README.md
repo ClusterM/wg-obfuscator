@@ -1,62 +1,63 @@
 # WireGuard Obfuscator
 
-WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data or some other protocol, making it much harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government attempts to block or throttle WireGuard traffic.
+WireGuard Obfuscator is a tool designed to disguise WireGuard traffic as random data or a different protocol, making it much harder for DPI (Deep Packet Inspection) systems to detect and block. This can be extremely useful if your ISP or government attempts to block or throttle WireGuard traffic.
 
-Project Goals:
-* **Compact and dependency-free**: The application is designed to be as lightweight as possible, with absolutely no external dependencies. This makes it suitable even for installation on minimal hardware such as basic home routers.
-* **Independent obfuscator**: Instead of maintaining a separate fork of WireGuard, the obfuscator is built to be fully independent of the VPN client/server. This allows seamless integration into an existing network architecture, or even running the obfuscator on a separate device if the device running the WireGuard client cannot support additional applications.
-* **Preserve bandwidth efficiency**: The obfuscator continues to use only UDP and introduces minimal overhead to the size of original packets, ensuring maximum throughput is maintained.
+**Project Goals:**
+* **Compact and dependency-free**: The application is designed to be as lightweight as possible, with no external dependencies at all. This makes it suitable even for installation on minimal hardware such as basic home routers.
+* **Independent obfuscator**: Instead of maintaining a separate fork of WireGuard, the obfuscator is built to be fully independent of the VPN client/server. This allows seamless integration into an existing network architecture or even running the obfuscator on a separate device if the device running WireGuard is unable to support additional applications.
+* **Preserve bandwidth efficiency**: The obfuscator continues to use only UDP and introduces minimal overhead to the size of original packets to ensure maximum throughput.
 
-What it's **NOT**:
-* **Not a standalone solution**: You need to use this tool on both ends. You must run the obfuscator on both the WireGuard client and server sides to ensure proper obfuscation and deobfuscation of traffic. So, you can't use it with 3rd-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., on a VPS) and connect to it using WireGuard.
+**What it's NOT:**
+* **Not a standalone solution**: You need to run this tool on both ends of the WireGuard connection. You must deploy the obfuscator on both sides to ensure proper obfuscation and deobfuscation of traffic. Therefore, you cannot use it with third-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., hosted on a VPS) and connect to it using WireGuard.
 * **Not a VPN**: This is not a VPN service or a WireGuard client/server. It only obfuscates WireGuard traffic.
 
 Table of Contents:
 - [Feature overview](#feature-overview)
 - [Basic concept](#basic-concept)
 - [Configuration](#configuration)
+  - [Avoiding Routing Loops](#avoiding-routing-loops)
+  - [Masking](#masking)
   - [Two-way Mode](#two-way-mode)
 - [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
-    - [Third-party packages](#)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
   - [Running Docker container on Linux](#running-docker-container-on-linux)
   - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
 - [Caveats and recommendations](#caveats-and-recommendations)
+- [Download](#download)
 - [Credits](#credits)
 - [Support the developer and the project](#support-the-developer-and-the-project)
 
 
 ## Feature overview
 
-What started as a quick-and-dirty solution just for personal use has grown into a fully-featured project with the following capabilities:
-
+Originally built as a quick personal solution, this project has grown into a fully-featured tool with the following capabilities:
 * **WireGuard-specific design**  
   This obfuscator is purpose-built for the WireGuard protocol: it recognizes WireGuard packet types and actively monitors handshake success to ensure reliable operation.
 * **Key-based obfuscation**  
-  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
+  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, note that providing strong cryptographic guarantees is not the goal here - WireGuard itself already handles secure encryption. The key’s purpose is to make your traffic look unrecognizable, not unbreakable.
 * **Symmetric operation**  
-  This tool will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
-* **Packet salting**  
-  Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
+  The tool automatically detects whether packets are obfuscated and processes them accordingly.
 * **Handshake randomization**  
-  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
+  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary significantly. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
+* **Masking**  
+  Starting from version 1.4, the project introduces masking support: the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
 * **Very fast and efficient**  
   The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
 * **Built-in NAT table**  
   The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
 * **Static (manual) bindings / two-way mode**  
-  You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
+  You can manually define static NAT table entries, which enables "two-way" mode - allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
 * **Multi-section configuration files**  
   Supports both simple configuration files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single configuration file.
 * **Detailed and customizable logging**  
-  Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
+  Verbosity levels range from error-only output to full packet-level traces for advanced troubleshooting and analytics.
 * **Cross-platform and lightweight**  
   Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
 * **Very low dependency footprint**  
-  No huge libraries or frameworks.
+  No large external libraries or frameworks are required.
 * **Android client**  
   A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
@@ -86,7 +87,7 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 ```
 
 In most cases, the obfuscator is used in a scenario where there is a clear separation between a server (with a static or public IP address) and clients (which may be behind NAT). We’ll focus on this setup here.
-If **both** ends have public IPs and can initiate connections to each other, see the section on ["Two-way mode"](#two-way-mode) below.
+If **both** ends have public IPs and can initiate connections to each other, refer to the ["Two-way mode"](#two-way-mode) section below.
 
 Usually, the obfuscator is installed on the same device as your WireGuard client or server. In this setup, you configure WireGuard to connect to the obfuscator’s address and port (typically `127.0.0.1` and a custom port), while the *real* remote address and port are specified in the obfuscator’s configuration.
 
@@ -132,11 +133,11 @@ source-lport = 19999
 target = 127.0.0.1:5555
 ```
 
-The application maintains its own internal address mapping table, so a single server-side obfuscator can handle connections from multiple clients—each with their own obfuscator instance—using just one server port. Likewise, on the client side, a single obfuscator can support connections to multiple peers (though this is rarely needed in typical use).
+The application maintains its own internal address mapping table, so a single server-side obfuscator can handle connections from multiple clients - each with their own obfuscator instance - using just one server port. Likewise, on the client side, a single obfuscator can support connections to multiple peers (though this is rarely needed in typical use).
 
 The obfuscator automatically determines the direction (obfuscation or deobfuscation) for each packet, so the configuration files on both the client and server sides look nearly identical. The only thing that matters is that both sides use the same key.
 
-**The key** is simply a text string. Cryptographic strength is not required here—feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
+**The key** is simply a plain text string. Cryptographic strength is not required here: feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
 
 
 ## Configuration
@@ -144,7 +145,7 @@ The obfuscator automatically determines the direction (obfuscation or deobfuscat
 ### Command line parameters and configuration file
 The obfuscator can be run with a command line configuration or using a configuration file. Available command line arguments are:
 * `-?` or `--help`  
-  Show help message about command line arguments and exit.
+  Show a help message describing all command-line arguments and exit.
 * `-V` or `--version`  
   Print version information and exit.
 * `-c <filename>` or `--config=<filename>`  
@@ -152,31 +153,34 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-i <interface>` or `--source-if=<interface>`  
   Source interface to listen on. Optional, default is `0.0.0.0`, e.g. all interfaces. Can be used to listen only on a specific interface.
 * `-p <port>` or `--source-lport=<port>`  
-  Source port to listen. Source client should connect to this port. Required.
+  Source port to listen. The source client should connect to this port. Required.
 * `-t <address:port>` or `--target=<address:port>`  
-  Target address and port in `address:port` format. Obfuscated/deobfuscated data will be forwarded to this address. Required.
+  Target address and port in `address:port` format. All obfuscated/deobfuscated data will be forwarded to this address. Required.
 * `-k <key>` or `--key=<key>`  
-  Obfuscation key. Just string. Longer - better. Required, must be 1-255 characters long.
+  Obfuscation key. Just a string. The longer, the better. Required, must be 1-255 characters long.
+* `-a <type>` or `--masking=<type>`  
+  Protocol masking type to disguise traffic. Optional, default is `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
-  Comma-separated static bindings for two-way mode as <client_ip>:<client_port>:<forward_port>
-  (see ["Two-way mode"](#two-way-mode))
+  Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. See ["Two-way mode"](#two-way-mode) for details.
+* `-f <mark>` or `--fwmark=<mark>`  
+  Firewall mark to set on all packets. Can be used to prevent routing loops. Optional, default is `0`, (i.e. disabled). Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
-  Verbosity level, Optional, default is INFO. Accepted values are:  
-    ERRORS (critical errors only)  
-    WARNINGS (important messages)  
-    INFO (informational messages: status messages, connection established, etc.)  
-    DEBUG (detailed debug messages)  
-    TRACE (very detailed debug messages, including packet dumps)  
+  Verbosity level. Optional, default is `INFO`. Accepted values are:  
+    `ERRORS` (critical errors only)  
+    `WARNINGS` (important messages)  
+    `INFO` (informational messages: status messages, connection established, etc.)  
+    `DEBUG` (detailed debug messages)  
+    `TRACE` (very detailed debug messages, including packet dumps)  
 
 Additional arguments for advanced users:
 * `-m <max_clients>` or `--max-clients=<max_clients>`  
-  Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is 1024.
+  Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is `1024`.
 * `-l <timeout>` or `--idle-timeout=<timeout>`  
-  Maximum idle timeout in seconds. This is the maximum time in milliseconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is 300 seconds (5 minutes).
+  Maximum idle timeout in seconds. This is the maximum time in seconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is `300` seconds (5 minutes).
 * `-d <length>` or `--max-dummy-length-data=<length>`  
-  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. This is used to obfuscate the traffic and make it harder to detect. The value must be between 0 and 1024. If set to 0, no dummy data will be added.Default is 4. Note: total packet size with dummy bytes will be limited to 1024 bytes.
+  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. Used to obfuscate traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added. Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
 
-You can use `--config` argument to specify a configuration file, which allows you to set all these parameters in `key=value` format. For example:
+You can use the `--config` argument to specify a configuration file, which allows you to set all these parameters in the `key=value` format. For example:
 ```
 # Instance name
 [main]
@@ -196,9 +200,91 @@ key = hate
 verbose = 4
 ```
 
-As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single configuration file.
+As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several instances of the obfuscator with different settings, all from a single configuration file.
 
-Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
+Be sure to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
+
+### Avoiding Routing Loops
+
+When using WireGuard, especially in combination with tools like WireGuard Obfuscator, it's important to ensure that traffic to the VPN server itself is **not accidentally routed through the VPN tunnel**. Otherwise, you may encounter a routing loop or complete loss of connection right after the handshake.
+
+#### Why and When This Happens
+
+WireGuard routes packets based on the `AllowedIPs` list. Normally, it automatically excludes the server’s IP address (as specified in the `Endpoint` field) to avoid routing handshake and keepalive packets through the tunnel itself.
+
+However, when you use WireGuard Obfuscator running locally (e.g., on `127.0.0.1`), **WireGuard only sees the obfuscator's local address**, not the actual public IP of the VPN server. It has no awareness of the real server endpoint, which is hidden inside the obfuscator's config.
+
+This becomes a problem especially when the peer is configured with:
+
+```
+AllowedIPs = 0.0.0.0/0
+```
+
+i.e., when all traffic is routed through the VPN tunnel. In this case, if the real server IP is not explicitly excluded, **WireGuard Obfuscator may try to send its own traffic to the VPN server through the tunnel**, leading to a routing loop or connection loss.
+
+#### Universal Solution: Manually Exclude the Server IP from `0.0.0.0/0`
+
+WireGuard does not support negation syntax (e.g., `!203.0.113.45`). To avoid routing traffic to the server through the tunnel, you can **manually split `0.0.0.0/0` into a set of smaller CIDR blocks that exclude the server's IP**.
+
+For example, if your server’s public IP is `203.0.113.45`, then instead of:
+
+```ini
+AllowedIPs = 0.0.0.0/0
+```
+
+You would use:
+
+```ini
+AllowedIPs = 0.0.0.0/1, 128.0.0.0/2, 224.0.0.0/3, 208.0.0.0/4, 192.0.0.0/5,
+204.0.0.0/6, 200.0.0.0/7, 202.0.0.0/8, 203.128.0.0/9, 203.64.0.0/10,
+203.32.0.0/11, 203.16.0.0/12, 203.8.0.0/13, 203.4.0.0/14, 203.2.0.0/15,
+203.1.0.0/16, 203.0.128.0/17, 203.0.0.0/18, 203.0.64.0/19, 203.0.96.0/20,
+203.0.120.0/21, 203.0.116.0/22, 203.0.114.0/23, 203.0.112.0/24,
+203.0.113.128/25, 203.0.113.64/26, 203.0.113.0/27, 203.0.113.48/28,
+203.0.113.32/29, 203.0.113.40/30, 203.0.113.46/31, 203.0.113.44/32
+```
+
+This long list routes all traffic through the tunnel **except** for the server's IP (`203.0.113.45`), which stays outside the tunnel and avoids the loop.
+
+You can use the following script to calculate the subnet list automatically:
+[https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ](https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ)
+
+#### Linux-Specific Solution: Using `fwmark`
+
+On Linux, there's a cleaner approach (since version 1.4): use the `FwMark` option in the WireGuard config. This is useful **only when `AllowedIPs = 0.0.0.0/0`**, as it allows the system to distinguish between traffic going through the tunnel and traffic required to establish or maintain the tunnel (e.g., handshake packets).
+
+Example WireGuard config:
+
+```ini
+[Interface]
+FwMark = 0xdead
+```
+
+Then, in **WireGuard Obfuscator**, specify the same mark:
+
+* In the config file:
+
+  ```
+  fwmark = 0xdead
+  ```
+* Or via command-line:
+
+  ```
+  --fwmark 0xdead
+  ```
+
+> **Note:** Using `fwmark` requires root privileges. Make sure to run WireGuard Obfuscator as root when using this option.
+
+### Masking
+As of version 1.4, masking support is available - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. You can set masking mode using the `masking` option in the config file or the `--masking` parameter on the command line.
+
+At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked. So, currently supported values are:
+* `NONE` 
+  No masking at all. The obfuscator will not mask outgoing traffic and will not recognize or process any incoming masked traffic.
+* `AUTO`  
+  The obfuscator will not mask outgoing traffic by default. However, if the first packet from the client (on the 'source-lport' side) is masked, the server will autodetect the masking type and switch to it, allowing the client to choose the masking mode independently.
+* `STUN`  
+  Forces the use of the STUN protocol for outgoing traffic and only accepts incoming traffic that is STUN-masked.
 
 ### Two-Way Mode
 (for advanced users)
@@ -207,7 +293,7 @@ In some setups, both WireGuard peers have public IP addresses and can each initi
 
 #### What Are Static Bindings?
 
-A **static binding** tells the obfuscator, right from startup, which peer IPs and ports should be mapped to which local ports. This allows the obfuscator to know exactly how to route packets from the server to the correct local WireGuard instance—**even if that peer hasn’t sent any packets yet.**
+A **static binding** tells the obfuscator, right from startup, which peer IPs and ports should be mapped to which local ports. This allows the obfuscator to know exactly how to route packets from the server to the correct local WireGuard instance - **even if that peer hasn’t sent any packets yet.**
 Without static bindings, the obfuscator only learns how to forward packets after seeing traffic from a client.
 
 #### Example: Two-way WireGuard with Obfuscation
@@ -326,21 +412,16 @@ When **Peer B** initiates a handshake with **Peer A**, the process is the same b
 
 #### Summary
 
-With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels—*even if both sides can initiate connections at any time.*
+With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels - *even if both sides can initiate connections at any time.*
 
 
 ## How to download, build and install
-
-* You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
-  https://github.com/ClusterM/wg-obfuscator/releases
-* Also, you can download automatic CI builds at:  
-  https://clusterm.github.io/wg-obfuscator/  
-  Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
+See [Download](#download) section below for download links.
 
 ### Linux
 On Linux, the obfuscator can be installed as a systemd service for automatic startup and management.
 
-To build and install on Linux, simply run:
+To build and install on Linux from the source code, simply run:
 ```sh
 make
 sudo make install
@@ -360,25 +441,23 @@ The configuration file is located at:
 - **`ALT Linux`** *apt-rpm package* in [**Sisyphus**](https://packages.altlinux.org/en/sisyphus/srpms/wg-obfuscator)
 
 ### Windows
-To build on Windows, you need [MSYS2](https://www.msys2.org/) and the following packages:
+You can download ready-to-run binaries with all required DLL libraries.
+
+If you want to build this tool for Windows from the source code, you need [MSYS2](https://www.msys2.org/) and the following packages:
 * `base-devel`
 * `gcc`
 * `git`
-* `libargp-devel`
 
 Install the required packages, then run:
 ```sh
 make
 ```
-> **Note:** On Windows, the obfuscator is only available as a command-line application. Run it from the MSYS2 terminal and manage startup manually.
+> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself, so it's required to use some additional tools if you want to install it as a system service.
 
 ### macOS
-On macOS, install the `argp-standalone` package via Homebrew:
-```sh
-brew install argp-standalone
-```
+You can download ready-to-run binaries for both x64 and ARM versions of macOS.
 
-Then build as usual:
+To build Obfuscator from the source code just type:
 ```sh
 make
 ```
@@ -394,9 +473,9 @@ WireGuard Obfuscator is available as a multi-architecture Docker image:
 
 **Supported tags:**
 
-* **`latest`** — always points to the most recent stable release.
-* **`nightly`** — built automatically from the current main branch; may be unstable. Use only for testing new features.
-* **Version tags** (e.g. `1.0`, `1.1`) — for specific releases.
+* **`latest`** - always points to the most recent stable release.
+* **`nightly`** - built automatically from the current main branch; may be unstable. Use only for testing new features.
+* **Version tags** (e.g. `1.0`, `1.1`) - for specific releases.
 
 **Architectures available:**
 
@@ -446,7 +525,7 @@ docker run -d \
 
 ### Running Docker Container on MikroTik Routers (RouterOS 7.4+)
 
-WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 7.4+** (ARM64/x86\_64).
+WireGuard Obfuscator can run as a container on MikroTik devices with **RouterOS 7.4+** (ARM64/x86\_64). Update to the latest RouterOS version to ensure you have all the latest container features and fixes.
 
 #### Quick Setup
 
@@ -579,18 +658,28 @@ You should see logs indicating the container has started successfully and is rea
 ## Caveats and Recommendations
 
 * **Endpoint Exclusion and Routing Loops:**  
-  WireGuard automatically excludes the server's IP address (as specified in the `Endpoint`) from the `AllowedIPs` list.
-  If the obfuscator is running on the same machine as your WireGuard client or server, this can lead to a subtle issue: after the handshake, all traffic to the VPN server might get routed *through the VPN tunnel itself* (causing a routing loop or connection loss).
-  **Solution:** Make sure to manually exclude the real (public) IP address of your VPN server from the `AllowedIPs` list in your WireGuard config. You can use this script: https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ
+  See the ["Avoiding Routing Loops"](#avoiding-routing-loops) section above for details on how to prevent routing loops. It's important to ensure that traffic to the VPN server itself is not routed through the VPN tunnel.
 * **PersistentKeepalive:**  
-  To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` or `60` seconds is generally sufficient.
+  To maintain a stable connection - especially when clients are behind NAT or firewalls - it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` seconds is usually sufficient.
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
 * **MTU Settings:**  
-  If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings.
+  If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings. Especially when using masking (it adds extra bytes to each packet), you may need to reduce the MTU. A common setting is `MTU = 1420`, but you may need to reduce it based on your network conditions.
 * **IPv6 Support:**  
   The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
+* **Check debug logs:**  
+  If you encounter issues, run the obfuscator with `--verbose=DEBUG` (DEBUG level) to see detailed logs. This can help diagnose many common problems.
+
+
+## Download
+* You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
+https://github.com/ClusterM/wg-obfuscator/releases
+* Also, you can download automatic CI builds at:  
+  https://clusterm.github.io/wg-obfuscator/  
+  Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
+* Android port:  
+  https://github.com/ClusterM/wg-obfuscator-android
 
 
 ## Credits
