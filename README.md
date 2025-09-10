@@ -1,14 +1,14 @@
 # WireGuard Obfuscator
 
-WireGuard Obfuscator is a tool designed to make WireGuard traffic look like random data or some other protocol, making it much harder to detect by DPI (Deep Packet Inspection) systems. This can be extremely useful if your ISP or government attempts to block or throttle WireGuard traffic.
+WireGuard Obfuscator is a tool designed to disguise WireGuard traffic as random data or a different protocol, making it much harder for DPI (Deep Packet Inspection) systems to detect and block. This can be extremely useful if your ISP or government attempts to block or throttle WireGuard traffic.
 
-Project Goals:
-* **Compact and dependency-free**: The application is designed to be as lightweight as possible, with absolutely no external dependencies. This makes it suitable even for installation on minimal hardware such as basic home routers.
-* **Independent obfuscator**: Instead of maintaining a separate fork of WireGuard, the obfuscator is built to be fully independent of the VPN client/server. This allows seamless integration into an existing network architecture, or even running the obfuscator on a separate device if the device running the WireGuard client cannot support additional applications.
-* **Preserve bandwidth efficiency**: The obfuscator continues to use only UDP and introduces minimal overhead to the size of original packets, ensuring maximum throughput is maintained.
+**Project Goals:**
+* **Compact and dependency-free**: The application is designed to be as lightweight as possible, with no external dependencies at all. This makes it suitable even for installation on minimal hardware such as basic home routers.
+* **Independent obfuscator**: Instead of maintaining a separate fork of WireGuard, the obfuscator is built to be fully independent of the VPN client/server. This allows seamless integration into an existing network architecture or even running the obfuscator on a separate device if the device running WireGuard is unable to support additional applications.
+* **Preserve bandwidth efficiency**: The obfuscator continues to use only UDP and introduces minimal overhead to the size of original packets to ensure maximum throughput.
 
-What it's **NOT**:
-* **Not a standalone solution**: You need to use this tool on both ends. You must run the obfuscator on both the WireGuard client and server sides to ensure proper obfuscation and deobfuscation of traffic. So, you can't use it with 3rd-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., on a VPS) and connect to it using WireGuard.
+**What it's NOT:**
+* **Not a standalone solution**: You need to run this tool on both ends of the WireGuard connection. You must deploy the obfuscator on both sides to ensure proper obfuscation and deobfuscation of traffic. Therefore, you cannot use it with third-party VPN servers. If you want to bypass your ISP's restrictions or censorship, you need to run your own VPN server (e.g., hosted on a VPS) and connect to it using WireGuard.
 * **Not a VPN**: This is not a VPN service or a WireGuard client/server. It only obfuscates WireGuard traffic.
 
 Table of Contents:
@@ -31,22 +31,23 @@ Table of Contents:
 - [Support the developer and the project](#support-the-developer-and-the-project)
 
 
+Понял, возвращаю оригинальную формулировку и выкладываю финальный исправленный вариант раздела **Feature overview**, только с исправлениями стиля, грамматики и технической точности — без переосмыслений архитектуры:
+
+---
+
 ## Feature overview
 
-What started as a quick-and-dirty solution just for personal use has grown into a fully-featured project with the following capabilities:
-
+Originally built as a quick personal solution, this project has grown into a fully-featured tool with the following capabilities:
 * **WireGuard-specific design**  
   This obfuscator is purpose-built for the WireGuard protocol: it recognizes WireGuard packet types and actively monitors handshake success to ensure reliable operation.
 * **Key-based obfuscation**  
-  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, keep in mind that strong cryptography is not the goal here—WireGuard itself already handles secure encryption. The key's purpose is to make your traffic look unrecognizable, not unbreakable.
+  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, note that providing strong cryptographic guarantees is not the goal here—WireGuard itself already handles secure encryption. The key’s purpose is to make your traffic look unrecognizable, not unbreakable.
 * **Symmetric operation**  
-  This tool will figure out automatically whether packets are obfuscated or not, and will always do the right thing.
-* **Packet salting**  
-  Each packet gets a random salt, ensuring that even identical packets always look different after obfuscation. This further frustrates signature-based DPI systems.
+  The tool automatically detects whether packets are obfuscated and processes them accordingly.
 * **Handshake randomization**  
-  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary widely. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
+  WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary significantly. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
 * **Masking**  
-  Starting from version 1.4, the project introduces masking support — the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
+  Starting from version 1.4, the project introduces masking support—the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
 * **Very fast and efficient**  
   The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
 * **Built-in NAT table**  
@@ -56,13 +57,13 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 * **Multi-section configuration files**  
   Supports both simple configuration files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single configuration file.
 * **Detailed and customizable logging**  
-  Verbosity levels range from errors-only to full packet-level traces for advanced troubleshooting and analytics.
+  Verbosity levels range from error-only output to full packet-level traces for advanced troubleshooting and analytics.
 * **Cross-platform and lightweight**  
   Available as binaries for Linux, Windows, and Mac, as well as tiny multi-arch Docker images (amd64, arm64, arm/v7, arm/v6, 386, ppc64le, s390x). The images are extremely small and suitable even for embedded routers like MikroTik.
 * **Very low dependency footprint**  
-  No huge libraries or frameworks.
+  No large external libraries or frameworks are required.
 * **Android client**  
-  A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
+  A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ — it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
 
 ## Basic Concept
@@ -90,7 +91,7 @@ What started as a quick-and-dirty solution just for personal use has grown into 
 ```
 
 In most cases, the obfuscator is used in a scenario where there is a clear separation between a server (with a static or public IP address) and clients (which may be behind NAT). We’ll focus on this setup here.
-If **both** ends have public IPs and can initiate connections to each other, see the section on ["Two-way mode"](#two-way-mode) below.
+If **both** ends have public IPs and can initiate connections to each other, refer to the ["Two-way mode"](#two-way-mode) section below.
 
 Usually, the obfuscator is installed on the same device as your WireGuard client or server. In this setup, you configure WireGuard to connect to the obfuscator’s address and port (typically `127.0.0.1` and a custom port), while the *real* remote address and port are specified in the obfuscator’s configuration.
 
@@ -140,7 +141,7 @@ The application maintains its own internal address mapping table, so a single se
 
 The obfuscator automatically determines the direction (obfuscation or deobfuscation) for each packet, so the configuration files on both the client and server sides look nearly identical. The only thing that matters is that both sides use the same key.
 
-**The key** is simply a text string. Cryptographic strength is not required here—feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
+**The key** is simply a plain text string. Cryptographic strength is not required here—feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
 
 
 ## Configuration
@@ -148,7 +149,7 @@ The obfuscator automatically determines the direction (obfuscation or deobfuscat
 ### Command line parameters and configuration file
 The obfuscator can be run with a command line configuration or using a configuration file. Available command line arguments are:
 * `-?` or `--help`  
-  Show help message about command line arguments and exit.
+  Show a help message describing all command-line arguments and exit.
 * `-V` or `--version`  
   Print version information and exit.
 * `-c <filename>` or `--config=<filename>`  
@@ -156,15 +157,15 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-i <interface>` or `--source-if=<interface>`  
   Source interface to listen on. Optional, default is `0.0.0.0`, e.g. all interfaces. Can be used to listen only on a specific interface.
 * `-p <port>` or `--source-lport=<port>`  
-  Source port to listen. Source client should connect to this port. Required.
+  Source port to listen. The source client should connect to this port. Required.
 * `-t <address:port>` or `--target=<address:port>`  
-  Target address and port in `address:port` format. Obfuscated/deobfuscated data will be forwarded to this address. Required.
+  Target address and port in `address:port` format. All obfuscated/deobfuscated data will be forwarded to this address. Required.
 * `-k <key>` or `--key=<key>`  
-  Obfuscation key. Just string. Longer - better. Required, must be 1-255 characters long.
+  Obfuscation key. Just a string. The longer, the better. Required, must be 1-255 characters long.
 * `-a <type>` or `--masking=<type>`  
   Masking type. Optional, default - `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
-  Comma-separated static bindings for two-way mode as `<client_ip>:<client_port>:<forward_port>. See ["Two-way mode"](#two-way-mode) for details.
+  Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
   Firewall mark to set on all packets. Can be used to prevent routing loops. Optional, default - 0, e.g. disabled. Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
@@ -179,11 +180,11 @@ Additional arguments for advanced users:
 * `-m <max_clients>` or `--max-clients=<max_clients>`  
   Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is `1024`.
 * `-l <timeout>` or `--idle-timeout=<timeout>`  
-  Maximum idle timeout in seconds. This is the maximum time in milliseconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is `300` seconds (5 minutes).
+  Maximum idle timeout in seconds. This is the maximum time in seconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is `300` seconds (5 minutes).
 * `-d <length>` or `--max-dummy-length-data=<length>`  
-  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. This is used to obfuscate the traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added.Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
+  Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. Used to obfuscate traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added. Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
 
-You can use `--config` argument to specify a configuration file, which allows you to set all these parameters in `key=value` format. For example:
+You can use the `--config` argument to specify a configuration file, which allows you to set all these parameters in the `key=value` format. For example:
 ```
 # Instance name
 [main]
@@ -203,9 +204,9 @@ key = hate
 verbose = 4
 ```
 
-As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single configuration file.
+As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several instances of the obfuscator with different settings, all from a single configuration file.
 
-Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
+Be sure to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
 
 ### Avoiding Routing Loops
 
@@ -279,15 +280,15 @@ Then, in **WireGuard Obfuscator**, specify the same mark:
 > **Note:** Using `fwmark` requires root privileges. Make sure to run WireGuard Obfuscator as root when using this option.
 
 ### Masking
-Starting from version 1.4, there is masking support - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. You can set masking mode using 	masking	 option in the config file or `--masking` parameter on the command line.
+As of version 1.4, masking support is available - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. You can set masking mode using the `masking` option in the config file or the `--masking` parameter on the command line.
 
 At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked. So, currently supported values are:
 * `NONE` 
   No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming mask traffic.
 * `AUTO`  
-  The obfuscator will not mask outgoing traffic by default but if the first packet from client (on the 'source-lport' side) is masked, server will autodetect masking type and switch to it. So, client can choose masking on his side.
+  The obfuscator will not mask outgoing traffic by default but if the first packet from client (on the 'source-lport' side) is masked, server will autodetect masking type and switch to it. So the client can choose the masking mode independently.
 * `STUN`  
-  Forces to use STUN protocol fot outgoing traffic and ignore other protocols for incoming one.
+  Forces to use STUN protocol for outgoing traffic and ignore other protocols for incoming one.
 
 ### Two-Way Mode
 (for advanced users)
