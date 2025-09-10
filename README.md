@@ -15,11 +15,11 @@ Table of Contents:
 - [Feature overview](#feature-overview)
 - [Basic concept](#basic-concept)
 - [Configuration](#configuration)
+  - [Avoiding Routing Loops](#avoiding-routing-loops)
   - [Masking](#masking)
   - [Two-way Mode](#two-way-mode)
 - [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
-    - [Third-party packages](#)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
@@ -206,6 +206,77 @@ verbose = 4
 As you can see, the configuration file allows you to define settings for multiple obfuscator instances. This makes it easy to run several copies of the obfuscator with different settings, all from a single configuration file.
 
 Don't forget to check the [Caveats and Recommendations](#caveats-and-recommendations) section below for important notes on configuration and usage.
+
+### Avoiding Routing Loops
+
+When using WireGuard, especially in combination with tools like WireGuard Obfuscator, it's important to ensure that traffic to the VPN server itself is **not accidentally routed through the VPN tunnel**. Otherwise, you may encounter a routing loop or complete loss of connection right after the handshake.
+
+#### Why and When This Happens
+
+WireGuard routes packets based on the `AllowedIPs` list. Normally, it automatically excludes the server’s IP address (as specified in the `Endpoint` field) to avoid routing handshake and keepalive packets through the tunnel itself.
+
+However, when you use WireGuard Obfuscator running locally (e.g., on `127.0.0.1`), **WireGuard only sees the obfuscator's local address**, not the actual public IP of the VPN server. It has no awareness of the real server endpoint, which is hidden inside the obfuscator's config.
+
+This becomes a problem especially when the peer is configured with:
+
+```
+AllowedIPs = 0.0.0.0/0
+```
+
+i.e., when all traffic is routed through the VPN tunnel. In this case, if the real server IP is not explicitly excluded, **WireGuard Obfuscator may try to send its own traffic to the VPN server through the tunnel**, leading to a routing loop or connection loss.
+
+#### Universal Solution: Manually Exclude the Server IP from `0.0.0.0/0`
+
+WireGuard does not support negation syntax (e.g., `!203.0.113.45`). To avoid routing traffic to the server through the tunnel, you can **manually split `0.0.0.0/0` into a set of smaller CIDR blocks that exclude the server's IP**.
+
+For example, if your server’s public IP is `203.0.113.45`, then instead of:
+
+```ini
+AllowedIPs = 0.0.0.0/0
+```
+
+You would use:
+
+```ini
+AllowedIPs = 0.0.0.0/1, 128.0.0.0/2, 224.0.0.0/3, 208.0.0.0/4, 192.0.0.0/5,
+204.0.0.0/6, 200.0.0.0/7, 202.0.0.0/8, 203.128.0.0/9, 203.64.0.0/10,
+203.32.0.0/11, 203.16.0.0/12, 203.8.0.0/13, 203.4.0.0/14, 203.2.0.0/15,
+203.1.0.0/16, 203.0.128.0/17, 203.0.0.0/18, 203.0.64.0/19, 203.0.96.0/20,
+203.0.120.0/21, 203.0.116.0/22, 203.0.114.0/23, 203.0.112.0/24,
+203.0.113.128/25, 203.0.113.64/26, 203.0.113.0/27, 203.0.113.48/28,
+203.0.113.32/29, 203.0.113.40/30, 203.0.113.46/31, 203.0.113.44/32
+```
+
+This long list routes all traffic through the tunnel **except** for the server's IP (`203.0.113.45`), which stays outside the tunnel and avoids the loop.
+
+You can use the following script to calculate the subnet list automatically:
+[https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ](https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ)
+
+#### Linux-Specific Solution: Using `fwmark`
+
+On Linux, there's a cleaner approach: use the `FwMark` option in the WireGuard config. This is useful **only when `AllowedIPs = 0.0.0.0/0`**, as it allows the system to distinguish between traffic going through the tunnel and traffic required to establish or maintain the tunnel (e.g., handshake packets).
+
+Example WireGuard config:
+
+```ini
+[Interface]
+FwMark = 0xdead
+```
+
+Then, in **WireGuard Obfuscator**, specify the same mark:
+
+* In the config file:
+
+  ```
+  fwmark = 0xdead
+  ```
+* Or via command-line:
+
+  ```
+  --fwmark 0xdead
+  ```
+
+> **Note:** Using `fwmark` requires root privileges. Make sure to run WireGuard Obfuscator as root when using this option.
 
 ### Masking
 Starting from version 1.4, there is masking support - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. You can set masking mode using 	masking	 option in the config file or `--masking` parameter on the command line.
@@ -590,26 +661,28 @@ You should see logs indicating the container has started successfully and is rea
 ## Caveats and Recommendations
 
 * **Endpoint Exclusion and Routing Loops:**  
-  WireGuard automatically excludes the server's IP address (as specified in the `Endpoint`) from the `AllowedIPs` list.
-  If the obfuscator is running on the same machine as your WireGuard client or server, this can lead to a subtle issue: after the handshake, all traffic to the VPN server might get routed *through the VPN tunnel itself* (causing a routing loop or connection loss).
-  **Solution:** Make sure to manually exclude the real (public) IP address of your VPN server from the `AllowedIPs` list in your WireGuard config. You can use this script: https://colab.research.google.com/drive/1spIsqkB4YOsctmZV83aG1HKISFFxxMCZ
+  See the ["Avoiding Routing Loops"](#avoiding-routing-loops) section above for details on how to prevent routing loops. It's important to ensure that traffic to the VPN server itself is not routed through the VPN tunnel.
 * **PersistentKeepalive:**  
-  To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` or `60` seconds is generally sufficient.
+  To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` seconds is usually sufficient.
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
 * **MTU Settings:**  
-  If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings.
+  If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings. Especially when using masking (it adds extra bytes to each packet), you may need to reduce the MTU. A common setting is `MTU = 1420`, but you may need to reduce it based on your network conditions.
 * **IPv6 Support:**  
   The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
+* **Check debug logs:**  
+  If you encounter issues, run the obfuscator with `--verbose=DEBUG` (DEBUG level) to see detailed logs. This can help diagnose many common problems.
 
 
 ## Download
- * You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
+* You can always find the latest release (source code, Docker images and ready-to-use binaries for Linux, Windows, and macOS) at:  
 https://github.com/ClusterM/wg-obfuscator/releases
 * Also, you can download automatic CI builds at:  
   https://clusterm.github.io/wg-obfuscator/  
   Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
+* Android port:  
+  https://github.com/ClusterM/wg-obfuscator-android
 
 
 ## Credits
