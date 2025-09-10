@@ -31,29 +31,25 @@ Table of Contents:
 - [Support the developer and the project](#support-the-developer-and-the-project)
 
 
-Понял, возвращаю оригинальную формулировку и выкладываю финальный исправленный вариант раздела **Feature overview**, только с исправлениями стиля, грамматики и технической точности — без переосмыслений архитектуры:
-
----
-
 ## Feature overview
 
 Originally built as a quick personal solution, this project has grown into a fully-featured tool with the following capabilities:
 * **WireGuard-specific design**  
   This obfuscator is purpose-built for the WireGuard protocol: it recognizes WireGuard packet types and actively monitors handshake success to ensure reliable operation.
 * **Key-based obfuscation**  
-  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, note that providing strong cryptographic guarantees is not the goal here—WireGuard itself already handles secure encryption. The key’s purpose is to make your traffic look unrecognizable, not unbreakable.
+  Obfuscation is performed using a user-specified key. While this arguably makes it more like encryption, note that providing strong cryptographic guarantees is not the goal here - WireGuard itself already handles secure encryption. The key’s purpose is to make your traffic look unrecognizable, not unbreakable.
 * **Symmetric operation**  
   The tool automatically detects whether packets are obfuscated and processes them accordingly.
 * **Handshake randomization**  
   WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary significantly. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
 * **Masking**  
-  Starting from version 1.4, the project introduces masking support—the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
+  Starting from version 1.4, the project introduces masking support - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
 * **Very fast and efficient**  
   The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
 * **Built-in NAT table**  
   The application features a high-performance, built-in NAT table. This allows hundreds of clients to connect to a single server port while preserving fast, efficient forwarding. Each client’s address and port are mapped to a unique server-side port.
 * **Static (manual) bindings / two-way mode**  
-  You can manually define static NAT table entries, which enables "two-way" mode—allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
+  You can manually define static NAT table entries, which enables "two-way" mode - allowing both WireGuard peers to initiate connections toward each other through the obfuscator.
 * **Multi-section configuration files**  
   Supports both simple configuration files and command-line arguments for quick one-off runs or advanced automation. You can define multiple obfuscator instances within a single configuration file.
 * **Detailed and customizable logging**  
@@ -63,7 +59,7 @@ Originally built as a quick personal solution, this project has grown into a ful
 * **Very low dependency footprint**  
   No large external libraries or frameworks are required.
 * **Android client**  
-  A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ — it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
+  A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
 
 ## Basic Concept
@@ -137,11 +133,11 @@ source-lport = 19999
 target = 127.0.0.1:5555
 ```
 
-The application maintains its own internal address mapping table, so a single server-side obfuscator can handle connections from multiple clients—each with their own obfuscator instance—using just one server port. Likewise, on the client side, a single obfuscator can support connections to multiple peers (though this is rarely needed in typical use).
+The application maintains its own internal address mapping table, so a single server-side obfuscator can handle connections from multiple clients - each with their own obfuscator instance - using just one server port. Likewise, on the client side, a single obfuscator can support connections to multiple peers (though this is rarely needed in typical use).
 
 The obfuscator automatically determines the direction (obfuscation or deobfuscation) for each packet, so the configuration files on both the client and server sides look nearly identical. The only thing that matters is that both sides use the same key.
 
-**The key** is simply a plain text string. Cryptographic strength is not required here—feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
+**The key** is simply a plain text string. Cryptographic strength is not required here - feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
 
 
 ## Configuration
@@ -297,7 +293,7 @@ In some setups, both WireGuard peers have public IP addresses and can each initi
 
 #### What Are Static Bindings?
 
-A **static binding** tells the obfuscator, right from startup, which peer IPs and ports should be mapped to which local ports. This allows the obfuscator to know exactly how to route packets from the server to the correct local WireGuard instance—**even if that peer hasn’t sent any packets yet.**
+A **static binding** tells the obfuscator, right from startup, which peer IPs and ports should be mapped to which local ports. This allows the obfuscator to know exactly how to route packets from the server to the correct local WireGuard instance - **even if that peer hasn’t sent any packets yet.**
 Without static bindings, the obfuscator only learns how to forward packets after seeing traffic from a client.
 
 #### Example: Two-way WireGuard with Obfuscation
@@ -416,7 +412,7 @@ When **Peer B** initiates a handshake with **Peer A**, the process is the same b
 
 #### Summary
 
-With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels—*even if both sides can initiate connections at any time.*
+With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels - *even if both sides can initiate connections at any time.*
 
 
 ## How to download, build and install
@@ -477,9 +473,9 @@ WireGuard Obfuscator is available as a multi-architecture Docker image:
 
 **Supported tags:**
 
-* **`latest`** — always points to the most recent stable release.
-* **`nightly`** — built automatically from the current main branch; may be unstable. Use only for testing new features.
-* **Version tags** (e.g. `1.0`, `1.1`) — for specific releases.
+* **`latest`** - always points to the most recent stable release.
+* **`nightly`** - built automatically from the current main branch; may be unstable. Use only for testing new features.
+* **Version tags** (e.g. `1.0`, `1.1`) - for specific releases.
 
 **Architectures available:**
 
@@ -664,7 +660,7 @@ You should see logs indicating the container has started successfully and is rea
 * **Endpoint Exclusion and Routing Loops:**  
   See the ["Avoiding Routing Loops"](#avoiding-routing-loops) section above for details on how to prevent routing loops. It's important to ensure that traffic to the VPN server itself is not routed through the VPN tunnel.
 * **PersistentKeepalive:**  
-  To maintain a stable connection—especially when clients are behind NAT or firewalls—it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` seconds is usually sufficient.
+  To maintain a stable connection - especially when clients are behind NAT or firewalls - it is recommended to use WireGuard’s `PersistentKeepalive` option. A value of `25` seconds is usually sufficient.
 * **Initial Handshake Requirement:**  
   After starting the obfuscator, no traffic will flow between WireGuard peers until a successful handshake has been established.
   If you restart the obfuscator *without* restarting WireGuard itself, it may take some time for the peers to re-establish the handshake and resume traffic. You can speed this up by briefly toggling the WireGuard interface.
