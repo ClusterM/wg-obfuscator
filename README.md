@@ -282,9 +282,9 @@ At the moment, the only available option is STUN emulation. Since STUN is common
 * `NONE` 
   No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming mask traffic.
 * `AUTO`  
-  The obfuscator will not mask outgoing traffic by default but if the first packet from client (on the 'source-lport' side) is masked, server will autodetect masking type and switch to it. So the client can choose the masking mode independently.
+  The obfuscator will not mask outgoing traffic by default, but if the first packet from the client (on the 'source-lport' side) is masked, the server will autodetect the masking type and switch to it. So the client can choose the masking mode independently.
 * `STUN`  
-  Forces to use STUN protocol for outgoing traffic and ignore other protocols for incoming one.
+  Forces the use of the STUN protocol for outgoing traffic and ignores other protocols for incoming traffic.
 
 ### Two-Way Mode
 (for advanced users)
