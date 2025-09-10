@@ -455,7 +455,7 @@ make
 > **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself, so it's required to use some additional tools if you want to install it as a system service.
 
 ### macOS
-You can download ready-to-run binaries for both x64 and ARM vertions of MAC.
+You can download ready-to-run binaries for both x64 and ARM versions of macOS.
 
 To build Obfuscator from the source code just type:
 ```sh
