@@ -159,7 +159,7 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-k <key>` or `--key=<key>`  
   Obfuscation key. Just a string. The longer, the better. Required, must be 1-255 characters long.
 * `-a <type>` or `--masking=<type>`  
-  Masking type. Optional, default is `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
+  Protocol masking type to disguise traffic. Optional, default is `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
   Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
@@ -280,11 +280,11 @@ As of version 1.4, masking support is available - the ability to disguise traffi
 
 At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked. So, currently supported values are:
 * `NONE` 
-  No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming masked traffic.
+  No masking at all. The obfuscator will not mask outgoing traffic and will not recognize or process any incoming masked traffic.
 * `AUTO`  
-  The obfuscator will not mask outgoing traffic by default, but if the first packet from the client (on the 'source-lport' side) is masked, the server will auto-detect the masking type and switch to it. So the client can choose the masking mode independently.
+  The obfuscator will not mask outgoing traffic by default. However, if the first packet from the client (on the 'source-lport' side) is masked, the server will autodetect the masking type and switch to it, allowing the client to choose the masking mode independently.
 * `STUN`  
-  Forces the use of the STUN protocol for outgoing traffic and ignores other protocols for incoming traffic.
+  Forces the use of the STUN protocol for outgoing traffic and only accepts incoming traffic that is STUN-masked.
 
 ### Two-Way Mode
 (for advanced users)
