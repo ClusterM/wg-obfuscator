@@ -43,7 +43,7 @@ Originally built as a quick personal solution, this project has grown into a ful
 * **Handshake randomization**  
   WireGuard handshake packets are padded with random dummy data, so their obfuscated sizes vary significantly. This makes it difficult for anyone monitoring traffic to spot patterns or reliably fingerprint handshakes. Even data packets can have their size increased by a few random bytes too.
 * **Masking**  
-  Starting from version 1.4, the project introduces masking support - the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
+  Starting from version 1.4, the project introduces masking support: the ability to disguise traffic as another protocol. This is especially useful when DPI only allows whitelisted protocols. At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked.
 * **Very fast and efficient**  
   The obfuscator is designed to be extremely fast, with minimal CPU and memory overhead. It can handle high traffic loads without noticeable performance degradation.
 * **Built-in NAT table**  
@@ -137,7 +137,7 @@ The application maintains its own internal address mapping table, so a single se
 
 The obfuscator automatically determines the direction (obfuscation or deobfuscation) for each packet, so the configuration files on both the client and server sides look nearly identical. The only thing that matters is that both sides use the same key.
 
-**The key** is simply a plain text string. Cryptographic strength is not required here - feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
+**The key** is simply a plain text string. Cryptographic strength is not required here: feel free to use any common word or phrase (longer is better, but even four or five characters is usually enough in practice). The main thing is that your key is not the same as everyone else’s!
 
 
 ## Configuration
@@ -163,7 +163,7 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-b <bindings>` or `--static-bindings=<bindings>`  
   Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
-  Firewall mark to set on all packets. Can be used to prevent routing loops. Optional, default is `0`, e.g. disabled. Can be `0`-`65535` or `0x0000`-`0xFFFF`.
+  Firewall mark to set on all packets. Can be used to prevent routing loops. Optional, default is `0`, (i.e. disabled). Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
   Verbosity level. Optional, default is `INFO`. Accepted values are:  
     `ERRORS` (critical errors only)  
@@ -280,9 +280,9 @@ As of version 1.4, masking support is available - the ability to disguise traffi
 
 At the moment, the only available option is STUN emulation. Since STUN is commonly used for video calls, it is rarely blocked. So, currently supported values are:
 * `NONE` 
-  No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming mask traffic.
+  No masking at all. The obfuscator will not mask outgoing traffic and will ignore all incoming masked traffic.
 * `AUTO`  
-  The obfuscator will not mask outgoing traffic by default, but if the first packet from the client (on the 'source-lport' side) is masked, the server will autodetect the masking type and switch to it. So the client can choose the masking mode independently.
+  The obfuscator will not mask outgoing traffic by default, but if the first packet from the client (on the 'source-lport' side) is masked, the server will auto-detect the masking type and switch to it. So the client can choose the masking mode independently.
 * `STUN`  
   Forces the use of the STUN protocol for outgoing traffic and ignores other protocols for incoming traffic.
 
