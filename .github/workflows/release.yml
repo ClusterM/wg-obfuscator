@@ -78,6 +78,8 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_NAME }}-${{ steps.prep.outputs.safe_platform }}
           platforms: ${{ matrix.platform }}
           outputs: type=docker,dest=${{ env.IMAGE_NAME }}-v${{ steps.prep.outputs.version }}-docker-${{ steps.prep.outputs.safe_platform }}.tar
+          build-args: |
+            RELEASE=1
           context: .
 
       - name: Load Release URL File from release job
@@ -412,4 +414,6 @@ jobs:
             clustermeerkat/${{ env.IMAGE_NAME }}:latest
             clustermeerkat/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }}
           platforms: ${{ env.PLATFORMS }}
+          build-args: |
+            RELEASE=1
           context: .

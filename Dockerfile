@@ -1,6 +1,7 @@
 # Stage 1: Build
 FROM debian:latest AS build
 ARG TARGETPLATFORM
+ARG RELEASE
 WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 COPY ./. ./
