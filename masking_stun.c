@@ -112,7 +112,6 @@ static int stun_build_binding_success(uint8_t *out,
     return (int)(20 + mlen);
 }
 
-
 static int stun_wrap(uint8_t *buf, size_t data_len) {
     const size_t header_size = 20;      // STUN header
     const size_t attr_header = 4;       // type + length
