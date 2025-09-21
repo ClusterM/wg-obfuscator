@@ -28,7 +28,7 @@ static int stun_write_header(uint8_t *b, uint16_t type, uint16_t mlen, const uin
     return 20;
 }
 
-static int stun_attr_xor_mapped_addr(uint8_t *b, const struct sockaddr_in *src){
+static int stun_attr_xor_mapped_addr(uint8_t *b, const struct sockaddr_in *src) {
     // type,len
     b[0] = STUN_ATTR_XORMAPPED >> 8;
     b[1] = STUN_ATTR_XORMAPPED & 0xFF;
@@ -48,7 +48,7 @@ static int stun_attr_xor_mapped_addr(uint8_t *b, const struct sockaddr_in *src){
 }
 
 /*
-static int stun_attr_software(uint8_t *b, const char *s){
+static int stun_attr_software(uint8_t *b, const char *s) {
     uint16_t n = (uint16_t)strlen(s);
     uint16_t pad = (4 - (n & 3)) & 3;
     if (b) {
@@ -63,7 +63,7 @@ static int stun_attr_software(uint8_t *b, const char *s){
 }
 */
 
-static uint32_t crc32(const uint8_t *p, size_t n){
+static uint32_t crc32(const uint8_t *p, size_t n) {
     uint32_t crc = ~0u;
     for(size_t i = 0; i < n; i++){
         crc ^= p[i];
@@ -73,7 +73,7 @@ static uint32_t crc32(const uint8_t *p, size_t n){
     return ~crc;
 }
 
-static int stun_attr_fingerprint(uint8_t *pkt, size_t cur_len){
+static int stun_attr_fingerprint(uint8_t *pkt, size_t cur_len) {
     uint8_t *b = pkt + cur_len;
     b[0] = STUN_ATTR_FINGERPR >> 8;
     b[1] = STUN_ATTR_FINGERPR & 0xFF;
@@ -84,8 +84,7 @@ static int stun_attr_fingerprint(uint8_t *pkt, size_t cur_len){
     return 8; // 4 hdr + 4 val
 }
 
-int stun_build_binding_request(uint8_t *out){
-    if (BUFFER_SIZE < 20 + 8) return -1; // header + fingerprint
+static int stun_build_binding_request(uint8_t *out) {
     uint8_t txid[12];
     rand_bytes(txid, 12);
     stun_write_header(out, STUN_BINDING_REQ, 0, txid);
@@ -166,7 +165,7 @@ static void stun_on_handshake_req(obfuscator_config_t *config,
                                 const struct sockaddr_in *dest_addr,
                                 send_data_callback_t send_back_callback,
                                 send_data_callback_t send_forward_callback) {
-    uint8_t buffer[20];
+    uint8_t buffer[128];
     int len = stun_build_binding_request(buffer);
     if (len < 0) return;
 
@@ -249,7 +248,7 @@ static void stun_on_timer(obfuscator_config_t *config,
                                 const struct sockaddr_in *server_addr,
                                 send_data_callback_t send_to_client_callback,
                                 send_data_callback_t send_to_server_callback) {
-    uint8_t buffer[20];
+    uint8_t buffer[128];
     int len = stun_build_binding_request(buffer);
     if (len < 0) return;
 
