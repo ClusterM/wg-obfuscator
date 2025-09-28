@@ -120,7 +120,7 @@ static void read_config_file(const char *filename, obfuscator_config_t *config)
 {
     // Read configuration from the file
     uint8_t first_section = 1; // Flag to indicate if this is the first section being processed
-    char line[256];
+    char line[10 * 1024]; // Buffer to hold each line from the config file
 
     FILE *config_file = fopen(filename, "r");
     if (config_file == NULL) {
