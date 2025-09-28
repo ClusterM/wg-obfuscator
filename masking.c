@@ -82,7 +82,7 @@ int masking_unwrap_from_client(uint8_t *buffer, int length,
             int r = masking_handlers[i]->on_data_unwrap(buffer, length, config, NULL, DIR_CLIENT_TO_SERVER, client_addr, server_addr, send_to_client_cb, send_to_server_cb);
             if (r >= 0) {
                 // Found a matching masking handler
-                log(LL_INFO, "Autodetected masking handler for client %s:%d: %s", inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port), masking_handlers[i]->name);
+                log(LL_TRACE, "Autodetected masking handler for packet from %s:%d: %s", inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port), masking_handlers[i]->name);
                 if (masking_handler_out) {
                     *masking_handler_out = masking_handlers[i];
                 }

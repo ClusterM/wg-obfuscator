@@ -810,6 +810,9 @@ int main(int argc, char *argv[]) {
                     log(!client_entry->handshaked ? LL_INFO : LL_DEBUG, "Handshake established with %s:%d to %s:%d (direct)",
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         target_host, target_port);
+                    if (!client_entry->handshaked && client_entry->masking_handler && !config.masking_handler_set) {
+                        log(LL_INFO, "Autodetected masking handler for client %s:%d: %s", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port), client_entry->masking_handler->name);
+                    }
                     client_entry->handshaked = 1;
                     client_entry->client_obfuscated = !obfuscated;
                     client_entry->server_obfuscated = obfuscated;
