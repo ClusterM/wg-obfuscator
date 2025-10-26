@@ -89,7 +89,7 @@ generate_instance_config() {
 mkdir -p "$(dirname "$CONFIG_FILE")"
 
 # Check if UCI configuration exists before generating
-local sections=$(uci -q show "$UCI_CONFIG" | grep -o "^$UCI_CONFIG\.[^=]*" | cut -d. -f2 | sort -u)
+sections=$(uci -q show "$UCI_CONFIG" | grep -o "^$UCI_CONFIG\.[^=]*" | cut -d. -f2 | sort -u)
 
 if [ -z "$sections" ]; then
     echo "No UCI configuration found"
