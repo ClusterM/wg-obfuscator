@@ -31,8 +31,8 @@ feeds/packages/net/wg-obfuscator/
 
 3. **Скопируйте файлы**:
    ```bash
-   cp Makefile net/wg-obfuscator/
-   cp files/wg-obfuscator.init net/wg-obfuscator/files/
+   cp openwrt/Makefile net/wg-obfuscator/
+   cp openwrt/files/wg-obfuscator.init net/wg-obfuscator/files/
    ```
 
 4. **Создайте коммит**:
