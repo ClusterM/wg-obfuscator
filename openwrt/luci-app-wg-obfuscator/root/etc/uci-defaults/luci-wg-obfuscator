@@ -8,7 +8,7 @@ set luci.main.lang='en'
 EOF
 
 # Ensure wg-obfuscator UCI configuration exists
-if ! uci -q get wg-obfuscator >/dev/null 2>&1; then
+if ! uci -q show wg-obfuscator >/dev/null 2>&1; then
     # Create default UCI configuration if it doesn't exist
     uci -q batch <<EOF
 set wg-obfuscator.main=wg_obfuscator
