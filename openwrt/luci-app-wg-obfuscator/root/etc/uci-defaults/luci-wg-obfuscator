@@ -1,0 +1,14 @@
+#!/bin/sh
+# LuCI defaults for WireGuard Obfuscator
+
+# Set default permissions for LuCI access
+uci -q batch <<EOF
+set luci.main.mediaurlbase='/luci-static/bootstrap'
+set luci.main.lang='en'
+set luci.main.mediaurlbase='/luci-static/bootstrap'
+EOF
+
+# Commit changes
+uci commit luci
+
+exit 0
