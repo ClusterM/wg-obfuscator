@@ -37,7 +37,7 @@ endef
 
 define Package/wg-obfuscator/conffiles
 /etc/config/wg-obfuscator
-/etc/wg-obfuscator.conf
+/etc/wg-obfuscator/wg-obfuscator.conf
 endef
 
 define Build/Compile
