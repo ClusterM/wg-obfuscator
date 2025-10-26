@@ -1,26 +1,26 @@
-# WireGuard Obfuscator для OpenWRT
+# WireGuard Obfuscator for OpenWRT
 
-Этот пакет предоставляет WireGuard Obfuscator для OpenWRT, позволяя обфусцировать трафик WireGuard для обхода DPI (Deep Packet Inspection).
+This package provides WireGuard Obfuscator for OpenWRT, allowing to obfuscate WireGuard traffic to bypass DPI (Deep Packet Inspection).
 
-## Установка
+## Installation
 
-### Через opkg (если пакет доступен в репозитории)
+### Via opkg (if package is available in repository)
 ```bash
 opkg update
 opkg install wg-obfuscator
 ```
 
-### Сборка из исходного кода
+### Build from source
 
-1. Скопируйте файлы пакета в папку `feeds/packages/net/wg-obfuscator/` вашего OpenWRT SDK
-2. Выполните сборку:
+1. Copy package files to `feeds/packages/net/wg-obfuscator/` in your OpenWRT SDK
+2. Build the package:
 ```bash
 make package/wg-obfuscator/compile
 ```
 
-## Конфигурация
+## Configuration
 
-Отредактируйте файл `/etc/wg-obfuscator.conf`:
+Edit the `/etc/wg-obfuscator.conf` file:
 
 ```ini
 [main]
@@ -35,78 +35,78 @@ idle-timeout = 300
 max-dummy-length-data = 4
 ```
 
-## Использование
+## Usage
 
-1. Настройте WireGuard для подключения к локальному адресу obfuscator'а:
+1. Configure WireGuard to connect to the local obfuscator address:
 ```ini
 [Peer]
 Endpoint = 127.0.0.1:13255
 ```
 
-2. Запустите obfuscator:
+2. Start the obfuscator:
 ```bash
 /etc/init.d/wg-obfuscator start
 ```
 
-3. Запустите WireGuard как обычно
+3. Start WireGuard as usual
 
-## Управление сервисом
+## Service Management
 
 ```bash
-# Запуск
+# Start
 /etc/init.d/wg-obfuscator start
 
-# Остановка
+# Stop
 /etc/init.d/wg-obfuscator stop
 
-# Перезапуск
+# Restart
 /etc/init.d/wg-obfuscator restart
 
-# Перезагрузка конфигурации
+# Reload configuration
 /etc/init.d/wg-obfuscator reload
 
-# Статус
+# Status
 /etc/init.d/wg-obfuscator status
 ```
 
-## Автозапуск
+## Auto-start
 
-Для автоматического запуска при загрузке системы:
+To automatically start on system boot:
 ```bash
 /etc/init.d/wg-obfuscator enable
 ```
 
-## Логи
+## Logs
 
-Логи сервиса можно просмотреть через:
+View service logs with:
 ```bash
 logread | grep wg-obfuscator
 ```
 
-## Поддерживаемые архитектуры
+## Supported Architectures
 
-Пакет поддерживает все архитектуры, поддерживаемые OpenWRT:
+The package supports all architectures supported by OpenWRT:
 - x86_64
 - ARM64
 - ARMv7
 - MIPS
 - MIPS64
-- и другие
+- and others
 
-## Требования
+## Requirements
 
-- OpenWRT 19.07 или новее
-- Минимум 1MB свободного места
-- Минимум 512KB RAM
+- OpenWRT 19.07 or newer
+- Minimum 1MB free space
+- Minimum 512KB RAM
 
-## Примечания
+## Notes
 
-- Убедитесь, что порт, указанный в `source-lport`, не используется другими сервисами
-- Для работы в режиме сервера может потребоваться настройка файрвола для проброса портов
-- При использовании `fwmark` убедитесь, что obfuscator запускается с правами root
+- Make sure the port specified in `source-lport` is not used by other services
+- For server mode operation, firewall port forwarding may be required
+- When using `fwmark`, ensure the obfuscator runs with root privileges
 
-## Поддержка
+## Support
 
-Для получения помощи и сообщения об ошибках обращайтесь к:
-- [Официальному репозиторию](https://github.com/ClusterM/wg-obfuscator)
-- [Документации OpenWRT](https://openwrt.org/docs)
+For help and bug reports, refer to:
+- [Official repository](https://github.com/ClusterM/wg-obfuscator)
+- [OpenWRT documentation](https://openwrt.org/docs)
