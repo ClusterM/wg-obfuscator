@@ -1,9 +1,12 @@
 *.exe
 wg-obfuscator
-*.o
 *.dll
 *dump
 commit.h
 .vscode/
 .wg-obfuscator.conf
 .idea/
+/CLAUDE.md
+
+# Build artifacts
+build/

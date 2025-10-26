@@ -1,0 +1,9 @@
+# Compiled test binaries
+test_harness
+test_wg_emulator
+
+# Build directory with object files
+build/
+
+# Test logs
+/tmp/wg-obfuscator-test/

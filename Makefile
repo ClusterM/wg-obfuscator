@@ -14,7 +14,11 @@ else
   CFLAGS   = -O2 -Wall
   LDFLAGS += -s
 endif
-OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
+# Build directories
+BUILD_DIR = build
+
+# Object files in build directory
+OBJS = $(BUILD_DIR)/wg-obfuscator.o $(BUILD_DIR)/config.o $(BUILD_DIR)/masking.o $(BUILD_DIR)/masking_stun.o
 EXEDIR = .
 
 EXTRA_CFLAGS =
@@ -85,15 +89,19 @@ ifneq ($(TARGETPLATFORM),)
 endif
 
 clean:
-	$(RM) *.o
+	$(RM) -r $(BUILD_DIR)
 ifeq ($(OS),Windows_NT)
 	@if [ -f "$(TARGET)" ]; then for f in `cygcheck "$(TARGET)" | grep .dll | grep msys` ; do rm -f $(EXEDIR)/`basename "$$f"` ; done fi
 endif
 	$(RM) $(TARGET)
+	@$(MAKE) -s clean-tests 2>/dev/null || true
 
-$(OBJS): 
+# Create build directory if it doesn't exist
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
 
-%.o : %.c $(HEADERS)
+# Compile source files to build directory
+$(BUILD_DIR)/%.o : %.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ -c $<
 
 $(TARGET): $(OBJS)
@@ -118,4 +126,53 @@ else
 	systemctl restart $(SERVICE_FILE)
 endif
 
-.PHONY: clean install
+# Test targets
+TEST_DIR = tests
+TEST_BUILD_DIR = $(TEST_DIR)/build
+TEST_HARNESS = $(TEST_DIR)/test_harness
+TEST_WG_EMULATOR = $(TEST_DIR)/test_wg_emulator
+
+# Create test build directory
+$(TEST_BUILD_DIR):
+	@mkdir -p $(TEST_BUILD_DIR)
+
+$(TEST_BUILD_DIR)/test_harness.o: $(TEST_DIR)/test_harness.c $(HEADERS) | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -I. -o $@ -c $<
+
+$(TEST_BUILD_DIR)/test_wg_emulator.o: $(TEST_DIR)/test_wg_emulator.c | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ -c $<
+
+$(TEST_HARNESS): $(TEST_BUILD_DIR)/test_harness.o
+	$(CC) -o $(TEST_HARNESS) $(TEST_BUILD_DIR)/test_harness.o $(LDFLAGS)
+
+$(TEST_WG_EMULATOR): $(TEST_BUILD_DIR)/test_wg_emulator.o
+	$(CC) -o $(TEST_WG_EMULATOR) $(TEST_BUILD_DIR)/test_wg_emulator.o $(LDFLAGS)
+
+# Build all test binaries
+test-build: $(TEST_HARNESS) $(TEST_WG_EMULATOR)
+	@echo "Test binaries built successfully"
+
+# Run unit tests only
+test-unit: $(TEST_HARNESS)
+	@echo "Running unit tests..."
+	@./$(TEST_HARNESS)
+
+# Run integration tests (requires main binary)
+test-integration: $(TARGET) $(TEST_WG_EMULATOR)
+	@echo "Running integration tests..."
+	@cd $(TEST_DIR) && ./run_tests.sh
+
+# Run all tests
+test: test-build test-unit test-integration
+	@echo ""
+	@echo "========================================="
+	@echo "All tests completed successfully!"
+	@echo "========================================="
+
+# Clean test artifacts
+clean-tests:
+	$(RM) -r $(TEST_BUILD_DIR)
+	$(RM) $(TEST_HARNESS) $(TEST_WG_EMULATOR)
+	$(RM) -r /tmp/wg-obfuscator-test
+
+.PHONY: clean install test test-build test-unit test-integration clean-tests
