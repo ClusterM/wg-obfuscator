@@ -36,11 +36,14 @@ define Package/luci-app-wg-obfuscator/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci
 	cp -pR ./luasrc/* $(1)/usr/lib/lua/luci/
 	
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
-	po2lmo ./po/zh-cn/wg-obfuscator.po $(1)/usr/lib/lua/luci/i18n/wg-obfuscator.zh-cn.lmo
-	
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./root/etc/uci-defaults/luci-wg-obfuscator $(1)/etc/uci-defaults/
+	
+	# Install translations if they exist
+	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
+	@if [ -f ./po/zh-cn/wg-obfuscator.po ]; then \
+		po2lmo ./po/zh-cn/wg-obfuscator.po $(1)/usr/lib/lua/luci/i18n/wg-obfuscator.zh-cn.lmo; \
+	fi
 endef
 
 $(eval $(call BuildPackage,luci-app-wg-obfuscator))
