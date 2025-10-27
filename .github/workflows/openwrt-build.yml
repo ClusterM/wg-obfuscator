@@ -149,6 +149,7 @@ jobs:
           make defconfig
 
       - name: Build OpenWRT package
+        timeout-minutes: 30
         run: |
           TARGET_NAME="${{ matrix.target[0] }}"
           ARCH="${{ matrix.target[1] }}"
@@ -158,12 +159,18 @@ jobs:
           
           echo "Building OpenWRT package for ${TARGET_NAME}..."
           
+          # First, build the toolchain (this is required)
+          echo "Building toolchain..."
+          timeout 15m make toolchain/compile -j$(nproc) || echo "Toolchain build failed or timed out, trying to continue..."
+          
           # Build only our package and its dependencies
-          make package/wg-obfuscator/compile V=s
+          echo "Building wg-obfuscator package..."
+          timeout 10m make package/wg-obfuscator/compile V=s -j$(nproc) || echo "Package build failed or timed out, checking what we have..."
           
           # Also build LuCI app if it exists
           if [ -d "package/network/wg-obfuscator/luci-app-wg-obfuscator" ]; then
-            make package/luci-app-wg-obfuscator/compile V=s || echo "LuCI app build failed, but continuing..."
+            echo "Building LuCI app..."
+            timeout 5m make package/luci-app-wg-obfuscator/compile V=s -j$(nproc) || echo "LuCI app build failed or timed out, but continuing..."
           fi
 
       - name: Verify build artifacts
@@ -176,21 +183,32 @@ jobs:
           
           echo "Verifying build artifacts for ${TARGET_NAME}..."
           
+          # Check if any packages were built
+          echo "Looking for built packages..."
+          find . -name "*.ipk" -type f | head -10
+          
           # Check if the package was built successfully
-          if find bin -name "*wg-obfuscator*.ipk" -type f | grep -q .; then
+          if find . -name "*wg-obfuscator*.ipk" -type f | grep -q .; then
             echo "✅ wg-obfuscator package built successfully"
-            find bin -name "*wg-obfuscator*.ipk" -type f | head -5
+            find . -name "*wg-obfuscator*.ipk" -type f | head -5
           else
             echo "❌ wg-obfuscator package not found"
+            echo "Checking build logs..."
+            if [ -f "logs/package.log" ]; then
+              echo "Package build log:"
+              tail -20 logs/package.log
+            fi
             echo "Available packages:"
-            find bin -name "*.ipk" -type f | head -10
+            find . -name "*.ipk" -type f | head -10
+            echo "Build directory contents:"
+            ls -la build_dir/ | head -10
             exit 1
           fi
           
           # Check if LuCI app was built (if it exists)
-          if find bin -name "*luci-app-wg-obfuscator*.ipk" -type f | grep -q .; then
+          if find . -name "*luci-app-wg-obfuscator*.ipk" -type f | grep -q .; then
             echo "✅ luci-app-wg-obfuscator package built successfully"
-            find bin -name "*luci-app-wg-obfuscator*.ipk" -type f | head -5
+            find . -name "*luci-app-wg-obfuscator*.ipk" -type f | head -5
           else
             echo "ℹ️ luci-app-wg-obfuscator package not found (may not exist or failed to build)"
           fi
@@ -206,7 +224,7 @@ jobs:
           echo "Testing package installation simulation for ${TARGET_NAME}..."
           
           # Extract package info
-          PKG_FILE=$(find bin -name "*wg-obfuscator*.ipk" -type f | head -1)
+          PKG_FILE=$(find . -name "*wg-obfuscator*.ipk" -type f | head -1)
           if [ -n "$PKG_FILE" ]; then
             echo "Package file: $PKG_FILE"
             
@@ -220,6 +238,8 @@ jobs:
               echo "✅ Binary file present in package"
             else
               echo "❌ Binary file missing from package"
+              echo "Package contents:"
+              tar -tzf "$PKG_FILE" | grep -E "(usr/bin|etc/)" | head -10
               exit 1
             fi
             
@@ -227,6 +247,8 @@ jobs:
               echo "✅ Init script present in package"
             else
               echo "❌ Init script missing from package"
+              echo "Package contents:"
+              tar -tzf "$PKG_FILE" | grep -E "(usr/bin|etc/)" | head -10
               exit 1
             fi
             
@@ -234,10 +256,14 @@ jobs:
               echo "✅ UCI config present in package"
             else
               echo "❌ UCI config missing from package"
+              echo "Package contents:"
+              tar -tzf "$PKG_FILE" | grep -E "(usr/bin|etc/)" | head -10
               exit 1
             fi
           else
             echo "❌ No package file found for testing"
+            echo "Available .ipk files:"
+            find . -name "*.ipk" -type f | head -10
             exit 1
           fi
 
