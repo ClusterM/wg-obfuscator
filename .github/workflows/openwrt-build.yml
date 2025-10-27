@@ -83,8 +83,15 @@ jobs:
           mkdir -p "${OPENWRT_DIR}/package/network/wg-obfuscator"
           cp -r openwrt/* "${OPENWRT_DIR}/package/network/wg-obfuscator/"
           
-          # Copy only the OpenWRT package files (not source files)
-          # OpenWRT will clone the git repository itself
+          # Copy source files to the package
+          cp *.c *.h Makefile LICENSE README.md "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
+          
+          # Create source archive for OpenWRT
+          echo "Creating source archive..."
+          cd "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
+          tar -czf wg-obfuscator-1.5.tar.gz *.c *.h Makefile LICENSE README.md
+          echo "Source archive created: wg-obfuscator-1.5.tar.gz"
+          ls -la wg-obfuscator-1.5.tar.gz
 
       - name: Configure OpenWRT build
         run: |
@@ -99,51 +106,11 @@ jobs:
           # Clean previous configuration
           rm -f .config
           
-          # Configure the build
-          make defconfig
+          # Configure the build with specific target
+          make defconfig TARGET_${ARCH}=y SUBTARGET=${SUBTARGET}
           
-          # Set target and packages
-          echo "CONFIG_TARGET_${ARCH}=y" >> .config
-          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" >> .config
-          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_Generic=y" >> .config
-          
-          # Force specific target selection
-          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_DEVICE_generic=y" >> .config
-          
-          # Enable our packages
+          # Enable our package
           echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-wg-obfuscator=y" >> .config
-          
-          # Enable LuCI and dependencies
-          echo "CONFIG_PACKAGE_luci=y" >> .config
-          echo "CONFIG_PACKAGE_luci-base=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-base=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-ipkg=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-jsonc=y" >> .config
-          echo "CONFIG_PACKAGE_luci-lib-nixio=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-network=y" >> .config
-          echo "CONFIG_PACKAGE_luci-mod-system=y" >> .config
-          echo "CONFIG_PACKAGE_luci-proto-ipv6=y" >> .config
-          echo "CONFIG_PACKAGE_luci-proto-ppp=y" >> .config
-          echo "CONFIG_PACKAGE_luci-theme-bootstrap=y" >> .config
-          
-          # Enable required libraries to fix dependency warnings
-          echo "CONFIG_PACKAGE_libpam=y" >> .config
-          echo "CONFIG_PACKAGE_liblzma=y" >> .config
-          echo "CONFIG_PACKAGE_libnetsnmp=y" >> .config
-          echo "CONFIG_PACKAGE_libopenssl=y" >> .config
-          echo "CONFIG_PACKAGE_libpthread=y" >> .config
-          echo "CONFIG_PACKAGE_librt=y" >> .config
-          echo "CONFIG_PACKAGE_libc=y" >> .config
-          echo "CONFIG_PACKAGE_libgcc=y" >> .config
-          echo "CONFIG_PACKAGE_libstdcpp=y" >> .config
-          
-          # Disable problematic packages that cause warnings
-          echo "CONFIG_PACKAGE_busybox=n" >> .config
-          echo "CONFIG_PACKAGE_kexec-tools=n" >> .config
-          echo "CONFIG_PACKAGE_lldpd=n" >> .config
-          echo "CONFIG_PACKAGE_policycoreutils=n" >> .config
           
           # Update config
           make defconfig
