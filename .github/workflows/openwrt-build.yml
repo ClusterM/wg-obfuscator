@@ -86,6 +86,13 @@ jobs:
           # Copy source files to the package
           cp *.c *.h Makefile LICENSE README.md "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
           
+          # Create source archive for OpenWRT
+          echo "Creating source archive..."
+          cd "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
+          tar -czf wg-obfuscator-1.5.tar.gz *.c *.h Makefile LICENSE README.md
+          echo "Source archive created: wg-obfuscator-1.5.tar.gz"
+          ls -la wg-obfuscator-1.5.tar.gz
+          
           # Create a simple Makefile for the source files
           cat > "${OPENWRT_DIR}/package/network/wg-obfuscator/files/Makefile" << 'EOF'
           PROG_NAME    = wg-obfuscator

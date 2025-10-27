@@ -12,7 +12,7 @@ PKG_VERSION:=1.5
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://github.com/ClusterM/wg-obfuscator/archive/refs/tags/v$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=file://$(CURDIR)/files/
 PKG_HASH:=skip
 
 PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
