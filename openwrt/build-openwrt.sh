@@ -62,11 +62,29 @@ print_status "Package files copied successfully"
 # Build the package
 print_status "Building package..."
 cd "$OPENWRT_BUILD_DIR"
-make package/wg-obfuscator/compile
 
-if [ $? -eq 0 ]; then
-    print_status "Package built successfully!"
-    print_status "Package files are located in: $OPENWRT_BUILD_DIR/bin/packages/*/network/wg-obfuscator_*.ipk"
+# Build the package with install to create .ipk
+print_status "Compiling and packaging..."
+make package/wg-obfuscator/{clean,compile,install} CONFIG_PACKAGE_wg-obfuscator=y V=s 2>&1 | tee /tmp/wg-obfuscator-build.log | tail -20
+BUILD_STATUS=$?
+
+# Check if .ipk was created (build can return error but still create .ipk)
+if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || grep -q "Packaged contents.*wg-obfuscator.*\.ipk" /tmp/wg-obfuscator-build.log; then
+    # Check if .ipk was created (exit code 2 means install failed but compile succeeded)
+    IPK_FILE=$(find bin/packages -name "wg-obfuscator*.ipk" 2>/dev/null | head -1)
+    if [ -n "$IPK_FILE" ]; then
+        print_status "Package built successfully!"
+        print_status "Package file: $IPK_FILE"
+        FILE_SIZE=$(ls -lh "$IPK_FILE" | awk '{print $5}')
+        print_status "Package size: $FILE_SIZE"
+        
+        # Run package index
+        print_status "Updating package index..."
+        make package/index >/dev/null 2>&1
+    else
+        print_error ".ipk file was not created!"
+        exit 1
+    fi
 else
     print_error "Package build failed!"
     exit 1

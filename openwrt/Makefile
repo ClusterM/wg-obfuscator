@@ -11,15 +11,18 @@ PKG_NAME:=wg-obfuscator
 PKG_VERSION:=1.5
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=file://$(CURDIR)/files/
-PKG_HASH:=skip
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/ClusterM/wg-obfuscator.git
+PKG_SOURCE_DATE:=2025-09-21
+PKG_SOURCE_VERSION:=0b547e964ea47541c7ebca57bd7359e5511ea485
+PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=LICENSE
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_BUILD_PARALLEL:=1
+PKG_BUILD_DEPENDS:=
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -38,6 +41,9 @@ endef
 define Package/wg-obfuscator/conffiles
 /etc/config/wg-obfuscator
 /etc/wg-obfuscator/wg-obfuscator.conf
+endef
+
+define Build/Configure
 endef
 
 define Build/Compile
