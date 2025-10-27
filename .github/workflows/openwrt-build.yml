@@ -83,52 +83,8 @@ jobs:
           mkdir -p "${OPENWRT_DIR}/package/network/wg-obfuscator"
           cp -r openwrt/* "${OPENWRT_DIR}/package/network/wg-obfuscator/"
           
-          # Copy source files to the package
-          cp *.c *.h Makefile LICENSE README.md "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
-          
-          # Create source archive for OpenWRT
-          echo "Creating source archive..."
-          cd "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
-          tar -czf wg-obfuscator-1.5.tar.gz *.c *.h Makefile LICENSE README.md
-          echo "Source archive created: wg-obfuscator-1.5.tar.gz"
-          ls -la wg-obfuscator-1.5.tar.gz
-          
-          # Create a simple Makefile for the source files
-          cat > "${OPENWRT_DIR}/package/network/wg-obfuscator/files/Makefile" << 'EOF'
-          PROG_NAME    = wg-obfuscator
-          CONFIG       = wg-obfuscator.conf
-          SERVICE_FILE = wg-obfuscator.service
-          HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h masking.h masking_stun.h
-          
-          RELEASE ?= 1
-          
-          RM    = rm -f
-          CC    = gcc
-          CFLAGS   = -O2 -Wall
-          LDFLAGS += -s
-          OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
-          EXEDIR = .
-          
-          EXTRA_CFLAGS =
-          
-          TARGET = $(EXEDIR)/$(PROG_NAME)
-          
-          all: $(TARGET)
-          
-          clean:
-          	$(RM) *.o
-          	$(RM) $(TARGET)
-          
-          $(OBJS): 
-          
-          %.o : %.c $(HEADERS)
-          	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ -c $<
-          
-          $(TARGET): $(OBJS)
-          	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
-          
-          .PHONY: clean
-          EOF
+          # Copy only the OpenWRT package files (not source files)
+          # OpenWRT will clone the git repository itself
 
       - name: Configure OpenWRT build
         run: |

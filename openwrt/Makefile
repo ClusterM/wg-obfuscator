@@ -11,9 +11,11 @@ PKG_NAME:=wg-obfuscator
 PKG_VERSION:=1.5
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=file://$(CURDIR)/files/
-PKG_HASH:=skip
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/ClusterM/wg-obfuscator.git
+PKG_SOURCE_DATE:=2024-10-27
+PKG_SOURCE_VERSION:=HEAD
+PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
 PKG_LICENSE:=GPL-2.0
