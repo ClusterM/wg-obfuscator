@@ -9,13 +9,23 @@ PROG="/usr/bin/wg-obfuscator"
 CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
 CONFIG_GENERATOR="/usr/libexec/wg-obfuscator-config.sh"
 
+enabled_count=0
+
+check_enabled() {
+    local enabled
+    config_get enabled "$1" enabled "0"
+    [ "$enabled" = "1" ] && enabled_count=$((enabled_count + 1))
+}
+
 start_service() {
-    # Check if any instance is enabled
-    local enabled_instances=$(uci -q show wg-obfuscator | grep "\.enabled='1'" | wc -l)
+    # Check if any instances are enabled (only wg_obfuscator sections)
+    local enabled_count=0
+    config_load wg-obfuscator
+    config_foreach check_enabled wg_obfuscator
     
-    if [ "$enabled_instances" -eq 0 ]; then
+    if [ "$enabled_count" -eq 0 ]; then
         echo "No wg-obfuscator instances are enabled"
-        return 1
+        return 0
     fi
     
     # Generate configuration from UCI

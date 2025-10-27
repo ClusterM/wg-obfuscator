@@ -36,6 +36,48 @@ convert_verbose_level() {
     esac
 }
 
+# Function to validate port number
+validate_port() {
+    local port="$1"
+    if [ -z "$port" ]; then
+        return 1
+    fi
+    if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ] 2>/dev/null; then
+        echo "ERROR: Invalid port number: $port (must be 1-65535)" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Function to validate target format (host:port)
+validate_target() {
+    local target="$1"
+    if [ -z "$target" ]; then
+        echo "ERROR: Target cannot be empty" >&2
+        return 1
+    fi
+    if ! echo "$target" | grep -qE '^.+:[0-9]+$'; then
+        echo "ERROR: Invalid target format: $target (expected host:port)" >&2
+        return 1
+    fi
+    local port=$(echo "$target" | sed 's/.*://')
+    validate_port "$port" || return 1
+    return 0
+}
+
+# Function to validate key
+validate_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        echo "ERROR: Obfuscation key cannot be empty" >&2
+        return 1
+    fi
+    if [ ${#key} -lt 4 ]; then
+        echo "WARNING: Key is very short (less than 4 characters)" >&2
+    fi
+    return 0
+}
+
 # Function to generate config for a single instance
 generate_instance_config() {
     local section="$1"
@@ -53,12 +95,24 @@ generate_instance_config() {
     fi
     
     local source_lport=$(get_uci_value "$section" "source_lport" "13255")
+    if ! validate_port "$source_lport"; then
+        echo "ERROR: Invalid source port for section '$section', skipping" >&2
+        return 1
+    fi
     echo "source-lport = $source_lport"
     
     local target=$(get_uci_value "$section" "target" "10.13.1.100:13255")
+    if ! validate_target "$target"; then
+        echo "ERROR: Invalid target for section '$section', skipping" >&2
+        return 1
+    fi
     echo "target = $target"
     
     local key=$(get_uci_value "$section" "key" "test")
+    if ! validate_key "$key"; then
+        echo "ERROR: Invalid key for section '$section', skipping" >&2
+        return 1
+    fi
     echo "key = $key"
     
     local masking=$(get_uci_value "$section" "masking" "AUTO")
@@ -74,12 +128,24 @@ generate_instance_config() {
     echo "verbose = $verbose_level"
     
     local max_clients=$(get_uci_value "$section" "max_clients" "1024")
+    if [ "$max_clients" -lt 1 ] || [ "$max_clients" -gt 65535 ] 2>/dev/null; then
+        echo "WARNING: Invalid max-clients value for section '$section', using default 1024" >&2
+        max_clients=1024
+    fi
     echo "max-clients = $max_clients"
     
     local idle_timeout=$(get_uci_value "$section" "idle_timeout" "300")
+    if [ "$idle_timeout" -lt 0 ] 2>/dev/null; then
+        echo "WARNING: Invalid idle-timeout value for section '$section', using default 300" >&2
+        idle_timeout=300
+    fi
     echo "idle-timeout = $idle_timeout"
     
     local max_dummy_length_data=$(get_uci_value "$section" "max_dummy_length_data" "4")
+    if [ "$max_dummy_length_data" -lt 0 ] || [ "$max_dummy_length_data" -gt 255 ] 2>/dev/null; then
+        echo "WARNING: Invalid max-dummy-length-data value for section '$section', using default 4" >&2
+        max_dummy_length_data=4
+    fi
     echo "max-dummy-length-data = $max_dummy_length_data"
     
     local fwmark=$(get_uci_value "$section" "fwmark" "0")
