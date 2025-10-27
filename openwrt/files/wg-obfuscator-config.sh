@@ -5,6 +5,11 @@
 CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
 UCI_CONFIG="wg-obfuscator"
 
+# Allow override of UCI config directory for testing
+if [ -n "$UCI_CONFIG_DIR" ]; then
+    export UCI_CONFIG_DIR
+fi
+
 # Function to get UCI value with default
 get_uci_value() {
     local section="$1"
