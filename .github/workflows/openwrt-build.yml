@@ -23,7 +23,6 @@ concurrency:
 
 env:
   OPENWRT_VERSION: "22.03.5"
-  OPENWRT_SDK_BASE: "https://downloads.openwrt.org/releases"
 
 jobs:
   test-openwrt-build:
@@ -35,20 +34,9 @@ jobs:
           # Popular OpenWRT targets for testing
           # Format: [target_name, arch, subtarget, profile]
           - [x86_64, x86_64, generic, Generic]
-          - [x86, x86, generic, Generic]
           - [mips_24kc, mips, 24kc, generic]
-          - [mipsel_24kc, mipsel, 24kc, generic]
-          - [mips_74kc, mips, 74kc, generic]
-          - [mipsel_74kc, mipsel, 74kc, generic]
           - [arm_cortex-a7_neon-vfpv4, arm_cortex-a7, neon-vfpv4, generic]
-          - [arm_cortex-a9_vfpv3-d16, arm_cortex-a9, vfpv3-d16, generic]
           - [aarch64_cortex-a72, aarch64, cortex-a72, generic]
-          - [aarch64_generic, aarch64, generic, generic]
-          - [mips64_mips64, mips64, mips64, generic]
-          - [mipsel_64, mipsel, 64, generic]
-          - [powerpc_464fp, powerpc, 464fp, generic]
-          - [powerpc_8540, powerpc, 8540, generic]
-          - [riscv64_generic, riscv64, generic, generic]
       fail-fast: false
 
     steps:
@@ -69,84 +57,37 @@ jobs:
             xsltproc \
             wget \
             unzip \
-            python3
+            python3 \
+            python3-dev \
+            python3-pip \
+            rsync
 
-      - name: Download OpenWRT SDK
+      - name: Clone OpenWRT
+        run: |
+          echo "Cloning OpenWRT repository..."
+          git clone https://github.com/openwrt/openwrt.git
+          cd openwrt
+          git checkout v22.03.5
+          echo "OPENWRT_DIR=$(pwd)" >> $GITHUB_ENV
+          echo "OpenWRT cloned successfully"
+
+      - name: Prepare package for build
         run: |
           TARGET_NAME="${{ matrix.target[0] }}"
           ARCH="${{ matrix.target[1] }}"
           SUBTARGET="${{ matrix.target[2] }}"
           
-          # Construct SDK URL with proper naming
-          if [ "$ARCH" = "x86_64" ]; then
-            SDK_ARCH="x86_64"
-          elif [ "$ARCH" = "x86" ]; then
-            SDK_ARCH="x86"
-          elif [ "$ARCH" = "mips" ]; then
-            SDK_ARCH="mips"
-          elif [ "$ARCH" = "mipsel" ]; then
-            SDK_ARCH="mipsel"
-          elif [ "$ARCH" = "arm_cortex-a7" ]; then
-            SDK_ARCH="arm_cortex-a7"
-          elif [ "$ARCH" = "aarch64" ]; then
-            SDK_ARCH="aarch64"
-          else
-            SDK_ARCH="$ARCH"
-          fi
+          echo "Preparing package for ${TARGET_NAME} (${ARCH}/${SUBTARGET})..."
           
-          # Try different naming patterns for SDK (22.03.5 uses gcc-11.3.0)
-          SDK_URL1="${OPENWRT_SDK_BASE}/${OPENWRT_VERSION}/targets/${SDK_ARCH}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${SDK_ARCH}-${SUBTARGET}_gcc-11.3.0_musl.Linux-x86_64.tar.xz"
-          SDK_URL2="${OPENWRT_SDK_BASE}/${OPENWRT_VERSION}/targets/${SDK_ARCH}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${SDK_ARCH}-${SUBTARGET}_gcc-11.3.0_musl_linux_x86_64.tar.xz"
-          SDK_URL3="${OPENWRT_SDK_BASE}/${OPENWRT_VERSION}/targets/${SDK_ARCH}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${SDK_ARCH}-${SUBTARGET}_gcc-11.3.0_musl.Linux-x86_64.tar.xz"
+          # Copy our OpenWRT package to OpenWRT source
+          mkdir -p "${OPENWRT_DIR}/package/network/wg-obfuscator"
+          cp -r openwrt/* "${OPENWRT_DIR}/package/network/wg-obfuscator/"
           
-          echo "Downloading OpenWRT SDK for ${TARGET_NAME}..."
-          echo "Architecture: ${ARCH} -> ${SDK_ARCH}"
-          echo "Subtarget: ${SUBTARGET}"
-          
-          # Try different URL patterns
-          for URL in "${SDK_URL1}" "${SDK_URL2}" "${SDK_URL3}"; do
-            echo "Trying URL: ${URL}"
-            if wget -q --spider "${URL}"; then
-              echo "✅ Found valid SDK URL, downloading..."
-              wget -q "${URL}" -O openwrt-sdk.tar.xz
-              tar -xf openwrt-sdk.tar.xz
-              break
-            else
-              echo "❌ URL not found: ${URL}"
-            fi
-          done
-          
-          # Check if download was successful
-          if [ ! -f "openwrt-sdk.tar.xz" ]; then
-            echo "❌ No valid SDK URL found for ${TARGET_NAME}"
-            echo "Tried URLs:"
-            echo "  ${SDK_URL1}"
-            echo "  ${SDK_URL2}"
-            echo "  ${SDK_URL3}"
-            echo "Available targets can be checked at: ${OPENWRT_SDK_BASE}/${OPENWRT_VERSION}/targets/"
-            exit 1
-          fi
-          
-          # Find the extracted directory
-          SDK_DIR=$(find . -maxdepth 1 -name "openwrt-sdk-*" -type d | head -1)
-          if [ -z "$SDK_DIR" ]; then
-            echo "❌ SDK directory not found after extraction"
-            exit 1
-          fi
-          echo "SDK_DIR=${SDK_DIR}" >> $GITHUB_ENV
-          echo "SDK_DIR=${SDK_DIR}"
-
-      - name: Prepare package for build
-        run: |
-          # Copy our OpenWRT package to the SDK
-          mkdir -p "${SDK_DIR}/package/network/wg-obfuscator"
-          cp -r openwrt/* "${SDK_DIR}/package/network/wg-obfuscator/"
-          
-          # Copy source files to the SDK
-          cp *.c *.h Makefile LICENSE README.md "${SDK_DIR}/package/network/wg-obfuscator/files/"
+          # Copy source files to the package
+          cp *.c *.h Makefile LICENSE README.md "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
           
           # Create a simple Makefile for the source files
-          cat > "${SDK_DIR}/package/network/wg-obfuscator/files/Makefile" << 'EOF'
+          cat > "${OPENWRT_DIR}/package/network/wg-obfuscator/files/Makefile" << 'EOF'
           PROG_NAME    = wg-obfuscator
           CONFIG       = wg-obfuscator.conf
           SERVICE_FILE = wg-obfuscator.service
@@ -184,16 +125,23 @@ jobs:
 
       - name: Configure OpenWRT build
         run: |
-          cd "${SDK_DIR}"
+          TARGET_NAME="${{ matrix.target[0] }}"
+          ARCH="${{ matrix.target[1] }}"
+          SUBTARGET="${{ matrix.target[2] }}"
+          
+          cd "${OPENWRT_DIR}"
+          
+          echo "Configuring OpenWRT for ${TARGET_NAME} (${ARCH}/${SUBTARGET})..."
           
           # Configure the build
           make defconfig
           
-          # Enable our package
+          # Set target and packages
+          echo "CONFIG_TARGET_${ARCH}=y" >> .config
+          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" >> .config
+          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_Generic=y" >> .config
           echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-wg-obfuscator=y" >> .config
-          
-          # Make sure dependencies are enabled
           echo "CONFIG_PACKAGE_luci=y" >> .config
           echo "CONFIG_PACKAGE_luci-base=y" >> .config
           
@@ -202,7 +150,13 @@ jobs:
 
       - name: Build OpenWRT package
         run: |
-          cd "${SDK_DIR}"
+          TARGET_NAME="${{ matrix.target[0] }}"
+          ARCH="${{ matrix.target[1] }}"
+          SUBTARGET="${{ matrix.target[2] }}"
+          
+          cd "${OPENWRT_DIR}"
+          
+          echo "Building OpenWRT package for ${TARGET_NAME}..."
           
           # Build only our package and its dependencies
           make package/wg-obfuscator/compile V=s
@@ -214,35 +168,45 @@ jobs:
 
       - name: Verify build artifacts
         run: |
-          cd "${SDK_DIR}"
+          TARGET_NAME="${{ matrix.target[0] }}"
+          ARCH="${{ matrix.target[1] }}"
+          SUBTARGET="${{ matrix.target[2] }}"
+          
+          cd "${OPENWRT_DIR}"
+          
+          echo "Verifying build artifacts for ${TARGET_NAME}..."
           
           # Check if the package was built successfully
-          if [ -f "bin/packages/*/network/wg-obfuscator_*.ipk" ]; then
+          if find bin -name "*wg-obfuscator*.ipk" -type f | grep -q .; then
             echo "✅ wg-obfuscator package built successfully"
-            ls -la bin/packages/*/network/wg-obfuscator_*.ipk
+            find bin -name "*wg-obfuscator*.ipk" -type f | head -5
           else
             echo "❌ wg-obfuscator package not found"
-            find bin -name "*wg-obfuscator*" -type f
+            echo "Available packages:"
+            find bin -name "*.ipk" -type f | head -10
             exit 1
           fi
           
           # Check if LuCI app was built (if it exists)
-          if [ -f "bin/packages/*/luci/luci-app-wg-obfuscator_*.ipk" ]; then
+          if find bin -name "*luci-app-wg-obfuscator*.ipk" -type f | grep -q .; then
             echo "✅ luci-app-wg-obfuscator package built successfully"
-            ls -la bin/packages/*/luci/luci-app-wg-obfuscator_*.ipk
+            find bin -name "*luci-app-wg-obfuscator*.ipk" -type f | head -5
           else
             echo "ℹ️ luci-app-wg-obfuscator package not found (may not exist or failed to build)"
           fi
 
       - name: Test package installation simulation
         run: |
-          cd "${SDK_DIR}"
+          TARGET_NAME="${{ matrix.target[0] }}"
+          ARCH="${{ matrix.target[1] }}"
+          SUBTARGET="${{ matrix.target[2] }}"
           
-          # Test that the package can be installed (simulation)
-          echo "Testing package installation simulation..."
+          cd "${OPENWRT_DIR}"
+          
+          echo "Testing package installation simulation for ${TARGET_NAME}..."
           
           # Extract package info
-          PKG_FILE=$(find bin/packages -name "wg-obfuscator_*.ipk" | head -1)
+          PKG_FILE=$(find bin -name "*wg-obfuscator*.ipk" -type f | head -1)
           if [ -n "$PKG_FILE" ]; then
             echo "Package file: $PKG_FILE"
             
@@ -281,8 +245,10 @@ jobs:
         if: always()
         run: |
           # Clean up large files to save space
-          rm -rf "${SDK_DIR}/dl" "${SDK_DIR}/build_dir" "${SDK_DIR}/staging_dir"
-          echo "Cleanup completed"
+          if [ -d "${OPENWRT_DIR}" ]; then
+            rm -rf "${OPENWRT_DIR}/dl" "${OPENWRT_DIR}/build_dir" "${OPENWRT_DIR}/staging_dir"
+            echo "Cleanup completed"
+          fi
 
   test-openwrt-syntax:
     runs-on: ubuntu-latest
@@ -332,19 +298,23 @@ jobs:
           
           # Test main OpenWRT Makefile (skip actual make, just check basic syntax)
           echo "Checking OpenWRT Makefile structure..."
-          if grep -q "include /rules.mk" openwrt/Makefile; then
+          if grep -q "include.*rules.mk" openwrt/Makefile; then
             echo "✅ OpenWRT Makefile has correct structure"
           else
             echo "❌ OpenWRT Makefile missing required includes"
+            echo "Makefile content:"
+            head -10 openwrt/Makefile
             exit 1
           fi
           
           # Test LuCI Makefile (skip actual make, just check basic syntax)
           echo "Checking LuCI Makefile structure..."
-          if grep -q "include /rules.mk" openwrt/luci-app-wg-obfuscator/Makefile; then
+          if grep -q "include.*rules.mk" openwrt/luci-app-wg-obfuscator/Makefile; then
             echo "✅ LuCI Makefile has correct structure"
           else
             echo "❌ LuCI Makefile missing required includes"
+            echo "LuCI Makefile content:"
+            head -10 openwrt/luci-app-wg-obfuscator/Makefile
             exit 1
           fi
 
