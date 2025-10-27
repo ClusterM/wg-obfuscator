@@ -17,14 +17,14 @@ Table of Contents:
 - [Configuration](#configuration)
   - [Avoiding Routing Loops](#avoiding-routing-loops)
   - [Masking](#masking)
-  - [Two-way Mode](#two-way-mode)
-- [How to download, build and install](#how-to-download-build-and-install)
+  - [Two-way Mo- [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
+  - [OpenWRT](#openwrt)
   - [Running Docker container on Linux](#running-docker-container-on-linux)
-  - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
+  - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)rotik-routers-routeros-74)
 - [Caveats and recommendations](#caveats-and-recommendations)
 - [Download](#download)
 - [Credits](#credits)
@@ -452,12 +452,85 @@ Install the required packages, then run:
 ```sh
 make
 ```
-> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself, so it's required to use some additional tools if you want to install it as a system service.
+> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from### Android
+A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
 
-### macOS
-You can download ready-to-run binaries for both x64 and ARM versions of macOS.
+### OpenWRT
+WireGuard Obfuscator is available as an OpenWRT package with full UCI integration and optional LuCI web interface.
 
-To build Obfuscator from the source code just type:
+#### Installation
+1. **Add the package to your OpenWRT build:**
+   ```bash
+   # Copy the openwrt directory to your OpenWRT source
+   cp -r openwrt/ /path/to/openwrt/package/network/wg-obfuscator/
+   
+   # Build the package
+   make package/wg-obfuscator/compile
+   ```
+
+2. **Install via opkg (if package is available in your repository):**
+   ```bash
+   opkg update
+   opkg install wg-obfuscator
+   opkg install luci-app-wg-obfuscator  # Optional web interface
+   ```
+
+#### Configuration
+The package uses UCI (Unified Configuration Interface) for configuration:
+
+```bash
+# Enable the service
+uci set wg-obfuscator.main.enabled='1'
+
+# Configure basic settings
+uci set wg-obfuscator.main.source_lport='13255'
+uci set wg-obfuscator.main.target='your-server.com:13255'
+uci set wg-obfuscator.main.key='your-obfuscation-key'
+
+# Commit changes
+uci commit wg-obfuscator
+
+# Start the service
+/etc/init.d/wg-obfuscator start
+```
+
+#### Web Interface (LuCI)
+If you installed `luci-app-wg-obfuscator`, you can configure the obfuscator through the web interface:
+
+1. Go to **Network** → **WireGuard Obfuscator** in LuCI
+2. Configure your settings
+3. Save & Apply
+
+#### Service Management
+```bash
+# Start service
+/etc/init.d/wg-obfuscator start
+
+# Stop service
+/etc/init.d/wg-obfuscator stop
+
+# Restart service
+/etc/init.d/wg-obfuscator restart
+
+# Enable auto-start
+/etc/init.d/wg-obfuscator enable
+
+# Check status
+/etc/init.d/wg-obfuscator status
+```
+
+#### Supported Platforms
+The OpenWRT package supports 15+ architectures including:
+- x86_64, x86 (Intel/AMD)
+- ARM Cortex-A7, A9, A72 (various routers)
+- MIPS 24Kc, 74Kc (many home routers)
+- MIPS64, MIPS64el (high-end routers)
+- PowerPC (some enterprise routers)
+- RISC-V (newer architectures)
+
+For detailed information, see the [OpenWRT Integration Guide](openwrt/README-OPENWRT.md).
+
+### Running Docker Container on Linuxe just type:
 ```sh
 make
 ```

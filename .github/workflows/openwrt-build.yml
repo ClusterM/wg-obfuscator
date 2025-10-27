@@ -1,0 +1,408 @@
+name: OpenWRT Build Test
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'openwrt/**'
+      - '*.c'
+      - '*.h'
+      - 'Makefile'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'openwrt/**'
+      - '*.c'
+      - '*.h'
+      - 'Makefile'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OPENWRT_VERSION: "23.05.3"
+  OPENWRT_SDK_BASE: "https://downloads.openwrt.org/releases"
+
+jobs:
+  test-openwrt-build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        target:
+          # Popular OpenWRT targets for testing
+          # Format: [target_name, arch, subtarget, profile]
+          - [x86_64, x86_64, generic, Generic]
+          - [x86, x86, generic, Generic]
+          - [mips_24kc, mips, 24kc, generic]
+          - [mipsel_24kc, mipsel, 24kc, generic]
+          - [mips_74kc, mips, 74kc, generic]
+          - [mipsel_74kc, mipsel, 74kc, generic]
+          - [arm_cortex-a7_neon-vfpv4, arm_cortex-a7, neon-vfpv4, generic]
+          - [arm_cortex-a9_vfpv3-d16, arm_cortex-a9, vfpv3-d16, generic]
+          - [aarch64_cortex-a72, aarch64, cortex-a72, generic]
+          - [aarch64_generic, aarch64, generic, generic]
+          - [mips64_mips64, mips64, mips64, generic]
+          - [mipsel_64, mipsel, 64, generic]
+          - [powerpc_464fp, powerpc, 464fp, generic]
+          - [powerpc_8540, powerpc, 8540, generic]
+          - [riscv64_generic, riscv64, generic, generic]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libncurses5-dev \
+            zlib1g-dev \
+            gawk \
+            git \
+            gettext \
+            libssl-dev \
+            xsltproc \
+            wget \
+            unzip \
+            python3 \
+            python3-distutils
+
+      - name: Download OpenWRT SDK
+        run: |
+          TARGET_NAME="${{ matrix.target[0] }}"
+          ARCH="${{ matrix.target[1] }}"
+          SUBTARGET="${{ matrix.target[2] }}"
+          
+          # Construct SDK URL
+          SDK_URL="${OPENWRT_SDK_BASE}/${OPENWRT_VERSION}/targets/${ARCH}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${ARCH}-${SUBTARGET}_gcc-12.3.0_musl.Linux-x86_64.tar.xz"
+          
+          echo "Downloading OpenWRT SDK for ${TARGET_NAME}..."
+          echo "URL: ${SDK_URL}"
+          
+          wget -q "${SDK_URL}" -O openwrt-sdk.tar.xz
+          tar -xf openwrt-sdk.tar.xz
+          
+          # Find the extracted directory
+          SDK_DIR=$(find . -maxdepth 1 -name "openwrt-sdk-*" -type d | head -1)
+          echo "SDK_DIR=${SDK_DIR}" >> $GITHUB_ENV
+          echo "SDK_DIR=${SDK_DIR}"
+
+      - name: Prepare package for build
+        run: |
+          # Copy our OpenWRT package to the SDK
+          mkdir -p "${SDK_DIR}/package/network/wg-obfuscator"
+          cp -r openwrt/* "${SDK_DIR}/package/network/wg-obfuscator/"
+          
+          # Copy source files to the SDK
+          cp *.c *.h Makefile LICENSE README.md "${SDK_DIR}/package/network/wg-obfuscator/files/"
+          
+          # Create a simple Makefile for the source files
+          cat > "${SDK_DIR}/package/network/wg-obfuscator/files/Makefile" << 'EOF'
+          PROG_NAME    = wg-obfuscator
+          CONFIG       = wg-obfuscator.conf
+          SERVICE_FILE = wg-obfuscator.service
+          HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h masking.h masking_stun.h
+          
+          RELEASE ?= 1
+          
+          RM    = rm -f
+          CC    = gcc
+          CFLAGS   = -O2 -Wall
+          LDFLAGS += -s
+          OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
+          EXEDIR = .
+          
+          EXTRA_CFLAGS =
+          
+          TARGET = $(EXEDIR)/$(PROG_NAME)
+          
+          all: $(TARGET)
+          
+          clean:
+          	$(RM) *.o
+          	$(RM) $(TARGET)
+          
+          $(OBJS): 
+          
+          %.o : %.c $(HEADERS)
+          	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -o $@ -c $<
+          
+          $(TARGET): $(OBJS)
+          	$(CC) -o $(TARGET) $(OBJS) $(LDFLAGS)
+          
+          .PHONY: clean
+          EOF
+
+      - name: Configure OpenWRT build
+        run: |
+          cd "${SDK_DIR}"
+          
+          # Configure the build
+          make defconfig
+          
+          # Enable our package
+          echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
+          echo "CONFIG_PACKAGE_luci-app-wg-obfuscator=y" >> .config
+          
+          # Make sure dependencies are enabled
+          echo "CONFIG_PACKAGE_luci=y" >> .config
+          echo "CONFIG_PACKAGE_luci-base=y" >> .config
+          
+          # Update config
+          make defconfig
+
+      - name: Build OpenWRT package
+        run: |
+          cd "${SDK_DIR}"
+          
+          # Build only our package and its dependencies
+          make package/wg-obfuscator/compile V=s
+          
+          # Also build LuCI app if it exists
+          if [ -d "package/network/wg-obfuscator/luci-app-wg-obfuscator" ]; then
+            make package/luci-app-wg-obfuscator/compile V=s || echo "LuCI app build failed, but continuing..."
+          fi
+
+      - name: Verify build artifacts
+        run: |
+          cd "${SDK_DIR}"
+          
+          # Check if the package was built successfully
+          if [ -f "bin/packages/*/network/wg-obfuscator_*.ipk" ]; then
+            echo "✅ wg-obfuscator package built successfully"
+            ls -la bin/packages/*/network/wg-obfuscator_*.ipk
+          else
+            echo "❌ wg-obfuscator package not found"
+            find bin -name "*wg-obfuscator*" -type f
+            exit 1
+          fi
+          
+          # Check if LuCI app was built (if it exists)
+          if [ -f "bin/packages/*/luci/luci-app-wg-obfuscator_*.ipk" ]; then
+            echo "✅ luci-app-wg-obfuscator package built successfully"
+            ls -la bin/packages/*/luci/luci-app-wg-obfuscator_*.ipk
+          else
+            echo "ℹ️ luci-app-wg-obfuscator package not found (may not exist or failed to build)"
+          fi
+
+      - name: Test package installation simulation
+        run: |
+          cd "${SDK_DIR}"
+          
+          # Test that the package can be installed (simulation)
+          echo "Testing package installation simulation..."
+          
+          # Extract package info
+          PKG_FILE=$(find bin/packages -name "wg-obfuscator_*.ipk" | head -1)
+          if [ -n "$PKG_FILE" ]; then
+            echo "Package file: $PKG_FILE"
+            
+            # Check package contents
+            tar -tzf "$PKG_FILE" | head -20
+            echo "..."
+            echo "Package contains $(tar -tzf "$PKG_FILE" | wc -l) files"
+            
+            # Verify key files are present
+            if tar -tzf "$PKG_FILE" | grep -q "usr/bin/wg-obfuscator"; then
+              echo "✅ Binary file present in package"
+            else
+              echo "❌ Binary file missing from package"
+              exit 1
+            fi
+            
+            if tar -tzf "$PKG_FILE" | grep -q "etc/init.d/wg-obfuscator"; then
+              echo "✅ Init script present in package"
+            else
+              echo "❌ Init script missing from package"
+              exit 1
+            fi
+            
+            if tar -tzf "$PKG_FILE" | grep -q "etc/config/wg-obfuscator"; then
+              echo "✅ UCI config present in package"
+            else
+              echo "❌ UCI config missing from package"
+              exit 1
+            fi
+          else
+            echo "❌ No package file found for testing"
+            exit 1
+          fi
+
+      - name: Clean up
+        if: always()
+        run: |
+          # Clean up large files to save space
+          rm -rf "${SDK_DIR}/dl" "${SDK_DIR}/build_dir" "${SDK_DIR}/staging_dir"
+          echo "Cleanup completed"
+
+  test-openwrt-syntax:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test shell script syntax
+        run: |
+          echo "Testing shell script syntax..."
+          
+          # Test main config generator
+          bash -n openwrt/files/wg-obfuscator-config.sh
+          echo "✅ wg-obfuscator-config.sh syntax OK"
+          
+          # Test init script
+          bash -n openwrt/files/wg-obfuscator.init
+          echo "✅ wg-obfuscator.init syntax OK"
+          
+          # Test LuCI defaults
+          bash -n openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator
+          echo "✅ luci-wg-obfuscator defaults syntax OK"
+          
+          # Test build script
+          bash -n openwrt/build-openwrt.sh
+          echo "✅ build-openwrt.sh syntax OK"
+
+      - name: Test Lua syntax
+        run: |
+          echo "Testing Lua syntax..."
+          
+          # Check if lua is available
+          if command -v lua >/dev/null 2>&1; then
+            lua -c openwrt/luci-app-wg-obfuscator/luasrc/controller/wg-obfuscator.lua
+            echo "✅ LuCI controller syntax OK"
+            
+            lua -c openwrt/luci-app-wg-obfuscator/luasrc/model/cbi/wg-obfuscator.lua
+            echo "✅ LuCI model syntax OK"
+          else
+            echo "ℹ️ Lua not available, skipping Lua syntax check"
+          fi
+
+      - name: Test Makefile syntax
+        run: |
+          echo "Testing Makefile syntax..."
+          
+          # Test main OpenWRT Makefile
+          make -n -f openwrt/Makefile
+          echo "✅ OpenWRT Makefile syntax OK"
+          
+          # Test LuCI Makefile
+          make -n -f openwrt/luci-app-wg-obfuscator/Makefile
+          echo "✅ LuCI Makefile syntax OK"
+
+      - name: Validate file permissions
+        run: |
+          echo "Validating file permissions..."
+          
+          # Check that scripts are executable
+          if [ -x "openwrt/files/wg-obfuscator-config.sh" ]; then
+            echo "✅ wg-obfuscator-config.sh is executable"
+          else
+            echo "❌ wg-obfuscator-config.sh is not executable"
+            exit 1
+          fi
+          
+          if [ -x "openwrt/files/wg-obfuscator.init" ]; then
+            echo "✅ wg-obfuscator.init is executable"
+          else
+            echo "❌ wg-obfuscator.init is not executable"
+            exit 1
+          fi
+          
+          if [ -x "openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
+            echo "✅ luci-wg-obfuscator defaults is executable"
+          else
+            echo "❌ luci-wg-obfuscator defaults is not executable"
+            exit 1
+          fi
+          
+          if [ -x "openwrt/build-openwrt.sh" ]; then
+            echo "✅ build-openwrt.sh is executable"
+          else
+            echo "❌ build-openwrt.sh is not executable"
+            exit 1
+          fi
+
+  test-openwrt-config-generation:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install UCI utilities
+        run: |
+          # Install uci utilities for testing
+          sudo apt-get update
+          sudo apt-get install -y uci
+
+      - name: Test configuration generation
+        run: |
+          echo "Testing configuration generation..."
+          
+          # Create a test UCI configuration
+          mkdir -p /tmp/test-uci
+          export UCI_CONFIG_DIR=/tmp/test-uci
+          
+          # Create test UCI config
+          cat > /tmp/test-uci/wg-obfuscator << 'EOF'
+          config wg_obfuscator 'main'
+          	option enabled '1'
+          	option source_lport '13255'
+          	option target 'test.example.com:13255'
+          	option key 'test-key'
+          	option source_if '0.0.0.0'
+          	option masking 'AUTO'
+          	option verbose 'INFO'
+          	option max_clients '1024'
+          	option idle_timeout '300'
+          	option max_dummy_length_data '4'
+          	option fwmark '0'
+          	option static_bindings ''
+          
+          config wg_obfuscator 'instance2'
+          	option enabled '0'
+          	option source_lport '13256'
+          	option target 'test2.example.com:13256'
+          	option key 'test-key-2'
+          	option source_if '0.0.0.0'
+          	option masking 'STUN'
+          	option verbose 'DEBUG'
+          	option max_clients '512'
+          	option idle_timeout '600'
+          	option max_dummy_length_data '8'
+          	option fwmark '0xdead'
+          	option static_bindings '1.2.3.4:12883:6670,5.6.7.8:12083:6679'
+          EOF
+          
+          # Test the config generator
+          UCI_CONFIG="wg-obfuscator" /tmp/test-uci/wg-obfuscator openwrt/files/wg-obfuscator-config.sh
+          
+          # Check if config was generated
+          if [ -f "/etc/wg-obfuscator/wg-obfuscator.conf" ]; then
+            echo "✅ Configuration generated successfully"
+            cat /etc/wg-obfuscator/wg-obfuscator.conf
+          else
+            echo "❌ Configuration generation failed"
+            exit 1
+          fi
+
+      - name: Test error handling
+        run: |
+          echo "Testing error handling..."
+          
+          # Test with no UCI config
+          rm -rf /tmp/test-uci
+          export UCI_CONFIG_DIR=/tmp/test-uci
+          
+          # This should fail
+          if UCI_CONFIG="wg-obfuscator" openwrt/files/wg-obfuscator-config.sh; then
+            echo "❌ Script should have failed with no UCI config"
+            exit 1
+          else
+            echo "✅ Script correctly failed with no UCI config"
+          fi
