@@ -96,6 +96,9 @@ jobs:
           
           echo "Configuring OpenWRT for ${TARGET_NAME} (${ARCH}/${SUBTARGET})..."
           
+          # Clean previous configuration
+          rm -f .config
+          
           # Configure the build
           make defconfig
           
@@ -103,6 +106,9 @@ jobs:
           echo "CONFIG_TARGET_${ARCH}=y" >> .config
           echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" >> .config
           echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_Generic=y" >> .config
+          
+          # Force specific target selection
+          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_DEVICE_generic=y" >> .config
           
           # Enable our packages
           echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
@@ -141,6 +147,13 @@ jobs:
           
           # Update config
           make defconfig
+          
+          # Verify configuration
+          echo "Verifying OpenWRT configuration..."
+          echo "Target architecture: ${ARCH}"
+          echo "Target subtarget: ${SUBTARGET}"
+          grep "CONFIG_TARGET_${ARCH}=y" .config || echo "WARNING: Target architecture not set correctly"
+          grep "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" .config || echo "WARNING: Target subtarget not set correctly"
 
       - name: Build OpenWRT package
         run: |
@@ -185,8 +198,10 @@ jobs:
           find . -name "*.ipk" -type f | head -10
           
           # Check if the package was built successfully
-          if find . -name "*wg-obfuscator*.ipk" -type f | grep -q .; then
+          PKG_FOUND=$(find . -name "*wg-obfuscator*.ipk" -type f | head -1)
+          if [ -n "$PKG_FOUND" ]; then
             echo "✅ wg-obfuscator package built successfully"
+            echo "Package: $PKG_FOUND"
             find . -name "*wg-obfuscator*.ipk" -type f | head -5
           else
             echo "❌ wg-obfuscator package not found"
