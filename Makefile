@@ -91,17 +91,6 @@ ifeq ($(OS),Windows_NT)
 endif
 	$(RM) $(TARGET)
 
-# OpenWRT build target
-openwrt:
-	@echo "Building for OpenWRT..."
-	@if [ ! -d "openwrt" ]; then \
-		echo "OpenWRT directory not found. Please ensure you have the openwrt/ directory with Makefile"; \
-		exit 1; \
-	fi
-	@echo "OpenWRT package files are ready in the openwrt/ directory"
-	@echo "To build the OpenWRT package, copy the openwrt/ directory to your OpenWRT build system"
-	@echo "and run: make package/wg-obfuscator/compile"
-
 $(OBJS): 
 
 %.o : %.c $(HEADERS)
