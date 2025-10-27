@@ -9,8 +9,6 @@ PROG="/usr/bin/wg-obfuscator"
 CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
 CONFIG_GENERATOR="/usr/libexec/wg-obfuscator-config.sh"
 
-enabled_count=0
-
 check_enabled() {
     local enabled
     config_get enabled "$1" enabled "0"
