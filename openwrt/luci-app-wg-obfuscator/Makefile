@@ -41,8 +41,8 @@ define Package/luci-app-wg-obfuscator/install
 	
 	# Install translations if they exist
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
-	@if [ -f ./po/zh-cn/wg-obfuscator.po ] && command -v po2lmo >/dev/null 2>&1; then \
-		po2lmo ./po/zh-cn/wg-obfuscator.po $(1)/usr/lib/lua/luci/i18n/wg-obfuscator.zh-cn.lmo; \
+	@if [ -f ./po/ru/wg-obfuscator.po ] && command -v po2lmo >/dev/null 2>&1; then \
+		po2lmo ./po/ru/wg-obfuscator.po $(1)/usr/lib/lua/luci/i18n/wg-obfuscator.ru.lmo; \
 	fi
 endef
 

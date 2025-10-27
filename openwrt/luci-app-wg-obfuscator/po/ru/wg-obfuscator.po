@@ -1,0 +1,175 @@
+# Russian translation for WireGuard Obfuscator LuCI application
+# Copyright (C) 2025 WireGuard Obfuscator
+# This file is distributed under the same license as the wg-obfuscator package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wg-obfuscator 1.5\n"
+"POT-Creation-Date: 2025-10-27 18:00+0000\n"
+"PO-Revision-Date: 2025-10-27 18:00+0000\n"
+"Last-Translator: AI Assistant\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+# Main configuration page
+msgid "WireGuard Obfuscator Configuration"
+msgstr "Настройка WireGuard Obfuscator"
+
+msgid "Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."
+msgstr "Настройка экземпляров WireGuard Obfuscator для обфускации WireGuard трафика."
+
+msgid "Instances"
+msgstr "Экземпляры"
+
+msgid "Configure individual obfuscator instances. Each instance can have different settings."
+msgstr "Настройка отдельных экземпляров обфускатора. Каждый экземпляр может иметь свои параметры."
+
+# Enable/Disable
+msgid "Enable"
+msgstr "Включить"
+
+msgid "Enable this instance"
+msgstr "Включить этот экземпляр"
+
+# Network settings
+msgid "Source Port"
+msgstr "Исходящий порт"
+
+msgid "Local port to listen for incoming connections"
+msgstr "Локальный порт для входящих соединений"
+
+msgid "Target"
+msgstr "Целевой сервер"
+
+msgid "Target server in format host:port"
+msgstr "Целевой сервер в формате хост:порт"
+
+msgid "Source Interface"
+msgstr "Исходящий интерфейс"
+
+msgid "Interface to bind to (0.0.0.0 for all interfaces)"
+msgstr "Интерфейс для привязки (0.0.0.0 для всех интерфейсов)"
+
+# Security settings
+msgid "Obfuscation Key"
+msgstr "Ключ обфускации"
+
+msgid "Key used for obfuscation (must be the same on both sides)"
+msgstr "Ключ для обфускации (должен совпадать на обеих сторонах)"
+
+msgid "Masking Type"
+msgstr "Тип маскировки"
+
+msgid "Protocol masking for DPI evasion"
+msgstr "Маскировка протокола для обхода DPI"
+
+msgid "None"
+msgstr "Нет"
+
+msgid "Auto-detect"
+msgstr "Автоопределение"
+
+msgid "STUN"
+msgstr "STUN"
+
+# Logging settings
+msgid "Log Level"
+msgstr "Уровень логирования"
+
+msgid "Verbosity level for logging"
+msgstr "Уровень детализации логов"
+
+msgid "Errors only"
+msgstr "Только ошибки"
+
+msgid "Warnings"
+msgstr "Предупреждения"
+
+msgid "Info"
+msgstr "Информация"
+
+msgid "Debug"
+msgstr "Отладка"
+
+msgid "Trace"
+msgstr "Трассировка"
+
+# Advanced settings
+msgid "Max Clients"
+msgstr "Макс. клиентов"
+
+msgid "Maximum number of concurrent clients"
+msgstr "Максимальное количество одновременных клиентов"
+
+msgid "Idle Timeout"
+msgstr "Таймаут простоя"
+
+msgid "Idle timeout in seconds"
+msgstr "Таймаут простоя в секундах"
+
+msgid "Max Dummy Data"
+msgstr "Макс. пустых данных"
+
+msgid "Maximum dummy data length for packets"
+msgstr "Максимальная длина пустых данных в пакетах"
+
+msgid "Firewall Mark"
+msgstr "Метка фаервола"
+
+msgid "Firewall mark for packets (0 to disable)"
+msgstr "Метка фаервола для пакетов (0 для отключения)"
+
+msgid "Static Bindings"
+msgstr "Статические привязки"
+
+msgid "Static bindings for two-way mode (format: ip:port:localport, comma-separated)"
+msgstr "Статические привязки для двустороннего режима (формат: ip:порт:локальный_порт, через запятую)"
+
+# Service status template
+msgid "Service Status"
+msgstr "Состояние сервиса"
+
+msgid "Running"
+msgstr "Работает"
+
+msgid "Stopped"
+msgstr "Остановлен"
+
+msgid "Configuration"
+msgstr "Конфигурация"
+
+msgid "Exists"
+msgstr "Существует"
+
+msgid "Not found"
+msgstr "Не найдена"
+
+msgid "Enabled instances"
+msgstr "Включено экземпляров"
+
+# Control buttons template
+msgid "Restart Service"
+msgstr "Перезапустить сервис"
+
+msgid "Refresh Status"
+msgstr "Обновить статус"
+
+msgid "Processing..."
+msgstr "Обработка..."
+
+msgid "Action completed successfully"
+msgstr "Действие выполнено успешно"
+
+msgid "Action failed"
+msgstr "Действие не выполнено"
+
+msgid "Connection error"
+msgstr "Ошибка соединения"
+
+msgid "Restart WireGuard Obfuscator service?"
+msgstr "Перезапустить сервис WireGuard Obfuscator?"
+
