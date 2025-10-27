@@ -106,21 +106,27 @@ jobs:
           # Clean previous configuration
           rm -f .config
           
-          # Configure the build with specific target
-          make defconfig TARGET_${ARCH}=y SUBTARGET=${SUBTARGET}
+          # Configure the build
+          make defconfig
           
-          # Enable our package
+          # Set target and packages
+          echo "CONFIG_TARGET_${ARCH}=y" >> .config
+          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" >> .config
+          echo "CONFIG_TARGET_${ARCH}_${SUBTARGET}_Generic=y" >> .config
           echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
           
           # Update config
           make defconfig
           
-          # Verify configuration
-          echo "Verifying OpenWRT configuration..."
-          echo "Target architecture: ${ARCH}"
-          echo "Target subtarget: ${SUBTARGET}"
-          grep "CONFIG_TARGET_${ARCH}=y" .config || echo "WARNING: Target architecture not set correctly"
-          grep "CONFIG_TARGET_${ARCH}_${SUBTARGET}=y" .config || echo "WARNING: Target subtarget not set correctly"
+          # Debug: Show what was actually configured
+          echo "=== OpenWRT Configuration Debug ==="
+          echo "Requested ARCH: ${ARCH}"
+          echo "Requested SUBTARGET: ${SUBTARGET}"
+          echo "Actual TARGET:"
+          grep "CONFIG_TARGET.*=y" .config | head -5
+          echo "Our package enabled:"
+          grep "CONFIG_PACKAGE_wg-obfuscator" .config
+          echo "=== End Debug ==="
 
       - name: Build OpenWRT package
         run: |
@@ -138,6 +144,14 @@ jobs:
           
           # Build only our package without dependencies first
           echo "Building wg-obfuscator package (no dependencies)..."
+          echo "=== Build Debug ==="
+          echo "Current directory: $(pwd)"
+          echo "Package directory exists:"
+          ls -la package/network/wg-obfuscator/
+          echo "Source files:"
+          ls -la package/network/wg-obfuscator/files/
+          echo "=== End Build Debug ==="
+          
           make package/wg-obfuscator/compile V=s -j$(nproc) IGNORE_ERRORS=1 || echo "Package build failed, checking what we have..."
           
           # Try to build LuCI app if it exists
