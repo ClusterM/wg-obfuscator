@@ -240,7 +240,7 @@ cd openwrt
 
 ## License
 
-This OpenWRT integration is released under the same license as the main project (GPL-2.0).
+This OpenWRT integration is released under the same license as the main project (GPL-3.0).
 
 ## Support
 

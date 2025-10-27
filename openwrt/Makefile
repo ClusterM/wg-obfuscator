@@ -1,7 +1,7 @@
 #
-# Copyright (C) 2024 WireGuard Obfuscator
+# Copyright (C) 2025 WireGuard Obfuscator
 #
-# This is free software, licensed under the GNU General Public License v2.
+# This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.
 #
 
@@ -16,7 +16,7 @@ PKG_SOURCE_URL:=file://$(CURDIR)/files/
 PKG_HASH:=skip
 
 PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
-PKG_LICENSE:=GPL-2.0
+PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=LICENSE
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
