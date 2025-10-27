@@ -65,8 +65,8 @@ jobs:
       - name: Clone OpenWRT
         run: |
           echo "Cloning OpenWRT repository..."
-          git clone https://github.com/openwrt/openwrt.git
-          cd openwrt
+          git clone https://github.com/openwrt/openwrt.git openwrt-source
+          cd openwrt-source
           git checkout v22.03.5
           echo "OPENWRT_DIR=$(pwd)" >> $GITHUB_ENV
           echo "OpenWRT cloned successfully"
