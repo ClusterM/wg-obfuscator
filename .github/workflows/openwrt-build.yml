@@ -180,7 +180,6 @@ jobs:
           make defconfig
 
       - name: Build OpenWRT package
-        timeout-minutes: 30
         run: |
           TARGET_NAME="${{ matrix.target[0] }}"
           ARCH="${{ matrix.target[1] }}"
@@ -192,16 +191,16 @@ jobs:
           
           # First, build the toolchain (this is required)
           echo "Building toolchain..."
-          timeout 15m make toolchain/compile -j$(nproc) || echo "Toolchain build failed or timed out, trying to continue..."
+          make toolchain/compile -j$(nproc) || echo "Toolchain build failed, trying to continue..."
           
           # Build only our package without dependencies first
           echo "Building wg-obfuscator package (no dependencies)..."
-          timeout 10m make package/wg-obfuscator/compile V=s -j$(nproc) IGNORE_ERRORS=1 || echo "Package build failed or timed out, checking what we have..."
+          make package/wg-obfuscator/compile V=s -j$(nproc) IGNORE_ERRORS=1 || echo "Package build failed, checking what we have..."
           
           # Try to build LuCI app if it exists
           if [ -d "package/network/wg-obfuscator/luci-app-wg-obfuscator" ]; then
             echo "Building LuCI app (no dependencies)..."
-            timeout 5m make package/luci-app-wg-obfuscator/compile V=s -j$(nproc) IGNORE_ERRORS=1 || echo "LuCI app build failed or timed out, but continuing..."
+            make package/luci-app-wg-obfuscator/compile V=s -j$(nproc) IGNORE_ERRORS=1 || echo "LuCI app build failed, but continuing..."
           fi
           
           # Show what we managed to build
