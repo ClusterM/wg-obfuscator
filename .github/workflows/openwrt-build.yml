@@ -89,9 +89,19 @@ jobs:
           # Create source archive for OpenWRT
           echo "Creating source archive..."
           cd "${OPENWRT_DIR}/package/network/wg-obfuscator/files/"
-          tar -czf wg-obfuscator-1.5.tar.gz *.c *.h Makefile LICENSE README.md
+          
+          # Create proper directory structure for OpenWRT
+          mkdir -p wg-obfuscator-1.5
+          cp *.c *.h Makefile LICENSE README.md wg-obfuscator-1.5/
+          
+          # Create archive with proper directory structure
+          tar -czf wg-obfuscator-1.5.tar.gz wg-obfuscator-1.5/
           echo "Source archive created: wg-obfuscator-1.5.tar.gz"
           ls -la wg-obfuscator-1.5.tar.gz
+          
+          # Verify archive contents
+          echo "Archive contents:"
+          tar -tzf wg-obfuscator-1.5.tar.gz | head -10
 
       - name: Configure OpenWRT build
         run: |
