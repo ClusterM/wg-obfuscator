@@ -1,12 +1,6 @@
 #!/bin/sh
 # LuCI defaults for WireGuard Obfuscator
 
-# Set default permissions for LuCI access
-uci -q batch <<EOF
-set luci.main.mediaurlbase='/luci-static/bootstrap'
-set luci.main.lang='en'
-EOF
-
 # Ensure wg-obfuscator UCI configuration exists
 if ! uci -q show wg-obfuscator >/dev/null 2>&1; then
     # Create default UCI configuration if it doesn't exist
@@ -28,6 +22,6 @@ EOF
 fi
 
 # Commit changes
-uci commit luci
+uci commit wg-obfuscator
 
 exit 0
