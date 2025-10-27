@@ -17,13 +17,14 @@ Table of Contents:
 - [Configuration](#configuration)
   - [Avoiding Routing Loops](#avoiding-routing-loops)
   - [Masking](#masking)
-  - [Two-way Mo- [How to download, build and install](#how-to-download-build-and-install)
+  - [Two-way Mode](#two-way-mode)
+- [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Android](#android)
   - [Running Docker container on Linux](#running-docker-container-on-linux)
-  - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)rotik-routers-routeros-74)
+  - [Running Docker container on MikroTik Routers](#running-docker-container-on-mikrotik-routers-routeros-74)
 - [Caveats and recommendations](#caveats-and-recommendations)
 - [Download](#download)
 - [Credits](#credits)
@@ -451,10 +452,12 @@ Install the required packages, then run:
 ```sh
 make
 ```
-> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from### Android
-A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
+> **Note:** On Windows, the obfuscator is only available as a command-line application. You need to run it from the terminal and manage startup yourself, so it's required to use some additional tools if you want to install it as a system service.
 
-### Running Docker Container on Linuxe just type:
+### macOS
+You can download ready-to-run binaries for both x64 and ARM versions of macOS.
+
+To build Obfuscator from the source code just type:
 ```sh
 make
 ```
@@ -692,3 +695,4 @@ https://github.com/ClusterM/wg-obfuscator/releases
 * [Sber](https://messenger.online.sberbank.ru/sl/Lnb2OLE4JsyiEhQgC)
 * [Donation Alerts](https://www.donationalerts.com/r/clustermeerkat)
 * [Boosty](https://boosty.to/cluster)
+
