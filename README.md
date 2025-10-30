@@ -177,7 +177,7 @@ Additional arguments for advanced users:
   Maximum number of clients. This is the maximum number of clients that can be connected to the obfuscator at the same time. If the limit is reached, new clients will be rejected. Optional, default is `1024`.
 * `-l <timeout>` or `--idle-timeout=<timeout>`  
   Maximum idle timeout in seconds. This is the maximum time in seconds that a client can be idle before it is disconnected. If the client does not send any packets for this time, it will be disconnected. Optional, default is `300` seconds (5 minutes).
-* `-d <length>` or `--max-dummy-length-data=<length>`  
+* `-d <length>` or `--max-dummy=<length>`  
   Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. Used to obfuscate traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added. Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
 
 You can use the `--config` argument to specify a configuration file, which allows you to set all these parameters in the `key=value` format. For example:
