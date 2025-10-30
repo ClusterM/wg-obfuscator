@@ -15,7 +15,7 @@ set wg-obfuscator.main.masking='AUTO'
 set wg-obfuscator.main.verbose='INFO'
 set wg-obfuscator.main.max_clients='1024'
 set wg-obfuscator.main.idle_timeout='300'
-set wg-obfuscator.main.max_dummy_length_data='4'
+set wg-obfuscator.main.max_dummy='4'
 set wg-obfuscator.main.fwmark='0'
 set wg-obfuscator.main.static_bindings=''
 EOF

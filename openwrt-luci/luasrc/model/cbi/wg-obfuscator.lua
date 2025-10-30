@@ -4,12 +4,17 @@ local sys = require "luci.sys"
 m = Map("wg-obfuscator", translate("WireGuard Obfuscator Configuration"), 
     translate("Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."))
 
+-- Add custom CSS and JavaScript
+m:append(Template("wg-obfuscator/css"))
+m:append(Template("wg-obfuscator/js"))
+
 -- Instance configuration
 s = m:section(TypedSection, "wg_obfuscator", translate("Instances"), 
     translate("Configure individual obfuscator instances. Each instance can have different settings."))
-s.template = "cbi/tblsection"
 s.addremove = true
 s.anonymous = false
+s.addbtntitle = translate("Add instance")
+s.nametitle = translate("Name")
 
 -- Enable flag for each instance
 enabled = s:option(Flag, "enabled", translate("Enable"), translate("Enable this instance"))
@@ -63,15 +68,10 @@ idle_timeout = s:option(Value, "idle_timeout", translate("Idle Timeout"),
 idle_timeout.datatype = "uinteger"
 idle_timeout.default = "300"
 
-max_dummy_length_data = s:option(Value, "max_dummy_length_data", translate("Max Dummy Data"), 
-    translate("Maximum dummy data length for packets"))
-max_dummy_length_data.datatype = "uinteger"
-max_dummy_length_data.default = "4"
-
-fwmark = s:option(Value, "fwmark", translate("Firewall Mark"), 
-    translate("Firewall mark for packets (0 to disable)"))
-fwmark.datatype = "uinteger"
-fwmark.default = "0"
+max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"), 
+    translate("Maximum length of dummy bytes for data packets (0-255)"))
+max_dummy.datatype = "uinteger"
+max_dummy.default = "4"
 
 static_bindings = s:option(TextValue, "static_bindings", translate("Static Bindings"), 
     translate("Static bindings for two-way mode (format: ip:port:localport, comma-separated)"))

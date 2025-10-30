@@ -53,6 +53,11 @@ define Package/luci-app-wg-obfuscator/install
 	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-wg-obfuscator.json $(1)/usr/share/rpcd/acl.d/
 	
+	# Install CSS and JavaScript
+	$(INSTALL_DIR) $(1)/www/luci-static/resources
+	$(INSTALL_DATA) ./htdocs/luci-static/resources/wg-obfuscator.css $(1)/www/luci-static/resources/
+	$(INSTALL_DATA) ./htdocs/luci-static/resources/wg-obfuscator.js $(1)/www/luci-static/resources/
+	
 	# Install translations if they exist
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
 	@if [ -f ./po/ru/wg-obfuscator.po ] && command -v po2lmo >/dev/null 2>&1; then \

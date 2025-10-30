@@ -129,12 +129,12 @@ generate_instance_config() {
     fi
     echo "idle-timeout = $idle_timeout"
     
-    local max_dummy_length_data=$(get_uci_value "$section" "max_dummy_length_data" "4")
-    if [ "$max_dummy_length_data" -lt 0 ] || [ "$max_dummy_length_data" -gt 255 ] 2>/dev/null; then
-        echo "WARNING: Invalid max-dummy-length-data value for section '$section', using default 4" >&2
-        max_dummy_length_data=4
+    local max_dummy=$(get_uci_value "$section" "max_dummy" "4")
+    if [ "$max_dummy" -lt 0 ] || [ "$max_dummy" -gt 255 ] 2>/dev/null; then
+        echo "WARNING: Invalid max-dummy value for section '$section', using default 4" >&2
+        max_dummy=4
     fi
-    echo "max-dummy-length-data = $max_dummy_length_data"
+    echo "max-dummy = $max_dummy"
     
     local fwmark=$(get_uci_value "$section" "fwmark" "0")
     if [ "$fwmark" != "0" ]; then

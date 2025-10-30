@@ -61,7 +61,7 @@ The service uses UCI (Unified Configuration Interface) for configuration. All se
 - `verbose` - Log level (ERRORS, WARNINGS, INFO, DEBUG, TRACE)
 - `max_clients` - Maximum number of clients
 - `idle_timeout` - Idle timeout in seconds
-- `max_dummy_length_data` - Maximum dummy data length
+- `max_dummy` - Maximum length of dummy bytes for data packets
 - `fwmark` - Firewall mark (0 to disable)
 - `static_bindings` - Static bindings for two-way mode
 
