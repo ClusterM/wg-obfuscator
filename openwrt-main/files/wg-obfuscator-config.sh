@@ -169,7 +169,7 @@ fi
     done
 } > "$CONFIG_FILE"
 
-if [ $? -eq 0 ]; then
+if [ -s "$CONFIG_FILE" ]; then
     echo "Configuration generated: $CONFIG_FILE"
 else
     echo "Failed to generate configuration file"

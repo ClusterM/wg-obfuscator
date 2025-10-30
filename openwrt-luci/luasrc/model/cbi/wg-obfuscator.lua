@@ -70,7 +70,7 @@ idle_timeout.default = "300"
 
 max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"), 
     translate("Maximum dummy data length for packets (0-255)"))
-max_dummy.datatype = "uinteger"
+max_dummy.datatype = "range(0,255)"
 max_dummy.default = "4"
 
 static_bindings = s:option(TextValue, "static_bindings", translate("Static Bindings"), 

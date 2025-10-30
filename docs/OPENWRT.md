@@ -201,8 +201,10 @@ cat /etc/wg-obfuscator/wg-obfuscator.conf
 
 ### Prerequisites
 
+> **Note:** The example below downloads the SDK for **x86/64 target** (PC routers). If your router uses a different target (e.g., `ipq40xx`, `ramips`, `ath79`), download the appropriate SDK from [OpenWrt Downloads](https://downloads.openwrt.org/releases/23.05.5/targets/) for your device's target/subtarget.
+
 ```bash
-# Install OpenWrt SDK
+# Install OpenWrt SDK (x86/64 target example)
 wget https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
 tar xf openwrt-sdk-*.tar.xz
 cd openwrt-sdk-*
