@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2025 WireGuard Obfuscator
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
 #
 # This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.
@@ -17,7 +17,7 @@ PKG_SOURCE_DATE:=2025-09-21
 PKG_SOURCE_VERSION:=0b547e964ea47541c7ebca57bd7359e5511ea485
 PKG_MIRROR_HASH:=skip
 
-PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
+PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
 PKG_LICENSE:=GPL-3.0
 PKG_LICENSE_FILES:=LICENSE
 

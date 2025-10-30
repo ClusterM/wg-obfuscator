@@ -1,5 +1,7 @@
 #!/bin/bash
 # Build script for wg-obfuscator OpenWrt package
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Licensed under GPLv3
 
 set -e
 

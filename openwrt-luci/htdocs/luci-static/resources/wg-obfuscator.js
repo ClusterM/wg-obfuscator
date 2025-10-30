@@ -1,4 +1,6 @@
 // Custom JavaScript for WireGuard Obfuscator LuCI app
+// Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+// Licensed under GPLv3
 
 (function() {
     'use strict';

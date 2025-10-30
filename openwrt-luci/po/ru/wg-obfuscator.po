@@ -1,5 +1,5 @@
 # Russian translation for WireGuard Obfuscator LuCI application
-# Copyright (C) 2025 WireGuard Obfuscator
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
 # This file is distributed under the same license as the wg-obfuscator package.
 #
 msgid ""

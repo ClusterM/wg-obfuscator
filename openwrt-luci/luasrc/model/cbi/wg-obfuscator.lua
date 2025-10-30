@@ -1,3 +1,7 @@
+-- WireGuard Obfuscator LuCI Configuration
+-- Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+-- Licensed under GPLv3
+
 local fs = require "nixio.fs"
 local sys = require "luci.sys"
 

@@ -1,7 +1,7 @@
 #
-# Copyright (C) 2024 WireGuard Obfuscator
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
 #
-# This is free software, licensed under the GNU General Public License v2.
+# This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.
 #
 
@@ -11,8 +11,8 @@ PKG_NAME:=luci-app-wg-obfuscator
 PKG_VERSION:=1.5
 PKG_RELEASE:=1
 
-PKG_MAINTAINER:=Cluster <cluster@cluster.wtf>
-PKG_LICENSE:=GPL-2.0
+PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
+PKG_LICENSE:=GPL-3.0
 
 include $(INCLUDE_DIR)/package.mk
 

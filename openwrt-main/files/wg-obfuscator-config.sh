@@ -1,6 +1,8 @@
 #!/bin/sh
 # WireGuard Obfuscator Configuration Generator
 # This script generates wg-obfuscator.conf from UCI configuration
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Licensed under GPLv3
 
 CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
 UCI_CONFIG="wg-obfuscator"

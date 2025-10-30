@@ -1,4 +1,6 @@
 /* Custom CSS for WireGuard Obfuscator LuCI app - minimal styling */
+/* Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf> */
+/* Licensed under GPLv3 */
 
 /* Style Delete button to make it red and visible */
 .cbi-section-remove input[type="submit"],
