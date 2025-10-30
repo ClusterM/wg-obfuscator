@@ -1,5 +1,5 @@
 *.exe
-wg-obfuscator
+/wg-obfuscator
 *.o
 *.dll
 *dump

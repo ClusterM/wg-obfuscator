@@ -1,0 +1,75 @@
+<%
+-- WireGuard Obfuscator LuCI Status Display Template
+-- Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+-- Licensed under GPLv3
+-- Status display template for WireGuard Obfuscator
+local sys = require "luci.sys"
+local util = require "luci.util"
+
+-- Check if service is running
+local running = sys.call("pgrep -f '/usr/bin/wg-obfuscator' >/dev/null 2>&1") == 0
+
+-- Check if config exists
+local config_exists = nixio.fs.access("/etc/wg-obfuscator/wg-obfuscator.conf")
+
+-- Count enabled instances
+local enabled_count = 0
+local uci = require "luci.model.uci".cursor()
+uci:foreach("wg-obfuscator", "wg_obfuscator", function(s)
+    if s.enabled == "1" then
+        enabled_count = enabled_count + 1
+    end
+end)
+%>
+
+<style>
+.wg-obfuscator-status {
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+.status-running {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.status-stopped {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+.indicator-running {
+    background-color: #28a745;
+}
+.indicator-stopped {
+    background-color: #dc3545;
+}
+</style>
+
+<div class="wg-obfuscator-status <%= running and 'status-running' or 'status-stopped' %>">
+    <strong><%:Service Status%>:</strong>
+    <span class="status-indicator <%= running and 'indicator-running' or 'indicator-stopped' %>"></span>
+    <% if running then %>
+        <span><%:Running%></span>
+    <% else %>
+        <span><%:Stopped%></span>
+    <% end %>
+    <br/>
+    <small>
+        <%:Configuration%>: 
+        <% if config_exists then %>
+            <span style="color: green;">✓ <%:Exists%></span>
+        <% else %>
+            <span style="color: red;">✗ <%:Not found%></span>
+        <% end %>
+        | <%:Enabled instances%>: <%= enabled_count %>
+    </small>
+</div>
+
