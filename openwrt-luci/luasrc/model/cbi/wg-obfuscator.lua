@@ -69,7 +69,7 @@ idle_timeout.datatype = "uinteger"
 idle_timeout.default = "300"
 
 max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"), 
-    translate("Maximum length of dummy bytes for data packets (0-255)"))
+    translate("Maximum dummy data length for packets (0-255)"))
 max_dummy.datatype = "uinteger"
 max_dummy.default = "4"
 
