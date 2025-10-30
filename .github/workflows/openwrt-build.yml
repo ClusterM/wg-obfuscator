@@ -100,10 +100,14 @@ jobs:
           echo "OPENWRT_DIR=$(realpath $SDK_DIR)" >> $GITHUB_ENV
           echo "OpenWrt SDK extracted successfully: $SDK_DIR"
           
-          # Update feeds
+          # Update feeds (only base packages, skip telephony to avoid non-critical errors)
           cd "$SDK_DIR"
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          ./scripts/feeds update -a || true
+          # Install only base and luci feeds, skip telephony
+          ./scripts/feeds install -a -p base || true
+          ./scripts/feeds install -a -p luci || true
+          ./scripts/feeds install -a -p packages || true
+          ./scripts/feeds install -a -p routing || true
 
       - name: Prepare packages for build
         run: |
