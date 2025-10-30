@@ -1,0 +1,185 @@
+#!/bin/sh
+# WireGuard Obfuscator Configuration Generator
+# This script generates wg-obfuscator.conf from UCI configuration
+# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Licensed under GPLv3
+
+CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
+UCI_CONFIG="wg-obfuscator"
+
+# Allow override of UCI config directory for testing
+if [ -n "$UCI_CONFIG_DIR" ]; then
+    export UCI_CONFIG_DIR
+fi
+
+# Function to get UCI value with default
+get_uci_value() {
+    local section="$1"
+    local option="$2"
+    local default="$3"
+    
+    local value=$(uci -q get "${UCI_CONFIG}.${section}.${option}")
+    if [ -z "$value" ]; then
+        echo "$default"
+    else
+        echo "$value"
+    fi
+}
+
+
+# Function to validate port number
+validate_port() {
+    local port="$1"
+    if [ -z "$port" ]; then
+        return 1
+    fi
+    if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ] 2>/dev/null; then
+        echo "ERROR: Invalid port number: $port (must be 1-65535)" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Function to validate target format (host:port)
+validate_target() {
+    local target="$1"
+    if [ -z "$target" ]; then
+        echo "ERROR: Target cannot be empty" >&2
+        return 1
+    fi
+    if ! echo "$target" | grep -qE '^.+:[0-9]+$'; then
+        echo "ERROR: Invalid target format: $target (expected host:port)" >&2
+        return 1
+    fi
+    local port=$(echo "$target" | sed 's/.*://')
+    validate_port "$port" || return 1
+    return 0
+}
+
+# Function to validate key
+validate_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        echo "ERROR: Obfuscation key cannot be empty" >&2
+        return 1
+    fi
+    if [ ${#key} -lt 4 ]; then
+        echo "WARNING: Key is very short (less than 4 characters)" >&2
+    fi
+    return 0
+}
+
+# Function to generate config for a single instance
+generate_instance_config() {
+    local section="$1"
+    local enabled=$(get_uci_value "$section" "enabled" "0")
+    
+    if [ "$enabled" = "0" ]; then
+        return 0
+    fi
+    
+    echo "[$section]"
+    
+    local source_if=$(get_uci_value "$section" "source_if" "0.0.0.0")
+    if [ "$source_if" != "0.0.0.0" ]; then
+        echo "source-if = $source_if"
+    fi
+    
+    local source_lport=$(get_uci_value "$section" "source_lport" "13255")
+    if ! validate_port "$source_lport"; then
+        echo "ERROR: Invalid source port for section '$section', skipping" >&2
+        return 1
+    fi
+    echo "source-lport = $source_lport"
+    
+    local target=$(get_uci_value "$section" "target" "10.13.1.100:13255")
+    if ! validate_target "$target"; then
+        echo "ERROR: Invalid target for section '$section', skipping" >&2
+        return 1
+    fi
+    echo "target = $target"
+    
+    local key=$(get_uci_value "$section" "key" "test")
+    if ! validate_key "$key"; then
+        echo "ERROR: Invalid key for section '$section', skipping" >&2
+        return 1
+    fi
+    echo "key = $key"
+    
+    local masking=$(get_uci_value "$section" "masking" "AUTO")
+    echo "masking = $masking"
+    
+    local static_bindings=$(get_uci_value "$section" "static_bindings" "")
+    if [ -n "$static_bindings" ]; then
+        # Normalize CRLF/whitespace, drop empty lines, join with single comma
+        static_bindings=$(printf "%s\n" "$static_bindings" \
+            | sed 's/\r//g' \
+            | awk 'BEGIN{FS="\n"} {gsub(/^ +| +$/,"",$0)} NF{a[++n]=$0} END{for(i=1;i<=n;i++){printf "%s%s", (i>1?",":""), a[i]}}')
+        if [ -n "$static_bindings" ]; then
+            echo "static-bindings = $static_bindings"
+        fi
+    fi
+    
+    local verbose=$(get_uci_value "$section" "verbose" "INFO")
+    echo "verbose = $verbose"
+    
+    local max_clients=$(get_uci_value "$section" "max_clients" "1024")
+    if [ "$max_clients" -lt 1 ] || [ "$max_clients" -gt 65535 ] 2>/dev/null; then
+        echo "WARNING: Invalid max-clients value for section '$section', using default 1024" >&2
+        max_clients=1024
+    fi
+    echo "max-clients = $max_clients"
+    
+    local idle_timeout=$(get_uci_value "$section" "idle_timeout" "300")
+    if [ "$idle_timeout" -lt 0 ] 2>/dev/null; then
+        echo "WARNING: Invalid idle-timeout value for section '$section', using default 300" >&2
+        idle_timeout=300
+    fi
+    echo "idle-timeout = $idle_timeout"
+    
+    local max_dummy=$(get_uci_value "$section" "max_dummy" "4")
+    if [ "$max_dummy" -lt 0 ] || [ "$max_dummy" -gt 255 ] 2>/dev/null; then
+        echo "WARNING: Invalid max-dummy value for section '$section', using default 4" >&2
+        max_dummy=4
+    fi
+    echo "max-dummy = $max_dummy"
+    
+    local fwmark=$(get_uci_value "$section" "fwmark" "0")
+    if [ "$fwmark" != "0" ]; then
+        echo "fwmark = $fwmark"
+    fi
+    
+    echo ""
+}
+
+# Create config directory if it doesn't exist
+mkdir -p "$(dirname "$CONFIG_FILE")"
+
+# Check if UCI configuration exists before generating
+# Only get sections of type wg_obfuscator
+sections=$(uci -q show "$UCI_CONFIG" | grep "^$UCI_CONFIG\.[^.]*=wg_obfuscator$" | cut -d. -f2 | cut -d= -f1 | sort -u)
+
+if [ -z "$sections" ]; then
+    echo "No UCI configuration found"
+    exit 1
+fi
+
+# Generate configuration file
+{
+    echo "# WireGuard Obfuscator Configuration"
+    echo "# Generated from UCI configuration on $(date)"
+    echo "# Do not edit this file manually - use UCI instead"
+    echo ""
+    
+    # Generate config for each section
+    for section in $sections; do
+        generate_instance_config "$section"
+    done
+} > "$CONFIG_FILE"
+
+if [ -s "$CONFIG_FILE" ]; then
+    echo "Configuration generated: $CONFIG_FILE"
+else
+    echo "Failed to generate configuration file"
+    exit 1
+fi

@@ -1,0 +1,33 @@
+/* Custom CSS for WireGuard Obfuscator LuCI app - minimal styling */
+/* Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf> */
+/* Licensed under GPLv3 */
+
+/* Style Delete button to make it red and visible */
+.cbi-section-remove input[type="submit"],
+.cbi-button-remove {
+    background-color: #dc3545 !important;
+    color: white !important;
+    border: 1px solid #dc3545 !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+
+.cbi-section-remove input[type="submit"]:hover,
+.cbi-button-remove:hover {
+    background-color: #c82333 !important;
+    border-color: #c82333 !important;
+}
+
+/* Add horizontal line after each instance */
+.cbi-section-node,
+fieldset.cbi-section {
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+/* Remove border from last section before "Add" button */
+.cbi-section-create {
+    border-top: none !important;
+}

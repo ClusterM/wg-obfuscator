@@ -1,0 +1,16 @@
+{
+	"admin/services/wg-obfuscator": {
+		"title": "WireGuard Obfuscator",
+		"order": 60,
+		"action": {
+			"type": "cbi",
+			"path": "wg-obfuscator",
+			"post": { "cbi.submit": true }
+		},
+		"depends": {
+			"acl": [ "luci-app-wg-obfuscator" ],
+			"fs": { "/usr/bin/wg-obfuscator": "executable" }
+		}
+	}
+}
+

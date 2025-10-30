@@ -1,0 +1,72 @@
+<%
+-- WireGuard Obfuscator LuCI Control Buttons Template
+-- Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+-- Licensed under GPLv3
+-- Control buttons template for WireGuard Obfuscator
+local sys = require "luci.sys"
+local dispatcher = require "luci.dispatcher"
+%>
+
+<style>
+.wg-obfuscator-buttons {
+    margin: 10px 0;
+}
+.wg-obfuscator-buttons input[type="button"] {
+    margin-right: 10px;
+    padding: 5px 15px;
+}
+</style>
+
+<script type="text/javascript">
+    function wgObfuscatorAction(action) {
+        var btn = event.target;
+        btn.disabled = true;
+        btn.value = "<%:Processing...%>";
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '<%=url("admin/network/wg-obfuscator")%>/' + action, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    alert("<%:Action completed successfully%>");
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    alert("<%:Action failed%>");
+                    btn.disabled = false;
+                    btn.value = btn.getAttribute('data-original-value');
+                }
+            } else {
+                alert("<%:Connection error%>");
+                btn.disabled = false;
+                btn.value = btn.getAttribute('data-original-value');
+            }
+        };
+        xhr.onerror = function() {
+            alert("<%:Connection error%>");
+            btn.disabled = false;
+            btn.value = btn.getAttribute('data-original-value');
+        };
+        xhr.send();
+    }
+    
+    function wgObfuscatorRestart() {
+        if (confirm("<%:Restart WireGuard Obfuscator service?%>")) {
+            wgObfuscatorAction('restart');
+        }
+    }
+</script>
+
+<div class="wg-obfuscator-buttons">
+    <input type="button" class="cbi-button cbi-button-apply" 
+           value="<%:Restart Service%>" 
+           data-original-value="<%:Restart Service%>"
+           onclick="wgObfuscatorRestart()" />
+    
+    <input type="button" class="cbi-button cbi-button-reload" 
+           value="<%:Refresh Status%>" 
+           onclick="window.location.reload()" />
+</div>
+
