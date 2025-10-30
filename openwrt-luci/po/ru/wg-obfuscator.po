@@ -179,3 +179,28 @@ msgstr "Ошибка соединения"
 msgid "Restart WireGuard Obfuscator service?"
 msgstr "Перезапустить сервис WireGuard Obfuscator?"
 
+# Validation messages
+msgid "Target cannot be empty"
+msgstr "Целевой сервер не может быть пустым"
+
+msgid "Invalid format. Expected: host:port (e.g., example.com:51820)"
+msgstr "Неверный формат. Ожидается: хост:порт (например, example.com:51820)"
+
+msgid "Host cannot be empty"
+msgstr "Хост не может быть пустым"
+
+msgid "Invalid port. Must be between 1 and 65535"
+msgstr "Неверный порт. Должен быть от 1 до 65535"
+
+msgid "Invalid format. Expected: ip:port:localport"
+msgstr "Неверный формат. Ожидается: ip:порт:локальный_порт"
+
+msgid "Invalid IP address: "
+msgstr "Неверный IP адрес: "
+
+msgid "Invalid remote port: "
+msgstr "Неверный удалённый порт: "
+
+msgid "Invalid local port: "
+msgstr "Неверный локальный порт: "
+
