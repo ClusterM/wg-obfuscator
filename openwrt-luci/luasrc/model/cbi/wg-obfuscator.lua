@@ -74,9 +74,9 @@ max_dummy.datatype = "range(0,255)"
 max_dummy.default = "4"
 
 static_bindings = s:option(TextValue, "static_bindings", translate("Static Bindings"), 
-    translate("Static bindings for two-way mode (format: ip:port:localport, comma-separated)"))
+    translate("Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."))
 static_bindings.rows = 3
-static_bindings.placeholder = "1.2.3.4:12883:6670, 5.6.7.8:12083:6679"
+static_bindings.placeholder = "1.2.3.4:12883:6670\n5.6.7.8:12083:6679"
 
 -- Service Status and Control
 s2 = m:section(SimpleSection)

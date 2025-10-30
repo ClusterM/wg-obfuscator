@@ -103,13 +103,21 @@ uci commit wg-obfuscator
 
 For bidirectional obfuscation (when both ends need to accept connections):
 
+**Via LuCI:** Enter each binding on a separate line in the "Static Bindings" text area:
+```
+1.2.3.4:12883:6670
+5.6.7.8:12083:6679
+```
+
+**Via UCI:** Use newlines or commas to separate multiple bindings:
 ```bash
-uci set wg-obfuscator.main.static_bindings='1.2.3.4:12883:6670,5.6.7.8:12083:6679'
+uci set wg-obfuscator.main.static_bindings='1.2.3.4:12883:6670
+5.6.7.8:12083:6679'
 uci commit wg-obfuscator
 /etc/init.d/wg-obfuscator restart
 ```
 
-Format: `remote_ip:remote_port:local_port` (comma-separated for multiple bindings)
+Format: `remote_ip:remote_port:local_port` (one per line or comma-separated)
 
 See the main README for detailed explanation of two-way mode.
 

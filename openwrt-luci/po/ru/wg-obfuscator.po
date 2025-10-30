@@ -28,6 +28,12 @@ msgstr "Экземпляры"
 msgid "Configure individual obfuscator instances. Each instance can have different settings."
 msgstr "Настройка отдельных экземпляров обфускатора. Каждый экземпляр может иметь свои параметры."
 
+msgid "Add instance"
+msgstr "Добавить экземпляр"
+
+msgid "Name"
+msgstr "Имя"
+
 # Enable/Disable
 msgid "Enable"
 msgstr "Включить"
@@ -114,8 +120,8 @@ msgstr "Таймаут простоя в секундах"
 msgid "Max Dummy Data"
 msgstr "Макс. пустых данных"
 
-msgid "Maximum dummy data length for packets"
-msgstr "Максимальная длина пустых данных в пакетах"
+msgid "Maximum dummy data length for packets (0-255)"
+msgstr "Максимальная длина пустых данных в пакетах (0-255)"
 
 msgid "Firewall Mark"
 msgstr "Метка фаервола"
@@ -126,8 +132,8 @@ msgstr "Метка фаервола для пакетов (0 для отключ
 msgid "Static Bindings"
 msgstr "Статические привязки"
 
-msgid "Static bindings for two-way mode (format: ip:port:localport, comma-separated)"
-msgstr "Статические привязки для двустороннего режима (формат: ip:порт:локальный_порт, через запятую)"
+msgid "Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."
+msgstr "Статические привязки для двустороннего режима. Вводите каждую привязку как ip:порт:локальный_порт, по одной на строку."
 
 # Service status template
 msgid "Service Status"

@@ -109,6 +109,8 @@ generate_instance_config() {
     
     local static_bindings=$(get_uci_value "$section" "static_bindings" "")
     if [ -n "$static_bindings" ]; then
+        # Convert newlines to commas for the config file format
+        static_bindings=$(echo "$static_bindings" | tr '\n' ',' | sed 's/,*$//' | sed 's/,,*/,/g')
         echo "static-bindings = $static_bindings"
     fi
     
