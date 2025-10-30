@@ -111,9 +111,13 @@ generate_instance_config() {
     
     local static_bindings=$(get_uci_value "$section" "static_bindings" "")
     if [ -n "$static_bindings" ]; then
-        # Convert newlines to commas for the config file format
-        static_bindings=$(echo "$static_bindings" | tr '\n' ',' | sed 's/,*$//' | sed 's/,,*/,/g')
-        echo "static-bindings = $static_bindings"
+        # Normalize CRLF/whitespace, drop empty lines, join with single comma
+        static_bindings=$(printf "%s\n" "$static_bindings" \
+            | sed 's/\r//g' \
+            | awk 'BEGIN{FS="\n"} {gsub(/^ +| +$/,"",$0)} NF{a[++n]=$0} END{for(i=1;i<=n;i++){printf "%s%s", (i>1?",":""), a[i]}}')
+        if [ -n "$static_bindings" ]; then
+            echo "static-bindings = $static_bindings"
+        fi
     fi
     
     local verbose=$(get_uci_value "$section" "verbose" "INFO")
