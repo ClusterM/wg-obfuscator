@@ -1,0 +1,24 @@
+{
+	"luci-app-wg-obfuscator": {
+		"description": "Grant access to WireGuard Obfuscator configuration",
+		"read": {
+			"uci": [ "wg-obfuscator" ],
+			"file": {
+				"/etc/wg-obfuscator/*": [ "read" ],
+				"/usr/bin/wg-obfuscator": [ "exec" ]
+			}
+		},
+		"write": {
+			"uci": [ "wg-obfuscator" ],
+			"file": {
+				"/etc/wg-obfuscator/*": [ "write" ]
+			},
+			"ubus": {
+				"file": [ "exec" ],
+				"service": [ "list", "event" ]
+			},
+			"cgi-io": [ "exec" ]
+		}
+	}
+}
+

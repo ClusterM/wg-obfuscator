@@ -24,17 +24,6 @@ get_uci_value() {
     fi
 }
 
-# Function to convert verbose level
-convert_verbose_level() {
-    case "$1" in
-        "ERRORS") echo "0" ;;
-        "WARNINGS") echo "1" ;;
-        "INFO") echo "2" ;;
-        "DEBUG") echo "3" ;;
-        "TRACE") echo "4" ;;
-        *) echo "2" ;;
-    esac
-}
 
 # Function to validate port number
 validate_port() {
@@ -124,8 +113,7 @@ generate_instance_config() {
     fi
     
     local verbose=$(get_uci_value "$section" "verbose" "INFO")
-    local verbose_level=$(convert_verbose_level "$verbose")
-    echo "verbose = $verbose_level"
+    echo "verbose = $verbose"
     
     local max_clients=$(get_uci_value "$section" "max_clients" "1024")
     if [ "$max_clients" -lt 1 ] || [ "$max_clients" -gt 65535 ] 2>/dev/null; then

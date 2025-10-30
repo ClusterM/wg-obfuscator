@@ -43,6 +43,13 @@ define Package/wg-obfuscator/conffiles
 /etc/wg-obfuscator/wg-obfuscator.conf
 endef
 
+define Package/wg-obfuscator/postinst
+#!/bin/sh
+[ -z "$${IPKG_INSTROOT}" ] || exit 0
+echo "Done."
+exit 0
+endef
+
 define Build/Configure
 endef
 

@@ -21,12 +21,19 @@ define Package/luci-app-wg-obfuscator
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
   TITLE:=LuCI interface for WireGuard Obfuscator
-  DEPENDS:=+wg-obfuscator +luci-base
+  DEPENDS:=+wg-obfuscator +luci-base +luci-compat
   PKGARCH:=all
 endef
 
 define Package/luci-app-wg-obfuscator/description
   LuCI web interface for WireGuard Obfuscator configuration and management.
+endef
+
+define Package/luci-app-wg-obfuscator/postinst
+#!/bin/sh
+[ -z "$${IPKG_INSTROOT}" ] || exit 0
+echo "Done."
+exit 0
 endef
 
 define Build/Compile
@@ -38,6 +45,13 @@ define Package/luci-app-wg-obfuscator/install
 	
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./root/etc/uci-defaults/luci-wg-obfuscator $(1)/etc/uci-defaults/
+	
+	# Install menu and ACL for ucode LuCI
+	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
+	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-wg-obfuscator.json $(1)/usr/share/luci/menu.d/
+	
+	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
+	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-wg-obfuscator.json $(1)/usr/share/rpcd/acl.d/
 	
 	# Install translations if they exist
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
