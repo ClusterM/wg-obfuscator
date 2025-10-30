@@ -1,20 +1,28 @@
-# WireGuard Obfuscator for OpenWRT
+# WireGuard Obfuscator for OpenWrt
 
-This directory contains the OpenWRT package files for WireGuard Obfuscator.
+This directory contains the OpenWrt package files for WireGuard Obfuscator.
 
 ## Files
 
-- `Makefile` - OpenWRT package Makefile
+- `Makefile` - OpenWrt package Makefile
 - `files/wg-obfuscator.config` - UCI configuration template
-- `files/wg-obfuscator.init` - OpenWRT init script
+- `files/wg-obfuscator.init` - OpenWrt init script
 - `files/wg-obfuscator.conf` - Example configuration file
 - `files/wg-obfuscator-config.sh` - Script to generate config from UCI
+- `build.sh` - Build script for this package
 
 ## Building
 
-To build this package for OpenWRT:
+### Using the build script:
 
-1. Copy the `openwrt/` directory to your OpenWRT build system
+```bash
+export OPENWRT_BUILD_DIR=~/openwrt-sdk
+./openwrt-main/build.sh
+```
+
+### Manual build:
+
+1. Copy this directory to your OpenWrt SDK
 2. Place it in `package/network/wg-obfuscator/`
 3. Run: `make package/wg-obfuscator/compile`
 
@@ -24,6 +32,7 @@ After building and installing the package:
 
 1. Configure the service using UCI:
    ```bash
+   uci set wg-obfuscator.main=wg_obfuscator
    uci set wg-obfuscator.main.enabled=1
    uci set wg-obfuscator.main.source_lport=13255
    uci set wg-obfuscator.main.target=your-server.com:13255
@@ -34,10 +43,6 @@ After building and installing the package:
 2. Start the service:
    ```bash
    /etc/init.d/wg-obfuscator start
-   ```
-
-3. Enable auto-start:
-   ```bash
    /etc/init.d/wg-obfuscator enable
    ```
 
@@ -65,11 +70,13 @@ The service uses UCI (Unified Configuration Interface) for configuration. All se
 You can configure multiple instances by creating additional sections:
 
 ```bash
+uci set wg-obfuscator.instance2=wg_obfuscator
 uci set wg-obfuscator.instance2.enabled=1
 uci set wg-obfuscator.instance2.source_lport=13256
 uci set wg-obfuscator.instance2.target=another-server.com:13256
 uci set wg-obfuscator.instance2.key=another-key
 uci commit wg-obfuscator
+/etc/init.d/wg-obfuscator restart
 ```
 
 ## Service Management
@@ -88,13 +95,9 @@ View logs using:
 logread | grep wg-obfuscator
 ```
 
-## Configuration Generation
+## LuCI Web Interface
 
-The actual configuration file (`/etc/wg-obfuscator/wg-obfuscator.conf`) is automatically generated from UCI settings. You can regenerate it manually:
-
-```bash
-/usr/libexec/wg-obfuscator-config.sh
-```
+For web-based configuration, install the optional `luci-app-wg-obfuscator` package from the `openwrt-luci/` directory.
 
 ## Notes
 

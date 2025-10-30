@@ -1,17 +1,19 @@
-name: OpenWRT Build Test
+name: OpenWrt Build Test
 
 on:
   push:
     branches: [ master ]
     paths:
-      - 'openwrt/**'
+      - 'openwrt-main/**'
+      - 'openwrt-luci/**'
       - '*.c'
       - '*.h'
       - 'Makefile'
   pull_request:
     branches: [ master ]
     paths:
-      - 'openwrt/**'
+      - 'openwrt-main/**'
+      - 'openwrt-luci/**'
       - '*.c'
       - '*.h'
       - 'Makefile'
@@ -31,7 +33,7 @@ jobs:
     strategy:
       matrix:
         target:
-          # Popular OpenWRT targets for testing
+          # Popular OpenWrt targets for testing
           # Format: [name, target, subtarget]
           - [x86_64, x86, 64]
           - [ramips_mt7621, ramips, mt7621]
@@ -76,12 +78,12 @@ jobs:
             python3-dev \
             swig
 
-      - name: Clone OpenWRT SDK
+      - name: Clone OpenWrt SDK
         run: |
           TARGET="${{ matrix.target[1] }}"
           SUBTARGET="${{ matrix.target[2] }}"
           
-          echo "Downloading OpenWRT SDK for ${TARGET}/${SUBTARGET}..."
+          echo "Downloading OpenWrt SDK for ${TARGET}/${SUBTARGET}..."
           
           # Use SDK instead of full source for faster builds
           SDK_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}_gcc-12.3.0_musl.Linux-x86_64.tar.xz"
@@ -96,50 +98,67 @@ jobs:
           tar -xf sdk.tar.xz
           SDK_DIR=$(find . -maxdepth 1 -type d -name "openwrt-sdk-*" | head -1)
           echo "OPENWRT_DIR=$(realpath $SDK_DIR)" >> $GITHUB_ENV
-          echo "OpenWRT SDK extracted successfully: $SDK_DIR"
+          echo "OpenWrt SDK extracted successfully: $SDK_DIR"
           
           # Update feeds
           cd "$SDK_DIR"
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Prepare package for build
+      - name: Prepare packages for build
         run: |
           TARGET_NAME="${{ matrix.target[0] }}"
           
-          echo "Preparing wg-obfuscator package for ${TARGET_NAME}..."
+          echo "Preparing wg-obfuscator packages for ${TARGET_NAME}..."
           
-          # Copy our OpenWRT package to SDK
-          mkdir -p "${OPENWRT_DIR}/package/network/wg-obfuscator"
-          cp -r openwrt/Makefile "${OPENWRT_DIR}/package/network/wg-obfuscator/"
-          cp -r openwrt/files "${OPENWRT_DIR}/package/network/wg-obfuscator/"
+          # Create parent directories
+          mkdir -p "${OPENWRT_DIR}/package/network"
+          mkdir -p "${OPENWRT_DIR}/package/luci"
           
-          # Copy LuCI app if present
-          if [ -d "openwrt/luci-app-wg-obfuscator" ]; then
-            cp -r openwrt/luci-app-wg-obfuscator "${OPENWRT_DIR}/package/network/wg-obfuscator/"
+          # Create symlink for main package
+          echo "Creating symlink for main package..."
+          ln -sf "$(pwd)/openwrt-main" "${OPENWRT_DIR}/package/network/wg-obfuscator"
+          
+          echo "Main package structure:"
+          ls -la "${OPENWRT_DIR}/package/network/wg-obfuscator/"
+          
+          # Create symlink for LuCI app
+          if [ -d "openwrt-luci" ]; then
+            echo "Creating symlink for LuCI app..."
+            ln -sf "$(pwd)/openwrt-luci" "${OPENWRT_DIR}/package/luci/luci-app-wg-obfuscator"
+            
+            echo "LuCI app structure:"
+            ls -la "${OPENWRT_DIR}/package/luci/luci-app-wg-obfuscator/"
           fi
           
-          echo "Package structure created:"
-          ls -la "${OPENWRT_DIR}/package/network/wg-obfuscator/"
+          # Make scripts executable
+          chmod +x openwrt-main/files/wg-obfuscator.init
+          chmod +x openwrt-main/files/wg-obfuscator-config.sh
 
-      - name: Configure OpenWRT build
+      - name: Configure OpenWrt build
         run: |
           cd "${OPENWRT_DIR}"
           
-          echo "Configuring OpenWRT..."
+          echo "Configuring OpenWrt..."
           
-          # Enable our package
+          # Enable our packages
           echo "CONFIG_PACKAGE_wg-obfuscator=y" >> .config
+          
+          # Enable LuCI app if present
+          if [ -d "package/luci/luci-app-wg-obfuscator" ]; then
+            echo "CONFIG_PACKAGE_luci-app-wg-obfuscator=y" >> .config
+          fi
           
           # Update config
           make defconfig
           
           # Debug: Show configuration
           echo "=== Configuration ==="
-          grep "CONFIG_PACKAGE_wg-obfuscator" .config || echo "Package not found in config!"
+          grep "CONFIG_PACKAGE_wg-obfuscator" .config || echo "Packages not found in config!"
+          grep "CONFIG_PACKAGE_luci-app-wg-obfuscator" .config || echo "LuCI app not in config (may be optional)"
           echo "=== End Configuration ==="
 
-      - name: Build OpenWRT package
+      - name: Build OpenWrt packages
         run: |
           TARGET_NAME="${{ matrix.target[0] }}"
           
@@ -147,9 +166,9 @@ jobs:
           
           echo "Building wg-obfuscator package for ${TARGET_NAME}..."
           
-          # Build only our package (install is not a separate target, .ipk is created during compile)
+          # Build main package (install is not a separate target, .ipk is created during compile)
           make package/wg-obfuscator/{clean,download,prepare,compile} V=s CONFIG_PACKAGE_wg-obfuscator=y -j$(nproc) || {
-            echo "Build failed, checking logs..."
+            echo "Main package build failed, checking logs..."
             if [ -d "logs" ]; then
               find logs -name "*.log" -type f 2>/dev/null | head -5 | xargs tail -50 2>/dev/null || true
             fi
@@ -157,6 +176,23 @@ jobs:
             find build_dir -name "wg-obfuscator" -type f 2>/dev/null | head -5
             exit 1
           }
+          
+          echo "✅ Main package built successfully!"
+          
+          # Build LuCI app if present
+          if [ -d "package/luci/luci-app-wg-obfuscator" ]; then
+            echo "Building LuCI app for ${TARGET_NAME}..."
+            make package/luci-app-wg-obfuscator/{clean,compile} V=s CONFIG_PACKAGE_luci-app-wg-obfuscator=y -j$(nproc) || {
+              echo "⚠️  LuCI app build failed (non-critical)"
+            }
+            
+            # Check if built
+            if find bin/packages -name "luci-app-wg-obfuscator*.ipk" -type f | head -1 | grep -q .; then
+              echo "✅ LuCI app built successfully!"
+            else
+              echo "⚠️  LuCI app was not built (this is optional)"
+            fi
+          fi
           
           echo "Build completed!"
 
@@ -167,11 +203,20 @@ jobs:
           cd "${OPENWRT_DIR}"
           
           echo "Verifying build artifacts for ${TARGET_NAME}..."
+          echo ""
           
-          # Find built package
-          PKG_FILE=$(find bin/packages -name "wg-obfuscator*.ipk" -type f | head -1)
+          # Find all built packages
+          echo "=== Built packages ==="
+          find bin/packages -name "*wg-obfuscator*.ipk" -type f | while read pkg; do
+            echo "  - $pkg ($(du -h "$pkg" | cut -f1))"
+          done
+          echo ""
+          
+          # Find main package
+          PKG_FILE=$(find bin/packages -name "wg-obfuscator_*.ipk" -type f | head -1)
           
           if [ -n "$PKG_FILE" ]; then
+            echo "=== Main package verification ==="
             echo "✅ wg-obfuscator package built successfully"
             echo "Package: $PKG_FILE"
             ls -lh "$PKG_FILE"
@@ -214,6 +259,37 @@ jobs:
             find build_dir -name "wg-obfuscator" -type f | head -5
             exit 1
           fi
+          
+          echo ""
+          
+          # Verify LuCI package if present
+          LUCI_PKG_FILE=$(find bin/packages -name "luci-app-wg-obfuscator*.ipk" -type f | head -1)
+          if [ -n "$LUCI_PKG_FILE" ]; then
+            echo "=== LuCI app verification ==="
+            echo "✅ luci-app-wg-obfuscator package built successfully"
+            echo "Package: $LUCI_PKG_FILE"
+            ls -lh "$LUCI_PKG_FILE"
+            
+            echo ""
+            echo "Files in LuCI package:"
+            tar -xzOf "$LUCI_PKG_FILE" ./data.tar.gz | tar -tz | grep "luci" | head -20
+            
+            # Verify key LuCI files
+            if tar -xzOf "$LUCI_PKG_FILE" ./data.tar.gz | tar -tz | grep -q "luci/controller/wg-obfuscator.lua"; then
+              echo "✅ LuCI controller present in package"
+            else
+              echo "⚠️  LuCI controller missing from package"
+            fi
+            
+            if tar -xzOf "$LUCI_PKG_FILE" ./data.tar.gz | tar -tz | grep -q "luci/model/cbi/wg-obfuscator.lua"; then
+              echo "✅ LuCI CBI model present in package"
+            else
+              echo "⚠️  LuCI CBI model missing from package"
+            fi
+          else
+            echo "=== LuCI app ==="
+            echo "ℹ️  LuCI app was not built (this is optional)"
+          fi
 
       - name: Clean up
         if: always()
@@ -236,20 +312,23 @@ jobs:
           echo "Testing shell script syntax..."
           
           # Test main config generator
-          bash -n openwrt/files/wg-obfuscator-config.sh
+          bash -n openwrt-main/files/wg-obfuscator-config.sh
           echo "✅ wg-obfuscator-config.sh syntax OK"
           
           # Test init script
-          bash -n openwrt/files/wg-obfuscator.init
+          bash -n openwrt-main/files/wg-obfuscator.init
           echo "✅ wg-obfuscator.init syntax OK"
           
-          # Test build script
-          bash -n openwrt/build-openwrt.sh
-          echo "✅ build-openwrt.sh syntax OK"
+          # Test build scripts
+          bash -n openwrt-main/build.sh
+          echo "✅ openwrt-main/build.sh syntax OK"
+          
+          bash -n openwrt-luci/build.sh
+          echo "✅ openwrt-luci/build.sh syntax OK"
           
           # Test LuCI defaults if present
-          if [ -f "openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
-            bash -n openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator
+          if [ -f "openwrt-luci/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
+            bash -n openwrt-luci/root/etc/uci-defaults/luci-wg-obfuscator
             echo "✅ luci-wg-obfuscator defaults syntax OK"
           fi
 
@@ -261,13 +340,13 @@ jobs:
           sudo apt-get install -y -qq lua5.1 > /dev/null
           
           # Test LuCI files if present (using luac -p for syntax check)
-          if [ -f "openwrt/luci-app-wg-obfuscator/luasrc/controller/wg-obfuscator.lua" ]; then
-            luac -p openwrt/luci-app-wg-obfuscator/luasrc/controller/wg-obfuscator.lua
+          if [ -f "openwrt-luci/luasrc/controller/wg-obfuscator.lua" ]; then
+            luac -p openwrt-luci/luasrc/controller/wg-obfuscator.lua
             echo "✅ LuCI controller syntax OK"
           fi
           
-          if [ -f "openwrt/luci-app-wg-obfuscator/luasrc/model/cbi/wg-obfuscator.lua" ]; then
-            luac -p openwrt/luci-app-wg-obfuscator/luasrc/model/cbi/wg-obfuscator.lua
+          if [ -f "openwrt-luci/luasrc/model/cbi/wg-obfuscator.lua" ]; then
+            luac -p openwrt-luci/luasrc/model/cbi/wg-obfuscator.lua
             echo "✅ LuCI model syntax OK"
           fi
 
@@ -275,23 +354,23 @@ jobs:
         run: |
           echo "Testing Makefile structure..."
           
-          # Test main OpenWRT Makefile
-          if grep -q "include.*rules.mk" openwrt/Makefile; then
-            echo "✅ OpenWRT Makefile has correct structure"
+          # Test main OpenWrt Makefile
+          if grep -q "include.*rules.mk" openwrt-main/Makefile; then
+            echo "✅ OpenWrt Makefile has correct structure"
           else
-            echo "❌ OpenWRT Makefile missing required includes"
+            echo "❌ OpenWrt Makefile missing required includes"
             exit 1
           fi
           
           # Check for PKG_SOURCE_PROTO
-          if grep -q "PKG_SOURCE_PROTO:=git" openwrt/Makefile; then
+          if grep -q "PKG_SOURCE_PROTO:=git" openwrt-main/Makefile; then
             echo "✅ Makefile uses git source protocol"
           else
             echo "⚠️ Makefile doesn't use git source protocol"
           fi
           
           # Check for Build/Compile section
-          if grep -q "define Build/Compile" openwrt/Makefile; then
+          if grep -q "define Build/Compile" openwrt-main/Makefile; then
             echo "✅ Makefile has Build/Compile section"
           else
             echo "❌ Makefile missing Build/Compile section"
@@ -299,8 +378,8 @@ jobs:
           fi
           
           # Test LuCI Makefile if present
-          if [ -f "openwrt/luci-app-wg-obfuscator/Makefile" ]; then
-            if grep -q "include.*rules.mk" openwrt/luci-app-wg-obfuscator/Makefile; then
+          if [ -f "openwrt-luci/Makefile" ]; then
+            if grep -q "include.*rules.mk" openwrt-luci/Makefile; then
               echo "✅ LuCI Makefile has correct structure"
             else
               echo "❌ LuCI Makefile missing required includes"
@@ -314,9 +393,10 @@ jobs:
           
           # Check that scripts are executable
           for script in \
-            "openwrt/files/wg-obfuscator-config.sh" \
-            "openwrt/files/wg-obfuscator.init" \
-            "openwrt/build-openwrt.sh"
+            "openwrt-main/files/wg-obfuscator-config.sh" \
+            "openwrt-main/files/wg-obfuscator.init" \
+            "openwrt-main/build.sh" \
+            "openwrt-luci/build.sh"
           do
             if [ -x "$script" ]; then
               echo "✅ $(basename $script) is executable"
@@ -327,8 +407,8 @@ jobs:
           done
           
           # Check LuCI defaults if present
-          if [ -f "openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
-            if [ -x "openwrt/luci-app-wg-obfuscator/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
+          if [ -f "openwrt-luci/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
+            if [ -x "openwrt-luci/root/etc/uci-defaults/luci-wg-obfuscator" ]; then
               echo "✅ luci-wg-obfuscator defaults is executable"
             else
               echo "❌ luci-wg-obfuscator defaults is not executable"
@@ -348,17 +428,17 @@ jobs:
           echo "Testing configuration file structure..."
           
           # Check that config files have correct structure
-          if [ -f "openwrt/files/wg-obfuscator.config" ]; then
+          if [ -f "openwrt-main/files/wg-obfuscator.config" ]; then
             echo "✅ UCI config file exists"
-            cat openwrt/files/wg-obfuscator.config
+            cat openwrt-main/files/wg-obfuscator.config
           else
             echo "❌ UCI config file missing"
             exit 1
           fi
           
-          if [ -f "openwrt/files/wg-obfuscator.conf" ]; then
+          if [ -f "openwrt-main/files/wg-obfuscator.conf" ]; then
             echo "✅ App config file exists"
-            head -10 openwrt/files/wg-obfuscator.conf
+            head -10 openwrt-main/files/wg-obfuscator.conf
           else
             echo "❌ App config file missing"
             exit 1
@@ -369,7 +449,7 @@ jobs:
           echo "Testing error handling..."
           
           # Test init script with dry-run
-          if bash openwrt/files/wg-obfuscator.init help 2>&1 | grep -q "Usage"; then
+          if bash openwrt-main/files/wg-obfuscator.init help 2>&1 | grep -q "Usage"; then
             echo "✅ Init script shows usage"
           else
             echo "ℹ️ Init script doesn't show usage (might be OK)"
