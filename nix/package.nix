@@ -52,8 +52,13 @@ stdenv.mkDerivation rec {
       - Two-way mode with static bindings
     '';
     homepage = "https://github.com/ClusterM/wg-obfuscator";
-    license = licenses.mit; # Update based on actual LICENSE file
-    maintainers = [ ];
+    license = licenses.gpl3;
+    maintainers = [{
+      name = "Alexey Cluster";
+      email = "cluster@cluster.wtf";
+      github = "ClusterM";
+      githubId = 4236181;
+    }];
     platforms = platforms.unix;
     mainProgram = "wg-obfuscator";
   };
