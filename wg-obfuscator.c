@@ -258,7 +258,7 @@ void print_version(void) {
 #ifndef ARCH
     fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ") (" ARCH ")\n");
 #endif
 #else
 #ifndef ARCH
