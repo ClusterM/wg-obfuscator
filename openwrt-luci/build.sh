@@ -70,7 +70,33 @@ print_status "Symlink created successfully"
 print_status "Building package..."
 cd "$OPENWRT_BUILD_DIR"
 
-make package/$PACKAGE_NAME/{clean,compile,install} \
+# Check if .config exists (required for proper SDK configuration)
+if [ ! -f .config ]; then
+    print_error "OpenWrt SDK is not configured. Please configure it first."
+    echo ""
+    print_status "To configure the SDK, run the following commands:"
+    echo ""
+    echo "  cd $OPENWRT_BUILD_DIR"
+    echo "  make defconfig"
+    echo ""
+    echo "This will create a default .config file for your target architecture."
+    echo "After that, you can run this build script again."
+    echo ""
+    echo "Alternatively, you can use menuconfig to configure manually:"
+    echo "  make menuconfig"
+    echo ""
+    exit 1
+fi
+
+# Enable package in config if not already enabled
+if ! grep -q "CONFIG_PACKAGE_$PACKAGE_NAME=y" .config 2>/dev/null; then
+    print_status "Enabling package in .config..."
+    echo "CONFIG_PACKAGE_$PACKAGE_NAME=y" >> .config
+    make defconfig
+fi
+
+# Build package (install is not needed - .ipk is created during compile)
+make package/$PACKAGE_NAME/{clean,compile} \
     CONFIG_PACKAGE_$PACKAGE_NAME=y \
     V=s \
     2>&1 | tee /tmp/$PACKAGE_NAME-build.log | tail -20

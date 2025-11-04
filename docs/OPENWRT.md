@@ -207,43 +207,217 @@ cat /etc/wg-obfuscator/wg-obfuscator.conf
 
 ## Building from Source
 
-### Prerequisites
+Since `.ipk` packages are architecture-specific and must be built for your router's exact platform, you need to build them using the OpenWrt build system. This section explains how to build packages using the OpenWrt source code.
 
-> **Note:** The example below downloads the SDK for **x86/64 target** (PC routers). If your router uses a different target (e.g., `ipq40xx`, `ramips`, `ath79`), download the appropriate SDK from [OpenWrt Downloads](https://downloads.openwrt.org/releases/23.05.5/targets/) for your device's target/subtarget.
+### Using OpenWrt Source Code
+
+This method uses the full OpenWrt source code, which allows you to configure everything via `menuconfig`.
+
+#### Step 1: Get OpenWrt Source Code
+
+Download the latest OpenWrt release from [GitHub releases](https://github.com/openwrt/openwrt/releases):
 
 ```bash
-# Install OpenWrt SDK (x86/64 target example)
-wget https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-tar xf openwrt-sdk-*.tar.xz
-cd openwrt-sdk-*
+# Download and extract OpenWrt source code
+wget https://github.com/openwrt/openwrt/archive/refs/tags/v24.10.4.tar.gz
+tar xzf v24.10.4.tar.gz
+cd openwrt-24.10.4
 ```
 
-### Build Main Package
+Or clone the repository:
 
 ```bash
-# From wg-obfuscator repository
-export OPENWRT_BUILD_DIR=~/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64
-cd openwrt-main
+git clone https://github.com/openwrt/openwrt.git
+cd openwrt
+git checkout v24.10.4  # or latest release tag
+```
+
+#### Step 2: Update and Install Feeds
+
+```bash
+# Update package feeds (downloads package definitions)
+./scripts/feeds update -a
+
+# Install feeds (makes packages available for building)
+./scripts/feeds install -a
+```
+
+**Note:** The `luci-app-wg-obfuscator` package requires the `luci` feed. Ensure it's installed:
+
+```bash
+./scripts/feeds install -a -p luci
+```
+
+#### Step 3: Configure Build System with menuconfig
+
+This is where you select your router's target, subtarget, and optionally the device profile:
+
+```bash
+make menuconfig
+```
+
+In the menuconfig interface:
+
+1. **Select Target System:**
+   - Navigate to **Target System** and select your router's architecture (e.g., `x86`, `ARM`, `MIPS`, etc.)
+
+2. **Select Subtarget:**
+   - Navigate to **Subtarget** and select the appropriate subtarget (e.g., `x86_64`, `generic`, `mt7621`, etc.)
+
+3. **Select Target Profile (Optional):**
+   - Navigate to **Target Profile** and select your specific router model if available
+   - This automatically configures all necessary settings for your device
+
+4. **Save configuration:**
+   - Press `<Enter>` on **Save** to save the configuration
+   - Press `<Enter>` on **Exit** to exit menuconfig
+
+**Note:** You don't need to enable the packages manually - the build scripts will do this automatically.
+
+#### Step 4: Build Toolchain and Dependencies
+
+Before building packages, you need to build the toolchain and dependencies:
+
+```bash
+# Build toolchain and dependencies
+make -j$(nproc) tools/install toolchain/install
+```
+
+**Note:** This process may take a long time (from 30 minutes to several hours depending on your system). The toolchain needs to be compiled from source, which includes GCC, binutils, and other build tools.
+
+This builds the cross-compilation toolchain and all necessary dependencies for your selected target.
+
+#### Step 5: Build Packages
+
+The build scripts will automatically create symlinks and enable packages in the configuration:
+
+```bash
+# Set the build directory
+export OPENWRT_BUILD_DIR="$(pwd)"
+
+# Build main package
+cd /path/to/wg-obfuscator/openwrt-main
+./build.sh
+
+# Build LuCI package
+cd ../openwrt-luci
 ./build.sh
 ```
 
-### Build LuCI Package
+The scripts will:
+- Automatically create symlinks to package directories
+- Enable packages in `.config` if needed
+- Build the packages
+
+#### Step 6: Install Built Packages
+
+After successful build, the `.ipk` files will be in `bin/packages/*/base/`.
+
+##### Using LuCI Web Interface (Recommended)
+
+1. Find the built packages:
+   ```bash
+   find bin/packages -name "*.ipk" | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
+   ```
+
+2. Copy `.ipk` files to your computer (if building on a remote machine)
+
+3. Log into LuCI web interface on your router
+
+4. Go to **System → Software**
+
+5. Click **Upload Package...**
+
+6. Select and upload each `.ipk` file:
+   - `wg-obfuscator_*.ipk`
+   - `luci-app-wg-obfuscator_*.ipk`
+
+7. Click **Install** for each package
+
+##### Using Command Line (Alternative)
+
+If you prefer using SSH:
 
 ```bash
-cd openwrt-luci
-./build.sh
-```
+# Find built packages
+find bin/packages -name "*.ipk" | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
 
-### Install Built Packages
+# Copy to router (adjust paths and router IP)
+scp bin/packages/*/base/wg-obfuscator*.ipk root@192.168.1.1:/tmp/
+scp bin/packages/*/base/luci-app-wg-obfuscator*.ipk root@192.168.1.1:/tmp/
 
-```bash
-# Copy .ipk files to your router
-scp ~/openwrt-sdk/bin/packages/*/base/wg-obfuscator*.ipk root@router:/tmp/
-scp ~/openwrt-sdk/bin/packages/*/base/luci-app-wg-obfuscator*.ipk root@router:/tmp/
-
-# On router
+# Install on router (via SSH)
+ssh root@192.168.1.1
 opkg install /tmp/wg-obfuscator*.ipk
 opkg install /tmp/luci-app-wg-obfuscator*.ipk
+```
+
+### Troubleshooting Build Issues
+
+#### Issue: "Package not found" or "No rule to make target"
+
+**Solution:** Ensure you've updated feeds and created symlinks correctly:
+```bash
+./scripts/feeds update -a
+./scripts/feeds install -a
+ls -la package/network/wg-obfuscator  # Should show symlink
+```
+
+#### Issue: "luci-compat not found" error
+
+**Solution:** Ensure LuCI feed is installed:
+```bash
+./scripts/feeds install -a -p luci
+```
+
+#### Issue: Build fails with missing dependencies
+
+**Solution:** Install missing build dependencies. Common packages:
+```bash
+# On Ubuntu/Debian
+sudo apt-get install build-essential gawk gettext git libncurses5-dev libssl-dev python3 python3-setuptools rsync unzip zlib1g-dev
+```
+
+#### Issue: Wrong SDK version
+
+**Solution:** Ensure SDK version matches your OpenWrt version. Check your router:
+```bash
+cat /etc/openwrt_release | grep DISTRIB_RELEASE
+```
+
+Then download the matching SDK version.
+
+### Quick Reference: Complete Build Example
+
+Here's a complete example using OpenWrt source code:
+
+```bash
+# 1. Download OpenWrt source code
+git clone https://github.com/openwrt/openwrt.git
+cd openwrt
+git checkout v24.10.4  # or latest release
+
+# 2. Update and install feeds
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+# 3. Configure target/subtarget with menuconfig
+make menuconfig
+# Select Target System, Subtarget, and optionally Target Profile
+# Save and exit
+
+# 4. Build toolchain and dependencies
+make -j$(nproc) tools/install toolchain/install
+
+# 5. Build packages (scripts will create symlinks automatically)
+export OPENWRT_BUILD_DIR="$(pwd)"
+cd /path/to/wg-obfuscator/openwrt-main
+./build.sh
+cd ../openwrt-luci
+./build.sh
+
+# 6. Find built packages
+find ../openwrt/bin/packages -name "*.ipk" | grep wg-obfuscator
 ```
 
 ## Important Notes
