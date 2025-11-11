@@ -5,12 +5,12 @@ function index()
         return
     end
 
-    local page = entry({"admin", "network", "wg-obfuscator"}, cbi("wg-obfuscator"), _("WireGuard Obfuscator"), 60)
+    local page = entry({"admin", "services", "wg-obfuscator"}, cbi("wg-obfuscator"), _("WireGuard Obfuscator"), 60)
     page.dependent = true
     page.acl_depends = { "luci-app-wg-obfuscator" }
 
-    entry({"admin", "network", "wg-obfuscator", "status"}, call("action_status"), nil).leaf = true
-    entry({"admin", "network", "wg-obfuscator", "restart"}, call("action_restart"), nil).leaf = true
+    entry({"admin", "services", "wg-obfuscator", "status"}, call("action_status"), nil).leaf = true
+    entry({"admin", "services", "wg-obfuscator", "restart"}, call("action_restart"), nil).leaf = true
 end
 
 function action_status()
