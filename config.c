@@ -291,12 +291,14 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
         case 'f':
             // parse string with decimal and hexadecimal support
 #ifdef __linux__
-            long int v = strtol(val, NULL, 0);
-            if (v <= 0 || v > UINT16_MAX) {
-                log(LL_ERROR, "Invalid firewall mark: %s", val);
-                exit(EXIT_FAILURE);
+            {
+                long int v = strtol(val, NULL, 0);
+                if (v <= 0 || v > UINT16_MAX) {
+                    log(LL_ERROR, "Invalid firewall mark: %s", val);
+                    exit(EXIT_FAILURE);
+                }
+                config->fwmark = (uint16_t)v;
             }
-            config->fwmark = (uint16_t)v;
 #else
             log(LL_WARN, "Firewall mark is not supported on this platform");
 #endif
