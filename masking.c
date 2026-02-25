@@ -23,8 +23,8 @@ masking_handler_t * get_masking_handler_by_name(const char *name) {
     if (!name) return NULL;
 
     for (int i = 0; masking_handlers[i]; ++i) {
-        char handler_name_lower[sizeof(masking_handlers[i]->name)];
-        snprintf(handler_name_lower, sizeof(handler_name_lower), "%s", masking_handlers[i]->name);
+        char handler_name_lower[MASKING_HANDLER_NAME_LEN];
+        strncpy(handler_name_lower, masking_handlers[i]->name, sizeof(handler_name_lower) - 1);
         handler_name_lower[sizeof(handler_name_lower) - 1] = 0;
         for (char *p = handler_name_lower; *p; ++p) *p = tolower((unsigned char)*p);
 

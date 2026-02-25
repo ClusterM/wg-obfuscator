@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include "wg-obfuscator.h"
 
+#define MASKING_HANDLER_NAME_LEN 32
+
 typedef ssize_t (*send_data_callback_t)(uint8_t *buffer, int length);
 
 typedef void (*masking_event_handler_t)(obfuscator_config_t *config,
@@ -32,7 +34,7 @@ typedef void (*masking_timer_handler_t)(obfuscator_config_t *config,
                                 send_data_callback_t send_to_server_callback);
 
 struct masking_handler {
-    char name[32];
+    char name[MASKING_HANDLER_NAME_LEN];
     masking_event_handler_t on_handshake_req;
     masking_data_handler_t on_data_wrap;
     masking_data_handler_t on_data_unwrap;
