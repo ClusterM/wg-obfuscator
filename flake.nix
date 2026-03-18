@@ -78,7 +78,8 @@
               };
 
               key = mkOption {
-                type = types.str;
+                type = types.nullOr types.str;
+                default = null;
                 description = "Obfuscation key (must match on both sides)";
                 example = "your_secret_key";
               };
@@ -202,7 +203,7 @@
               }
               {
                 assertion = all (inst:
-                  inst.enable -> (inst.key != "" || inst.keyFile != null)
+                  inst.enable -> (inst.key != null || inst.keyFile != null)
                 ) (attrValues cfg.instances);
                 message = "Each enabled wg-obfuscator instance must have either 'key' or 'keyFile' set";
               }
@@ -263,7 +264,7 @@
                       max-clients = ${toString inst.maxClients}
                       idle-timeout = ${toString inst.idleTimeout}
                       max-dummy = ${toString inst.maxDummy}
-                    '') (attrValues instances)
+                    '') instances
                   )}
                   EOF
 
