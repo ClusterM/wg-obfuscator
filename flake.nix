@@ -80,7 +80,7 @@
               key = mkOption {
                 type = types.nullOr types.str;
                 default = null;
-                description = "Obfuscation key (must match on both sides)";
+                description = "Obfuscation key (must match on both sides; required when keyFile is not set)";
                 example = "your_secret_key";
               };
 
@@ -203,9 +203,17 @@
               }
               {
                 assertion = all (inst:
-                  inst.enable -> (inst.key != null || inst.keyFile != null)
+                  inst.enable ->
+                    (
+                      inst.keyFile != null
+                      || (
+                        inst.key != null
+                        && builtins.stringLength inst.key >= 1
+                        && builtins.stringLength inst.key <= 255
+                      )
+                    )
                 ) (attrValues cfg.instances);
-                message = "Each enabled wg-obfuscator instance must have either 'key' or 'keyFile' set";
+                message = "Each enabled wg-obfuscator instance must have either 'keyFile' set, or 'key' set to a string of length 1–255 characters";
               }
             ];
 
