@@ -25,6 +25,7 @@ static const mini_argp_opt options[] = {
     { "static-bindings", 'b', 1 },
     { "max-clients" , 'm', 1 },
     { "idle-timeout", 'l', 1 },
+    { "in-timeout", 'n', 1 },
     { "max-dummy", 'd', 1 },
     { "fwmark", 'f', 1 },
     { "verbose", 'v', 1 },
@@ -64,6 +65,7 @@ static void show_usage(void)
         "Additional options:\n"
         "  -m, --max-clients=<number> Maximum number of clients (default: 1024)\n"
         "  -l, --idle-timeout=<sec>   Idle timeout in seconds (default: 300)\n"
+        "  -n, --in-timeout=<sec>     Incoming timeout in seconds (default: 0 - disabled)\n"
         "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
         "                             (default: 4)\n");
 }
@@ -83,6 +85,7 @@ static void reset_config(obfuscator_config_t *config)
     memset(config, 0, sizeof(*config));
     config->max_clients = MAX_CLIENTS_DEFAULT;
     config->idle_timeout = IDLE_TIMEOUT_DEFAULT;
+    config->in_timeout = IN_TIMEOUT_DEFAULT;
     config->max_dummy_length_data = MAX_DUMMY_LENGTH_DATA_DEFAULT;
     verbose = LL_DEFAULT;
 }
@@ -276,6 +279,18 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                 exit(EXIT_FAILURE);
             }
             config->idle_timeout *= 1000; // Convert to milliseconds
+            break;
+        case 'n':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid incoming timeout: %s (must be an integer)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->in_timeout = atol(val);
+            if (config->in_timeout <= 0) {
+                log(LL_ERROR, "Invalid incoming timeout: %s (must be greater than 0)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->in_timeout *= 1000; // Convert to milliseconds
             break;
         case 'd':
             if (!is_integer(val)) {

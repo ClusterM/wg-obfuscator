@@ -625,6 +625,7 @@ int main(int argc, char *argv[]) {
                             continue;
                         }
                         client_entry->last_activity_time = now;
+                        client_entry->last_incoming_time = 0;
                         client_entry->masking_handler = masking_handler;
                     }
                     if (!obfuscated) {
@@ -863,6 +864,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 client_entry->last_activity_time = now;
+                client_entry->last_incoming_time = now;
             } // if (event->data.fd != listen_sock)
         } // for (int e = 0; e < events_n; e++)
 
@@ -871,15 +873,18 @@ int main(int argc, char *argv[]) {
             // Iterate over all client entries
             HASH_ITER(hh, conn_table, current_entry, tmp) {
                 // Check if the entry is idle for too long
-                if (
-                    (
-                        (now - current_entry->last_activity_time >= config.idle_timeout)
-                        || (!current_entry->handshaked && (now - current_entry->last_activity_time >= HANDSHAKE_TIMEOUT))
-                    ) && !current_entry->is_static // Do not remove static entries
-                ) {
+                uint8_t idle = now - current_entry->last_activity_time >= config.idle_timeout;
+                uint8_t incoming_timeout = config.in_timeout > 0 && now - current_entry->last_incoming_time >= config.in_timeout;
+                uint8_t handshake_timeout = !current_entry->handshaked && now - current_entry->last_activity_time >= HANDSHAKE_TIMEOUT;
+                if ((idle || incoming_timeout || handshake_timeout) && !current_entry->is_static) { // Do not remove static entries
                     // Remove old entry
-                    log(current_entry->handshaked ? LL_INFO : LL_DEBUG, "Removing idle client %s:%d (handshaked=%s)", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port), 
-                        current_entry->handshaked ? "yes" : "no");
+                    if (idle) {
+                        log(LL_INFO, "Removing idle client %s:%d", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    } else if (incoming_timeout) {
+                        log(LL_INFO, "Removing client %s:%d due to incoming timeout", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    } else if (handshake_timeout) {
+                        log(LL_INFO, "Removing client %s:%d due to handshake timeout", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                    }
 #ifdef USE_EPOLL
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
 #endif

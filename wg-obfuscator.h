@@ -34,6 +34,7 @@
 
 #define MAX_CLIENTS_DEFAULT             1024    // maximum number of clients
 #define IDLE_TIMEOUT_DEFAULT            300000  // in milliseconds
+#define IN_TIMEOUT_DEFAULT              0       // in milliseconds
 #define MAX_DUMMY_LENGTH_DATA_DEFAULT   4       // maximum length of dummy data for data packets
 
 // Default instance name
@@ -79,6 +80,7 @@ typedef struct {
     char static_bindings[10 * 1024];            // Static bindings as a string
     int max_clients;                            // Maximum number of clients
     long idle_timeout;                          // Idle timeout in milliseconds
+    long in_timeout;                            // Incoming timeout in milliseconds
     int max_dummy_length_data;                  // Maximum length of dummy data for data packets
     uint32_t fwmark;                            // Firewall mark
     masking_handler_t *masking_handler;         // Masking handler to use
@@ -96,6 +98,7 @@ typedef struct {
     struct sockaddr_in client_addr;             // client address and port (key for the hash table)
     struct sockaddr_in our_addr;                // our address and port on the server connection
     long last_activity_time;                    // last time we received data from/to this client
+    long last_incoming_time;                    // last time we received data from the remote server
     long last_handshake_request_time;           // last time we received a handshake request from/to this client
     long last_handshake_time;                   // last time we received a handshake response from/to this client
     long last_masking_timer_time;               // last time we called the masking timer handler for this client
