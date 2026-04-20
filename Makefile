@@ -1,6 +1,6 @@
-PROG_NAME    = wg-obfuscator
-CONFIG       = wg-obfuscator.conf
-SERVICE_FILE = wg-obfuscator.service
+PROG_NAME    = wg0-obfuscator
+CONFIG       = wg0-obfuscator.conf
+SERVICE_FILE = wg0-obfuscator.service
 HEADERS      = wg-obfuscator.h obfuscation.h config.h uthash.h mini_argp.h masking.h masking_stun.h
 
 RELEASE ?= 0
@@ -183,6 +183,6 @@ test: test-build test-unit test-integration test-stderr-block
 clean-tests:
 	$(RM) -r $(TEST_BUILD_DIR)
 	$(RM) $(TEST_HARNESS) $(TEST_WG_EMULATOR)
-	$(RM) -r /tmp/wg-obfuscator-test
+	$(RM) -r /tmp/wg0-obfuscator-test
 
 .PHONY: clean install test test-build test-unit test-integration test-stderr-block clean-tests

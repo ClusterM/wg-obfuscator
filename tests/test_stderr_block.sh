@@ -33,11 +33,11 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OBFUSCATOR_BIN="${OBFUSCATOR_BIN:-$SCRIPT_DIR/../wg-obfuscator}"
+OBFUSCATOR_BIN="${OBFUSCATOR_BIN:-$SCRIPT_DIR/../wg0-obfuscator}"
 LISTEN_PORT="${LISTEN_PORT:-34444}"
 TARGET_PORT="${TARGET_PORT:-34445}"
 TEST_KEY="stderr_block_test_key"
-TEST_DIR="/tmp/wg-obfuscator-stderr-test"
+TEST_DIR="/tmp/wg0-obfuscator-stderr-test"
 FIFO="$TEST_DIR/stderr.pipe"
 FLOOD_PACKETS="${FLOOD_PACKETS:-50000}"
 STABILISE_SEC="${STABILISE_SEC:-3}"

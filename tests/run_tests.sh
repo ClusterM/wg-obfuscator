@@ -22,7 +22,7 @@ NC='\033[0m' # No Color
 WG_SERVER_PORT=51820
 OBFUSCATOR_PORT=3333
 TEST_KEY="test_secret_key_123"
-LOG_DIR="/tmp/wg-obfuscator-test"
+LOG_DIR="/tmp/wg0-obfuscator-test"
 
 # PIDs of background processes
 WG_SERVER_PID=""
@@ -55,8 +55,8 @@ trap cleanup EXIT
 check_binaries() {
     echo -e "${BLUE}[CHECK]${NC} Verifying test binaries..."
 
-    if [ ! -f "../wg-obfuscator" ]; then
-        echo -e "${RED}[ERROR]${NC} wg-obfuscator binary not found"
+    if [ ! -f "../wg0-obfuscator" ]; then
+        echo -e "${RED}[ERROR]${NC} wg0-obfuscator binary not found"
         echo "Run 'make' first to build the project"
         exit 1
     fi
@@ -97,7 +97,7 @@ start_obfuscator() {
     echo "  Forward to: 127.0.0.1:$WG_SERVER_PORT"
     echo "  Key: $TEST_KEY"
 
-    ../wg-obfuscator \
+    ../wg0-obfuscator \
         -p $OBFUSCATOR_PORT \
         -t 127.0.0.1:$WG_SERVER_PORT \
         -k "$TEST_KEY" \

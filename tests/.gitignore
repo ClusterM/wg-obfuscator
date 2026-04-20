@@ -6,4 +6,4 @@ test_wg_emulator
 build/
 
 # Test logs
-/tmp/wg-obfuscator-test/
+/tmp/wg0-obfuscator-test/
