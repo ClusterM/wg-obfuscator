@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: wg-obfuscator
+  IMAGE_NAME: wg0-obfuscator
   MUSL_RELEASE: https://github.com/cross-tools/musl-cross/releases/download/20250520/
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -28,7 +28,9 @@ jobs:
 
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6, linux/arm/v5, linux/386, linux/ppc64le, linux/s390x]
+        # Only linux/arm64: produced for MikroTik hAP ax^3 (ARMv8) RouterOS
+        # container runtime. Other platforms are not packaged for this fork.
+        platform: [linux/arm64]
       fail-fast: false
 
     steps:
@@ -66,57 +68,13 @@ jobs:
     strategy:
       matrix:
         target:
+          # Trimmed for the ramanarupa/wg0-obfuscator fork: only x64 and arm64
+          # static builds are packaged. arm64 covers ARMv8 / aarch64 hardware
+          # (e.g. generic "ARMv8 Processor rev 4" devices). Docker arm64 images
+          # cover the MikroTik hAP ax^3 / RouterOS container use-case.
           #  name                      packages                          musl                               CC                                       CFLAGS                                                  LDFLAGS
-          # ======================== x86_64 / x86 ========================
-          - [x86,                      gcc-i686-linux-gnu,               "",                                i686-linux-gnu-gcc,                      "",                                                     "-static"]
-           #[x86,                      "",                               i686-unknown-linux-musl,           i686-unknown-linux-musl-gcc,             "",                                                     "-static"]
           - [x64,                      "",                               "",                                gcc,                                     "",                                                     "-static"]
-           #[x64-musl,                 "",                               x86_64-unknown-linux-musl,         x86_64-unknown-linux-musl-gcc,           "",                                                     "-static"]
-          # ======================== ARM (32-bit) =========================
-          - [armv5-sf,                 gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv5te -mfloat-abi=soft",                      "-static"]
-           #[armv5-musl-sf,            "",                               arm-unknown-linux-musleabi,        arm-unknown-linux-musleabi-gcc,          "-march=armv5te -mfloat-abi=soft",                      "-static"]
-          - [armv6-softfp,             gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv6 -mfpu=vfp -mfloat-abi=softfp",            "-static"]
-           #[armv6-musl-softfp,        "",                               arm-unknown-linux-musleabi,        arm-unknown-linux-musleabi-gcc,          "-march=armv6 -mfpu=vfp -mfloat-abi=softfp",            "-static"]
-           #[armv7-sf,                 gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv7-a -mfloat-abi=soft",                      "-static"]
-           #[armv7-sf,                 "",                               armv7-unknown-linux-musleabi,      armv7-unknown-linux-musleabi-gcc,        "-march=armv7-a -mfloat-abi=soft",                      "-static"]
-          - [armv7-softfp,             gcc-arm-linux-gnueabi,            "",                                arm-linux-gnueabi-gcc,                   "-march=armv7-a -mfpu=vfp -mfloat-abi=softfp",          "-static"]
-           #[armv7-softfp,             "",                               armv7-unknown-linux-musleabi,      armv7-unknown-linux-musleabi-gcc,        "-march=armv7-a -mfpu=vfp -mfloat-abi=softfp",          "-static"]
-          - [armv7-hf,                 gcc-arm-linux-gnueabihf,          "",                                arm-linux-gnueabihf-gcc,                 "-march=armv7-a -mfpu=vfp -mfloat-abi=hard",            "-static"]
-           #[armv7-hf,                 "",                               armv7-unknown-linux-musleabihf,    armv7-unknown-linux-musleabihf-gcc,      "-march=armv7-a -mfpu=vfp -mfloat-abi=hard",            "-static"]
           - [arm64,                    gcc-aarch64-linux-gnu,            "",                                aarch64-linux-gnu-gcc,                   "",                                                     "-static"]
-           #[arm64,                    "",                               aarch64-unknown-linux-musl,        aarch64-unknown-linux-musl-gcc,          "",                                                     "-static"]
-          # ======================== MIPS little-endian ====================
-          - [mipsel-mips1,             gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips1 -mabi=32 -mfp32",                         "-static"]
-          - [mipsel-mips32,            gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips32 -mabi=32",                               "-static"]
-           #[mipsel-mips32,            "",                               mipsel-unknown-linux-musl,         mipsel-unknown-linux-musl-gcc,           "-march=mips32 -mabi=32",                               "-static"]
-          - [mipsel-mips32r2,          gcc-mipsel-linux-gnu,             "",                                mipsel-linux-gnu-gcc,                    "-march=mips32r2 -mabi=32",                             "-static"]
-           #[mipsel-mips32r2,          "",                               mipsel-unknown-linux-musl,         mipsel-unknown-linux-musl-gcc,           "-march=mips32r2 -mabi=32",                             "-static"]
-          - [mips64el,                 gcc-mips64el-linux-gnuabi64,      "",                                mips64el-linux-gnuabi64-gcc,             "-march=mips64 -mabi=64",                               "-static"]
-           #[mips64el,                 "",                               mips64el-unknown-linux-musl,       mips64el-unknown-linux-musl-gcc,         "-march=mips64 -mabi=64",                               "-static"]
-          - [mips64elr2,               gcc-mips64el-linux-gnuabi64,      "",                                mips64el-linux-gnuabi64-gcc,             "-march=mips64r2 -mabi=64",                             "-static"]
-           #[mips64elr2,               "",                               mips64el-unknown-linux-musl,       mips64el-unknown-linux-musl-gcc,         "-march=mips64r2 -mabi=64",                             "-static"]
-          - [mipsel-mips32-sf,         "",                               mipsel-unknown-linux-muslsf,       mipsel-unknown-linux-muslsf-gcc,         "-march=mips32 -mabi=32",                               "-static"]
-          # ======================== MIPS big-endian =======================
-          - [mips-mips1,               gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips1 -mabi=32 -mfp32",                         "-static"]
-          - [mips-mips32,              gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips32 -mabi=32",                               "-static"]
-           #[mips-mips32,              "",                               mips-unknown-linux-musl,           mips-unknown-linux-musl-gcc,             "-march=mips32 -mabi=32",                               "-static"]
-          - [mips-mips32r2,            gcc-mips-linux-gnu,               "",                                mips-linux-gnu-gcc,                      "-march=mips32r2 -mabi=32",                             "-static"]
-           #[mips-mips32r2,            "",                               mips-unknown-linux-musl,           mips-unknown-linux-musl-gcc,             "-march=mips32r2 -mabi=32",                             "-static"]
-          - [mips64,                   gcc-mips64-linux-gnuabi64,        "",                                mips64-linux-gnuabi64-gcc,               "-march=mips64 -mabi=64",                               "-static"]
-           #[mips64,                   "",                               mips64-unknown-linux-musl,         mips64-unknown-linux-musl-gcc,           "-march=mips64 -mabi=64",                               "-static"]
-          - [mips64r2,                 gcc-mips64-linux-gnuabi64,        "",                                mips64-linux-gnuabi64-gcc,               "-march=mips64r2 -mabi=64",                             "-static"]
-          - [mips-mips32-sf,           "",                               mips-unknown-linux-muslsf,         mips-unknown-linux-muslsf-gcc,           "-march=mips32 -mabi=32",                               "-static"]
-          # ======================== other architectures =================
-          - [ppc64le,                  gcc-powerpc64le-linux-gnu,        "",                                powerpc64le-linux-gnu-gcc,               "",                                                     "-static"]
-           #[ppc64le-musl,             "",                               powerpc64-unknown-linux-musl,      powerpc64-unknown-linux-musl-gcc,        "",                                                     "-static"]
-          - [powerpc,                  gcc-powerpc-linux-gnu,            "",                                powerpc-linux-gnu-gcc,                   "",                                                     "-static"]
-           #[powerpc,                  "",                               powerpc-unknown-linux-musl,        powerpc-unknown-linux-musl-gcc,          "",                                                     "-static"]
-          - [s390x,                    gcc-s390x-linux-gnu,              "",                                s390x-linux-gnu-gcc,                     "",                                                     "-static"]
-           #[s390x,                    "",                               s390x-ibm-linux-musl,              s390x-ibm-linux-musl-gcc,                "",                                                     "-static"]
-           #[riscv32,                  gcc-riscv64-linux-gnu,            "",                                riscv64-linux-gnu-gcc,                   "-march=rv32gc -mabi=ilp32",                            "-static"]
-          - [riscv32,                  "",                               riscv32-unknown-linux-musl,        riscv32-unknown-linux-musl-gcc,          "",                                                     "-static"]
-          - [riscv64,                  gcc-riscv64-linux-gnu,            "",                                riscv64-linux-gnu-gcc,                   "",                                                     "-static"]
-           #[riscv64-musl,             "",                               riscv64-unknown-linux-musl,        riscv64-unknown-linux-musl-gcc,          "",                                                     "-static"]
 
     steps:
       - name: Checkout
@@ -156,48 +114,7 @@ jobs:
           path: output/
 
 
-  build-macos-arm64:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: make clean all
-        run: make clean all
-
-      - name: Prepare files
-        run: |
-          mkdir -p output
-          cp LICENSE *.md ${{ env.IMAGE_NAME }} *.conf output/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-macos-arm64.zip
-          path: output/
-
-
-
-  build-macos-x64:
-    runs-on: macos-13
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: make clean all
-        run: make clean all
-
-      - name: Prepare files
-        run: |
-          mkdir -p output
-          cp LICENSE *.md ${{ env.IMAGE_NAME }} *.conf output/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.IMAGE_NAME }}-macos-x64.zip
-          path: output/
-
+  # macOS jobs removed — not a packaging target for the wg0-obfuscator fork.
 
   build-windows:
     runs-on: windows-latest
