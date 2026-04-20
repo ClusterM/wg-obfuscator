@@ -162,8 +162,18 @@ test-integration: $(TARGET) $(TEST_WG_EMULATOR)
 	@echo "Running integration tests..."
 	@cd $(TEST_DIR) && ./run_tests.sh
 
+# Run the stderr-pipe-blocking regression test (Linux only).
+# Not included in the default 'test' target because it requires
+# /proc/<pid>/wchan and `ss` (iproute2); skip gracefully elsewhere.
+test-stderr-block: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-stderr-block: skipped (Linux-only)"; \
+		exit 0; \
+	fi
+	@$(TEST_DIR)/test_stderr_block.sh
+
 # Run all tests
-test: test-build test-unit test-integration
+test: test-build test-unit test-integration test-stderr-block
 	@echo ""
 	@echo "========================================="
 	@echo "All tests completed successfully!"
@@ -175,4 +185,4 @@ clean-tests:
 	$(RM) $(TEST_HARNESS) $(TEST_WG_EMULATOR)
 	$(RM) -r /tmp/wg-obfuscator-test
 
-.PHONY: clean install test test-build test-unit test-integration clean-tests
+.PHONY: clean install test test-build test-unit test-integration test-stderr-block clean-tests

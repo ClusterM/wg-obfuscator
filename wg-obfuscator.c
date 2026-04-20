@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <time.h>
 #include <stdarg.h>
+#include <fcntl.h>
 #include "wg-obfuscator.h"
 #include "config.h"
 #include "obfuscation.h"
@@ -270,6 +271,20 @@ void print_version(void) {
 }
 
 int main(int argc, char *argv[]) {
+    // Make stderr non-blocking and line-buffered before anything else
+    // writes to it. If stderr is a pipe (systemd → journald) and the
+    // reader is stalled, a blocking write(2) would freeze the single
+    // event loop. O_NONBLOCK turns pipe-full into EAGAIN (lost line,
+    // not a hang); _IOLBF makes each '\n'-terminated log() message
+    // its own atomic write ≤ PIPE_BUF. See FIX_PLAN.md (Layer 2).
+    {
+        int f = fcntl(STDERR_FILENO, F_GETFL, 0);
+        if (f >= 0) {
+            (void)fcntl(STDERR_FILENO, F_SETFL, f | O_NONBLOCK);
+        }
+        setvbuf(stderr, NULL, _IOLBF, 0);
+    }
+
     obfuscator_config_t config;
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
