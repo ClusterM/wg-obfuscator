@@ -41,9 +41,9 @@ static int mini_argp_parse(int argc, char **argv,
             if ((val = strchr(name, '='))) { *val = 0; ++val; }
 
             const mini_argp_opt *o = margp_find(opts, name, 0);
-            if (!o) { fprintf(stderr,"unknown --%s\n", name); return -1; }
+            if (!o) { log(LL_ERROR, "unknown --%s", name); return -1; }
             if (o->has_arg && !val) {
-                if (++i == argc) { fprintf(stderr,"--%s needs value\n",name);return -1; }
+                if (++i == argc) { log(LL_ERROR, "--%s needs value", name); return -1; }
                 val = argv[i];
             }
             if (!o->has_arg) val = NULL;
@@ -56,13 +56,13 @@ static int mini_argp_parse(int argc, char **argv,
             for (size_t pos=1; arg[pos]; ++pos) {
                 char c = arg[pos];
                 const mini_argp_opt *o = margp_find(opts,NULL,c);
-                if (!o){ fprintf(stderr,"unknown -%c\n",c); return -1;}
+                if (!o){ log(LL_ERROR, "unknown -%c", c); return -1; }
                 const char *val = NULL;
 
                 if (o->has_arg) {
                     if (arg[pos+1])          val = &arg[pos+1];    /* -fVAL */
                     else if (++i < argc)     val = argv[i];        /* -f VAL */
-                    else { fprintf(stderr,"-%c needs value\n",c); return -1;}
+                    else { log(LL_ERROR, "-%c needs value", c); return -1; }
                     /* Stop further char-scanning: the rest of the arg is the value */
                     pos = strlen(arg)-1;
                 }
@@ -73,7 +73,7 @@ static int mini_argp_parse(int argc, char **argv,
 
         /* positional not allowed */
         else {
-            fprintf(stderr,"unexpected arg: %s\n",arg); return -1;
+            log(LL_ERROR, "unexpected arg: %s", arg); return -1;
         }
     }
     return 0;

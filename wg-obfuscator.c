@@ -18,6 +18,9 @@
 int verbose = LL_DEFAULT;
 // Section name (for multiple instances)
 char section_name[256] = DEFAULT_INSTANCE_NAME;
+// 1 = log to stderr (interactive), 0 = log via syslog(3) (daemon/redirected).
+// Chosen at main() startup based on isatty(STDERR_FILENO).
+int log_to_stderr = 1;
 // Listening socket for receiving data from the clients
 static int listen_sock = 0;
 // Hash table for client connections
@@ -317,26 +320,34 @@ static client_entry_t *find_by_server_sock(int fd) {
 void print_version(void) {
 #ifdef COMMIT
 #ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+    log(LL_INFO, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")");
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+    log(LL_INFO, "Starting WireGuard Obfuscator (" ARCH ", commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")");
 #endif
 #else
 #ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+    log(LL_INFO, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION);
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")\n");
+    log(LL_INFO, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")");
 #endif
 #endif
 }
 
 int main(int argc, char *argv[]) {
-    // Make stderr non-blocking and line-buffered before anything else
-    // writes to it. If stderr is a pipe (systemd → journald) and the
-    // reader is stalled, a blocking write(2) would freeze the single
-    // event loop. O_NONBLOCK turns pipe-full into EAGAIN (lost line,
-    // not a hang); _IOLBF makes each '\n'-terminated log() message
-    // its own atomic write ≤ PIPE_BUF. See FIX_PLAN.md (Layer 2).
+    // ---- logging init -------------------------------------------------
+    // Decide between interactive (stderr) and daemon (syslog) logging.
+    // Must run BEFORE any log()/print_version() call — otherwise an early
+    // failure would still try to write to stderr under the wrong mode.
+    log_to_stderr = isatty(STDERR_FILENO) ? 1 : 0;
+    if (!log_to_stderr) {
+        openlog("wg-obfuscator", LOG_PID, LOG_DAEMON);
+    }
+
+    // Layer-2 belt-and-braces: even when log_to_stderr==1 the process may
+    // later be reconfigured (e.g. via `StandardError=journal` override),
+    // and `trace()` under DEBUG builds still writes directly to stderr.
+    // Make stderr non-blocking + line-buffered so a stalled reader can
+    // never wedge the event loop. See FIX_PLAN.md (Layer 2).
     {
         int f = fcntl(STDERR_FILENO, F_GETFL, 0);
         if (f >= 0) {
@@ -344,6 +355,7 @@ int main(int argc, char *argv[]) {
         }
         setvbuf(stderr, NULL, _IOLBF, 0);
     }
+    // -------------------------------------------------------------------
 
     obfuscator_config_t config;
     struct sockaddr_in 

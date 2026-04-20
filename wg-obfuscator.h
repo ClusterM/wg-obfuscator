@@ -4,7 +4,21 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <syslog.h>
+#include <unistd.h>
 #include "uthash.h"
+
+// uthash ships its own HASH_OOPS that calls fprintf(stderr,...)+exit(-1).
+// Re-define it to additionally emit to syslog so malloc-failure messages are
+// visible under systemd (where stderr may be disconnected).
+#undef HASH_OOPS
+#define HASH_OOPS(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    syslog(LOG_ERR, __VA_ARGS__); \
+    exit(-1); \
+} while (0)
 
 // on Linux, use epoll for better performance
 #ifdef __linux__
@@ -57,18 +71,49 @@
 #define LL_DEBUG        3
 #define LL_TRACE        4
 
-#define log(level, fmt, ...) { if (verbose >= (level))       \
-    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,      \
-    (                                                               \
-          (level) == LL_ERROR ? 'E'                                 \
-        : (level) == LL_WARN  ? 'W'                                 \
-        : (level) == LL_INFO  ? 'I'                                 \
-        : (level) == LL_DEBUG ? 'D'                                 \
-        : (level) == LL_TRACE ? 'T'                                 \
-        : '?'                                                       \
-    ), ##__VA_ARGS__);                                              \
-}
-#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+// log_to_stderr: chosen once at startup from isatty(STDERR_FILENO).
+//   1 → interactive — write to stderr (as before).
+//   0 → daemon/redirected — write via syslog(3), which uses a SOCK_DGRAM Unix
+//       socket to journald/syslogd and never blocks (the kernel drops on
+//       queue-full rather than suspending the writer — exactly what the
+//       original silent-hang bug needed). The syslog path is the ONLY path
+//       guaranteed not to deadlock on a stalled reader.
+extern int log_to_stderr;
+
+#define log(level, fmt, ...) do {                                            \
+    if (verbose >= (level)) {                                                \
+        if (log_to_stderr) {                                                 \
+            fprintf(stderr, "[%s][%c] " fmt "\n", section_name,              \
+            (                                                                \
+                  (level) == LL_ERROR ? 'E'                                  \
+                : (level) == LL_WARN  ? 'W'                                  \
+                : (level) == LL_INFO  ? 'I'                                  \
+                : (level) == LL_DEBUG ? 'D'                                  \
+                : (level) == LL_TRACE ? 'T'                                  \
+                : '?'                                                        \
+            ), ##__VA_ARGS__);                                               \
+        } else {                                                             \
+            syslog(                                                          \
+                (level) == LL_ERROR ? LOG_ERR                                \
+              : (level) == LL_WARN  ? LOG_WARNING                            \
+              : (level) == LL_INFO  ? LOG_INFO                               \
+              :                       LOG_DEBUG,                             \
+                "[%s] " fmt, section_name, ##__VA_ARGS__);                   \
+        }                                                                    \
+    }                                                                        \
+} while (0)
+
+// trace() is the per-packet hex-dump facility: in the hot path it is invoked
+// per byte (wg-obfuscator.c hex-dump loops) without a terminating newline,
+// so it cannot be routed through the single-line syslog contract. Gate it
+// behind DEBUG builds — release builds don't need it and it was the main
+// source of stderr flooding in the original incident.
+#ifdef DEBUG
+#define trace(fmt, ...) if (log_to_stderr && verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+#else
+#define trace(fmt, ...) ((void)0)
+#endif
+
 #define serror_level(level, fmt, ...) log(level, fmt " - %s (%d)", ##__VA_ARGS__, strerror(errno), errno)
 #define serror(fmt, ...) serror_level(LL_ERROR, fmt, ##__VA_ARGS__)
 

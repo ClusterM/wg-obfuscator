@@ -366,11 +366,11 @@ int parse_config(int argc, char **argv, obfuscator_config_t *config)
     reset_config(config);
     arg0 = argv[0]; // Save the executable name
     if (argc == 1) {
-        fprintf(stderr, "No arguments provided, use \"%s --help\" command for usage information\n", argv[0]);
+        log(LL_ERROR, "No arguments provided, use \"%s --help\" command for usage information", argv[0]);
         return -1;
     }
     if (mini_argp_parse(argc, argv, options, config, parse_opt) != 0) {
-        fprintf(stderr, "Failed to parse command line arguments\n");
+        log(LL_ERROR, "Failed to parse command line arguments");
         return -1;
     }
 
