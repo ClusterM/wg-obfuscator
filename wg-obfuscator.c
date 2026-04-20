@@ -27,18 +27,20 @@ static client_entry_t *conn_table = NULL;
     static int epfd = 0;
 #endif
 
+// Set by signal_handler() only; polled by the main loop to request a clean shutdown.
+// Marked volatile + sig_atomic_t so writes from a signal context are well-defined.
+static volatile sig_atomic_t stop_requested = 0;
+
 /**
- * @brief Handles incoming signals for the application.
+ * @brief Releases all runtime resources and terminates the process.
  *
- * This function is registered as a signal handler and is invoked when the process
- * receives a signal. The specific actions taken depend on the signal received.
- *
- * @param signal The signal number received by the process.
+ * Called from non-signal contexts only (end of main loop for clean shutdown,
+ * or from FAILURE() on a startup error). Uses non-async-signal-safe routines
+ * (free, fprintf via log()), which is fine here.
  */
-static void signal_handler(int signal) {
+static void cleanup_and_exit(int exit_status) {
     client_entry_t *current_entry, *tmp;
 
-    // Close all connections and clean up
     if (listen_sock) {
         close(listen_sock);
     }
@@ -55,9 +57,24 @@ static void signal_handler(int signal) {
     }
 #endif
     log(LL_INFO, "Stopped.");
-    exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
+    exit(exit_status);
 }
-#define FAILURE() signal_handler(-1)
+
+/**
+ * @brief Async-signal-safe signal handler.
+ *
+ * Only sets a flag — actual cleanup runs in the main loop on the next iteration
+ * via cleanup_and_exit(). POSIX forbids free()/fprintf()/exit() from signal
+ * handlers (signal-safety(7)); doing them here would risk deadlock on the libc
+ * malloc mutex or a torn stdio stream.
+ */
+static void signal_handler(int signal) {
+    (void)signal;
+    stop_requested = 1;
+}
+
+// Used from non-signal startup error paths. Safe to call cleanup directly.
+#define FAILURE() cleanup_and_exit(EXIT_FAILURE)
 
 /**
  * @brief Creates a new client_entry_t structure and initializes it with the provided client and forward addresses.
@@ -519,11 +536,13 @@ int main(int argc, char *argv[]) {
     log(LL_INFO, "WireGuard obfuscator successfully started");
 
     /* Main loop */
-    while (1) {
+    while (!stop_requested) {
         // Using epoll or poll to wait for events
 #ifdef USE_EPOLL
         int events_n = epoll_wait(epfd, events, MAX_EVENTS, POLL_TIMEOUT);
         if (events_n < 0) {
+            // EINTR is expected when SIGTERM/SIGINT arrives — just re-check the flag.
+            if (errno == EINTR) continue;
             serror("epoll_wait");
             FAILURE();
         }
@@ -544,6 +563,7 @@ int main(int argc, char *argv[]) {
         }
         int ret = poll(pollfds, nfds, POLL_TIMEOUT);
         if (ret < 0) {
+            if (errno == EINTR) continue;
             serror("poll");
             FAILURE();
         }
@@ -913,8 +933,9 @@ int main(int argc, char *argv[]) {
             // Update the last cleanup time
             last_cleanup_time = now;
         }
-    } // while (1)
+    } // while (!stop_requested)
 
-    // You should never reach this point, but just in case
-    return 0;
+    // Clean shutdown requested via SIGTERM/SIGINT.
+    cleanup_and_exit(EXIT_SUCCESS);
+    return 0; // unreachable, silences compilers
 }
