@@ -162,18 +162,63 @@ test-integration: $(TARGET) $(TEST_WG_EMULATOR)
 	@echo "Running integration tests..."
 	@cd $(TEST_DIR) && ./run_tests.sh
 
-# Run the stderr-pipe-blocking regression test (Linux only).
-# Not included in the default 'test' target because it requires
-# /proc/<pid>/wchan and `ss` (iproute2); skip gracefully elsewhere.
+# Linux-only functional tests introduced for v1.6 refactor.
+# Each gates one specific behavior; see the script header for details.
+LINUX_FUNCTIONAL_TESTS = \
+    $(TEST_DIR)/test_stderr_block.sh \
+    $(TEST_DIR)/test_syslog_mode.sh \
+    $(TEST_DIR)/test_stun_ratelimit.sh \
+    $(TEST_DIR)/test_sigterm_clean.sh \
+    $(TEST_DIR)/test_drain_burst.sh \
+    $(TEST_DIR)/test_so_rcvbuf.sh
+
 test-stderr-block: $(TARGET)
 	@if [ "$$(uname -s)" != "Linux" ]; then \
-		echo "test-stderr-block: skipped (Linux-only)"; \
-		exit 0; \
+		echo "test-stderr-block: skipped (Linux-only)"; exit 0; \
 	fi
 	@$(TEST_DIR)/test_stderr_block.sh
 
+test-syslog-mode: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-syslog-mode: skipped (Linux-only)"; exit 0; \
+	fi
+	@$(TEST_DIR)/test_syslog_mode.sh
+
+test-stun-ratelimit: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-stun-ratelimit: skipped (Linux-only)"; exit 0; \
+	fi
+	@$(TEST_DIR)/test_stun_ratelimit.sh
+
+test-sigterm-clean: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-sigterm-clean: skipped (Linux-only)"; exit 0; \
+	fi
+	@$(TEST_DIR)/test_sigterm_clean.sh
+
+test-drain-burst: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-drain-burst: skipped (Linux-only)"; exit 0; \
+	fi
+	@$(TEST_DIR)/test_drain_burst.sh
+
+test-so-rcvbuf: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-so-rcvbuf: skipped (Linux-only)"; exit 0; \
+	fi
+	@$(TEST_DIR)/test_so_rcvbuf.sh
+
+# Aggregate: every Linux-only functional test.
+test-functional: $(TARGET)
+	@if [ "$$(uname -s)" != "Linux" ]; then \
+		echo "test-functional: skipped (Linux-only)"; exit 0; \
+	fi
+	@set -e; for t in $(LINUX_FUNCTIONAL_TESTS); do \
+		echo ""; echo "=== $$t ==="; $$t; \
+	done
+
 # Run all tests
-test: test-build test-unit test-integration test-stderr-block
+test: test-build test-unit test-integration test-functional
 	@echo ""
 	@echo "========================================="
 	@echo "All tests completed successfully!"
@@ -185,4 +230,7 @@ clean-tests:
 	$(RM) $(TEST_HARNESS) $(TEST_WG_EMULATOR)
 	$(RM) -r /tmp/wg-obfuscator-test
 
-.PHONY: clean install test test-build test-unit test-integration test-stderr-block clean-tests
+.PHONY: clean install test test-build test-unit test-integration \
+        test-stderr-block test-syslog-mode test-stun-ratelimit \
+        test-sigterm-clean test-drain-burst test-so-rcvbuf test-functional \
+        clean-tests
