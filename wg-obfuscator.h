@@ -42,6 +42,11 @@
 // Undersized rcvbuf is the main reason for UdpRcvbufErrors under bursts.
 #define UDP_RCVBUF_BYTES        (8 * 1024 * 1024)
 
+// Cap on the number of packets drained from a single fd during one epoll/poll
+// event — prevents one busy fd from starving other fds or the idle-cleanup
+// timer. The kernel re-notifies on the next wait if more data is queued.
+#define DRAIN_BATCH_MAX         128
+
 // Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
 

@@ -92,6 +92,30 @@ static void bump_udp_rcvbuf(int sock, const char *label) {
 }
 
 /**
+ * @brief Put a socket into non-blocking mode.
+ *
+ * UDP send/sendto on a blocking socket can, in rare cases (full device queue,
+ * kernel memory pressure), suspend the caller for an indefinite time. In a
+ * single-threaded event-loop process that would freeze every connection.
+ * With O_NONBLOCK, send returns EAGAIN/ENOBUFS instead and we drop the
+ * datagram — the correct semantics for UDP.
+ */
+static void set_nonblocking(int sock, const char *label) {
+    int f = fcntl(sock, F_GETFL, 0);
+    if (f < 0 || fcntl(sock, F_SETFL, f | O_NONBLOCK) < 0) {
+        log(LL_WARN, "Failed to set O_NONBLOCK on %s: %s", label, strerror(errno));
+    }
+}
+
+/**
+ * @brief True if errno (from a failed send/sendto/recv/recvfrom) just means
+ * "socket queue full / no data right now" — i.e. drop-or-retry, not a bug.
+ */
+static inline int errno_is_transient(int e) {
+    return e == EAGAIN || e == EWOULDBLOCK || e == ENOBUFS || e == EINTR;
+}
+
+/**
  * @brief Creates a new client_entry_t structure and initializes it with the provided client and forward addresses.
  *
  * @param config Pointer to the obfuscator configuration structure.
@@ -123,6 +147,7 @@ static client_entry_t * new_client_entry(obfuscator_config_t *config, struct soc
         return NULL;
     }
     bump_udp_rcvbuf(client_entry->server_sock, "server socket");
+    set_nonblocking(client_entry->server_sock, "server socket");
 #ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
@@ -231,6 +256,7 @@ static client_entry_t * new_client_entry_static(obfuscator_config_t *config, str
         return NULL;
     }
     bump_udp_rcvbuf(client_entry->server_sock, "static server socket");
+    set_nonblocking(client_entry->server_sock, "static server socket");
 #ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
@@ -424,6 +450,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     bump_udp_rcvbuf(listen_sock, "listening socket");
+    set_nonblocking(listen_sock, "listening socket");
 
 #ifdef __linux__
     /* Set "Don't Fragment" flag */
@@ -601,12 +628,16 @@ int main(int argc, char *argv[]) {
             if (pollfds[e].fd == listen_sock) {
 #endif
                 /* *** Handle incoming data from the clients *** */
+                // Drain up to DRAIN_BATCH_MAX packets per notification. Level-triggered
+                // epoll will re-notify on the next wait if more is queued.
+                for (int drained = 0; drained < DRAIN_BATCH_MAX; drained++) {
                 struct sockaddr_in sender_addr = {0};
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
+                    if (errno_is_transient(errno)) break; // queue drained
                     serror_level(LL_DEBUG, "recvfrom client");
-                    continue;
+                    break;
                 }
                 if (length > BUFFER_SIZE) {
                     log(LL_DEBUG, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
@@ -765,6 +796,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 client_entry->last_activity_time = now;
+                } // end drain loop for listen_sock
             } else { // if (event->data.fd == listen_sock)
                 /* *** Handle data from the server *** */
 #ifdef USE_EPOLL
@@ -772,10 +804,13 @@ int main(int argc, char *argv[]) {
 #else
                 client_entry_t *client_entry = find_by_server_sock(pollfds[e].fd);
 #endif
+                // Drain up to DRAIN_BATCH_MAX packets per notification.
+                for (int drained = 0; drained < DRAIN_BATCH_MAX; drained++) {
                 int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC);
                 if (length < 0) {
+                    if (errno_is_transient(errno)) break; // queue drained
                     serror_level(LL_DEBUG, "recv from server");
-                    continue;
+                    break;
                 }
                 if (length > BUFFER_SIZE) {
                     log(LL_DEBUG, "Received packet from %s:%d is too large (%d bytes), while buffer size is %d bytes, ignoring",
@@ -916,6 +951,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 client_entry->last_activity_time = now;
+                } // end drain loop for server_sock
             } // if (event->data.fd != listen_sock)
         } // for (int e = 0; e < events_n; e++)
 
