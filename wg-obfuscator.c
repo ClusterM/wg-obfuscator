@@ -77,6 +77,21 @@ static void signal_handler(int signal) {
 #define FAILURE() cleanup_and_exit(EXIT_FAILURE)
 
 /**
+ * @brief Raise a UDP socket's receive buffer to UDP_RCVBUF_BYTES.
+ *
+ * Silently clamped by the kernel to net.core.rmem_max (so on systems with the
+ * distro default of ~208 KiB the effective size will be smaller). Logs a WARN
+ * only if setsockopt itself fails; use `ss -u -l -m` to verify the effective
+ * size at runtime.
+ */
+static void bump_udp_rcvbuf(int sock, const char *label) {
+    int rcvbuf = UDP_RCVBUF_BYTES;
+    if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
+        log(LL_WARN, "Failed to set SO_RCVBUF on %s: %s", label, strerror(errno));
+    }
+}
+
+/**
  * @brief Creates a new client_entry_t structure and initializes it with the provided client and forward addresses.
  *
  * @param config Pointer to the obfuscator configuration structure.
@@ -107,6 +122,7 @@ static client_entry_t * new_client_entry(obfuscator_config_t *config, struct soc
         free(client_entry);
         return NULL;
     }
+    bump_udp_rcvbuf(client_entry->server_sock, "server socket");
 #ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
@@ -208,17 +224,18 @@ static client_entry_t * new_client_entry_static(obfuscator_config_t *config, str
     client_entry->our_addr.sin_port = htons(local_port);
     // Set the local port number
     if (bind(client_entry->server_sock, (struct sockaddr *)&client_entry->our_addr, sizeof(client_entry->our_addr)) < 0) {
-        serror("Failed to bind server socket to %s:%d", 
+        serror("Failed to bind server socket to %s:%d",
             inet_ntoa(client_entry->our_addr.sin_addr), local_port);
         close(client_entry->server_sock);
         free(client_entry);
         return NULL;
     }
+    bump_udp_rcvbuf(client_entry->server_sock, "static server socket");
 #ifdef __linux__
     // Set "Don't Fragment" flag
     int optval = 1;
     if (setsockopt(client_entry->server_sock, IPPROTO_IP, IP_MTU_DISCOVER, &optval, sizeof(optval)) < 0) {
-        serror("Failed to set 'don't fragment' flag for client %s:%d", 
+        serror("Failed to set 'don't fragment' flag for client %s:%d",
             inet_ntoa(client_entry->client_addr.sin_addr), local_port);
         close(client_entry->server_sock);
         free(client_entry);
@@ -406,6 +423,7 @@ int main(int argc, char *argv[]) {
         serror("Can't create source socket to listen");
         exit(EXIT_FAILURE);
     }
+    bump_udp_rcvbuf(listen_sock, "listening socket");
 
 #ifdef __linux__
     /* Set "Don't Fragment" flag */

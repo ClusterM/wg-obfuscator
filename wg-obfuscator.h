@@ -36,6 +36,12 @@
 #define IDLE_TIMEOUT_DEFAULT            300000  // in milliseconds
 #define MAX_DUMMY_LENGTH_DATA_DEFAULT   4       // maximum length of dummy data for data packets
 
+// Request 8 MiB of kernel UDP receive buffer per socket. The kernel doubles the
+// value and clamps to net.core.rmem_max; on production systems you typically
+// want `sysctl -w net.core.rmem_max=16777216` so the full 8 MiB is honored.
+// Undersized rcvbuf is the main reason for UdpRcvbufErrors under bursts.
+#define UDP_RCVBUF_BYTES        (8 * 1024 * 1024)
+
 // Default instance name
 #define DEFAULT_INSTANCE_NAME   "main"
 
