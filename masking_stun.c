@@ -3,9 +3,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 #include "wg-obfuscator.h"
 #include "masking.h"
 #include "masking_stun.h"
+
+// Rate-limit STUN BINDING_REQUEST responses from unknown sources (client == NULL).
+// Prevents the obfuscator from being used as a STUN reflector against a spoofed
+// third party. Amplification ratio here is only ~1.43x (40 B response / 28 B
+// request), so this is a CPU/traffic sink rather than a serious amplifier, but
+// there's no legitimate reason to allow unbounded responses.
+#define STUN_UNKNOWN_REQ_MAX_PER_SEC    100
+static time_t stun_rl_window = 0;
+static unsigned int stun_rl_count = 0;
 
 static void rand_bytes(uint8_t* p, size_t n){ for(size_t i=0;i<n;i++) p[i]=rand()&0xFF; }
 
@@ -196,6 +206,20 @@ static int stun_on_data_unwrap(uint8_t *buffer, int length,
     case STUN_BINDING_REQ: {
         // Received STUN Binding Request from client, send Binding Success Response
         log(LL_TRACE, "Received STUN Binding Request from %s:%d", inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port));
+        // Rate-limit responses to requests from unknown sources to avoid being
+        // used as a traffic-amplifying reflector.
+        if (!client) {
+            time_t now_s = time(NULL);
+            if (now_s != stun_rl_window) {
+                stun_rl_window = now_s;
+                stun_rl_count = 0;
+            }
+            if (++stun_rl_count > STUN_UNKNOWN_REQ_MAX_PER_SEC) {
+                log(LL_DEBUG, "STUN Binding Request from %s:%d rate-limited (over %u/s from unknown sources)",
+                    inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port), STUN_UNKNOWN_REQ_MAX_PER_SEC);
+                return 0;
+            }
+        }
         uint8_t txid[12];
         memcpy(txid, buffer + 8, 12);
         int resp_len = stun_build_binding_success(buffer, txid, src_addr);
