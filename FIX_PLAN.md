@@ -458,10 +458,29 @@ environment; Layer 2/3 fixes the code.
 ## Rollout Order
 
 1. **Immediately (hotfix):** deploy Layer 1 to all prod nodes.
-2. **Next patch release (1.5.2):** Layer 2 + cleanup #1 (`SO_RCVBUF`).
-   These are small, safe, and fully covered by the new regression test.
-3. **Next minor release (1.6):** Layer 3 + cleanups #2–#5. Bigger
-   refactor, deserves its own review cycle.
+2. **Patch release 1.5.2 (shipped):** Layer 2 only.
+   - Small, safe, fully covered by the new regression test.
+   - SO_RCVBUF (cleanup #1) was originally planned here but slipped
+     to 1.6.0; the hang is already gone, and rmem tuning can be done
+     operationally via `sysctl net.core.rmem_max` without a binary
+     update.
+3. **Minor release 1.6.0 (shipped on `v1.6-refactor`):** Layer 3 +
+   cleanups #1–#5.
+   - Layer 3: `syslog(3)` with `isatty()` fallback. `trace()` hex
+     dumps moved behind `#ifdef DEBUG`. `HASH_OOPS` mirrored to syslog.
+   - Cleanup #1: `SO_RCVBUF = 8 MiB` on all UDP sockets.
+   - Cleanup #2: `O_NONBLOCK` on all UDP sockets; `errno_is_transient`
+     helper for EAGAIN/EWOULDBLOCK/ENOBUFS/EINTR.
+   - Cleanup #3: drain loop on EPOLLIN, capped at `DRAIN_BATCH_MAX=128`
+     packets per notification to avoid fd starvation.
+   - Cleanup #4: async-signal-safe `signal_handler()` — just sets a
+     flag; real work moved to `cleanup_and_exit()` driven from the
+     main loop. EINTR on `epoll_wait`/`poll` treated as expected
+     interruption rather than failure.
+   - Cleanup #5: global rate limit of 100 STUN BINDING_REQUESTs / sec
+     from unknown sources (client == NULL in `masking_stun.c`).
+   - Layer 2's `fcntl(O_NONBLOCK)` + `setvbuf(_IOLBF)` kept in place
+     as belt-and-braces for the stderr path and for DEBUG trace output.
 
 ## Open Questions
 
