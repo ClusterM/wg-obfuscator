@@ -30,17 +30,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute lowercase owner
+        id: prep
+        run: |
+          OWNER_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "owner=$OWNER_LC" >> $GITHUB_OUTPUT
 
       - name: Build and push multiarch image
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: |
-            clustermeerkat/${{ env.IMAGE_NAME }}:nightly
+            ghcr.io/${{ steps.prep.outputs.owner }}/${{ env.IMAGE_NAME }}:nightly
           platforms: ${{ env.PLATFORMS }}
           context: .

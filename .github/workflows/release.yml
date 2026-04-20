@@ -378,7 +378,7 @@ jobs:
           asset_content_type: application/zip
 
 
-  push-to-docker-hub:
+  push-to-ghcr:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -394,25 +394,28 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version
+      - name: Get version and owner
         id: prep
         run: |
           VERSION=$(grep WG_OBFUSCATOR_VERSION wg-obfuscator.h | awk '{print $3}' | sed 's|"||g' | tr -d '\r')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          OWNER_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "owner=$OWNER_LC" >> $GITHUB_OUTPUT
 
       - name: Build and push multiarch image
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: |
-            clustermeerkat/${{ env.IMAGE_NAME }}:latest
-            clustermeerkat/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }}
+            ghcr.io/${{ steps.prep.outputs.owner }}/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ steps.prep.outputs.owner }}/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }}
           platforms: ${{ env.PLATFORMS }}
           build-args: |
             RELEASE=1
