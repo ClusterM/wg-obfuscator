@@ -1,10 +1,10 @@
 *.exe
-wg-obfuscator
+wg0-obfuscator
 *.dll
 *dump
 commit.h
 .vscode/
-.wg-obfuscator.conf
+.wg0-obfuscator.conf
 .idea/
 /CLAUDE.md
 

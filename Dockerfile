@@ -10,6 +10,6 @@ RUN make clean && make all LDFLAGS="-static"
 # Stage 2: Runtime
 FROM scratch
 WORKDIR /app
-COPY --from=build /src/wg-obfuscator ./wg-obfuscator
-COPY wg-obfuscator.conf /etc/wg-obfuscator/wg-obfuscator.conf
-ENTRYPOINT ["./wg-obfuscator", "-c", "/etc/wg-obfuscator/wg-obfuscator.conf"]
+COPY --from=build /src/wg0-obfuscator ./wg0-obfuscator
+COPY wg0-obfuscator.conf /etc/wg0-obfuscator/wg0-obfuscator.conf
+ENTRYPOINT ["./wg0-obfuscator", "-c", "/etc/wg0-obfuscator/wg0-obfuscator.conf"]

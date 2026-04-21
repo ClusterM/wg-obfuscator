@@ -3,7 +3,7 @@ Description=WireGuard Obfuscator
 After=network.target
 
 [Service]
-ExecStart=wg-obfuscator -c /etc/wg-obfuscator.conf
+ExecStart=wg0-obfuscator -c /etc/wg0-obfuscator.conf
 StandardOutput=inherit
 StandardError=inherit
 Restart=always
