@@ -136,6 +136,16 @@ generate_instance_config() {
         idle_timeout=300
     fi
     echo "idle-timeout = $idle_timeout"
+
+    local in_timeout=$(get_uci_value "$section" "in_timeout" "0")
+    if [ "$in_timeout" -lt 0 ] 2>/dev/null; then
+        echo "WARNING: Invalid in-timeout value for section '$section', using default 0" >&2
+        in_timeout=0
+    fi
+    # Omit when disabled: the daemon rejects in-timeout <= 0
+    if [ "$in_timeout" -gt 0 ] 2>/dev/null; then
+        echo "in-timeout = $in_timeout"
+    fi
     
     local max_dummy=$(get_uci_value "$section" "max_dummy" "4")
     if [ "$max_dummy" -lt 0 ] || [ "$max_dummy" -gt 255 ] 2>/dev/null; then

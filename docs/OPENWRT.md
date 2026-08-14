@@ -35,7 +35,8 @@ After installing `luci-app-wg-obfuscator`:
    - **Masking Type** - Protocol masking (AUTO recommended)
    - **Log Level** - Verbosity (INFO recommended)
    - **Max Clients** - Maximum concurrent clients
-   - **Idle Timeout** - Seconds before disconnecting idle clients
+   - **Idle Timeout** - Maximum time a session can be idle before it is disconnected
+   - **Incoming Timeout** - Same as Idle Timeout, but only counts data received from the target (0 = disabled)
    - **Max Dummy Data** - Random padding length (0-255)
    - **Static Bindings** - For two-way mode (see below)
 3. Click **"Save & Apply"** to save configuration
@@ -96,6 +97,7 @@ uci commit wg-obfuscator
 | `verbose` | Log level | `INFO` | `ERRORS`, `WARNINGS`, `INFO`, `DEBUG`, `TRACE` |
 | `max_clients` | Max concurrent clients | `1024` | `512` |
 | `idle_timeout` | Idle timeout (seconds) | `300` | `600` |
+| `in_timeout` | Same as idle_timeout, but only counts data received from the target (0 = disabled) | `0` | `60` |
 | `max_dummy` | Max dummy data length | `4` | `0`-`255` |
 | `static_bindings` | Static bindings (two-way mode) | - | `1.2.3.4:12883:6670` |
 

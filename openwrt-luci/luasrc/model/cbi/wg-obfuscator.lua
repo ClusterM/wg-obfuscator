@@ -98,6 +98,11 @@ idle_timeout = s:option(Value, "idle_timeout", translate("Idle Timeout"),
 idle_timeout.datatype = "uinteger"
 idle_timeout.default = "300"
 
+in_timeout = s:option(Value, "in_timeout", translate("Incoming Timeout"),
+    translate("Same as Idle Timeout, but only counts data received from the target (0 = disabled). Intended for clients: detects a dead or silently blocked server. If the client is still active and static bindings are not used, a new session is created with a fresh outbound UDP port. Useful when DPI bans a particular IP:port pair."))
+in_timeout.datatype = "uinteger"
+in_timeout.default = "0"
+
 max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"), 
     translate("Maximum dummy data length for packets (0-255)"))
 max_dummy.datatype = "range(0,255)"
