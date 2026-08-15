@@ -135,6 +135,12 @@
                 description = "Idle timeout in seconds";
               };
 
+              inTimeout = mkOption {
+                type = types.int;
+                default = 0;
+                description = "Incoming timeout in seconds (0 = disabled). Intended for clients: disconnect if nothing arrives from the target for this period";
+              };
+
               maxDummy = mkOption {
                 type = types.int;
                 default = 4;
@@ -163,6 +169,7 @@
               verbose = ${inst.verbose}
               max-clients = ${toString inst.maxClients}
               idle-timeout = ${toString inst.idleTimeout}
+              ${optionalString (inst.inTimeout > 0) "in-timeout = ${toString inst.inTimeout}"}
               max-dummy = ${toString inst.maxDummy}
               ${optionalString inst.allowClean "allow-clean = true"}
             '') (filterAttrs (_: inst: inst.enable) instances)
@@ -278,6 +285,7 @@
                       verbose = ${inst.verbose}
                       max-clients = ${toString inst.maxClients}
                       idle-timeout = ${toString inst.idleTimeout}
+                      ${optionalString (inst.inTimeout > 0) "in-timeout = ${toString inst.inTimeout}"}
                       max-dummy = ${toString inst.maxDummy}
                       ${optionalString inst.allowClean "allow-clean = true"}
                     '') instances

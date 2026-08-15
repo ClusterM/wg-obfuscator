@@ -305,7 +305,9 @@ Run multiple obfuscators for different VPN servers:
 | `verbose` | enum | "INFO" | Log level: ERRORS, WARNINGS, INFO, DEBUG, TRACE |
 | `maxClients` | int | 1024 | Maximum simultaneous clients |
 | `idleTimeout` | int | 300 | Idle timeout in seconds |
+| `inTimeout` | int | 0 | Incoming timeout in seconds (0 = disabled; for clients) |
 | `maxDummy` | int | 4 | Max dummy data bytes (0-1024) |
+| `allowClean` | bool | false | For servers: accept non-obfuscated clients (not compatible with staticBindings) |
 
 ### Service Options
 
