@@ -78,7 +78,7 @@ typedef struct {
     char forward_host_port[256];                // Host and port to forward the data to
     char xor_key[256];                          // Key for obfuscation
     char client_interface[256];                 // Client interface as a string
-    char static_bindings[10 * 1024];            // Static bindings as a string
+    char *static_bindings;                      // Static bindings as a string
     int max_clients;                            // Maximum number of clients
     long idle_timeout;                          // Idle timeout in milliseconds
     long in_timeout;                            // Incoming timeout in milliseconds

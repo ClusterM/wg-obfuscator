@@ -52,6 +52,7 @@ static void show_usage(void)
         "  -b, --static-bindings=<ip>:<port>:<port>,...\n"
         "                             Comma-separated static bindings for two-way mode\n"
         "                             as <client_ip>:<client_port>:<forward_port>\n"
+        "                             You can also repeat this option.\n"
         "  -f, --fwmark=<mark>        Firewall mark to set on all packets\n"
         "                             (optional, default - 0, e.g. disabled)\n"
         "  -v, --verbose=<level>      Verbosity level (optional, default - INFO)\n"
@@ -84,6 +85,9 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
  */
 static void reset_config(obfuscator_config_t *config)
 {
+    if (config->static_bindings) {
+        free(config->static_bindings);
+    }
     memset(config, 0, sizeof(*config));
     config->max_clients = MAX_CLIENTS_DEFAULT;
     config->idle_timeout = IDLE_TIMEOUT_DEFAULT;
@@ -279,9 +283,25 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
             config->forward_host_port_set = 1;
             break;
         case 'b':
-            strncpy(config->static_bindings, val, sizeof(config->static_bindings) - 1);
-            config->static_bindings[sizeof(config->static_bindings) - 1] = 0; // Ensure null-termination
-            config->static_bindings_set = 1;
+            {
+                char *new_bindings;
+                if (!config->static_bindings) {
+                    new_bindings = strdup(val);
+                } else {
+                    size_t old_len = strlen(config->static_bindings);
+                    new_bindings = realloc(config->static_bindings, old_len + strlen(val) + 2);
+                    if (new_bindings) {
+                        new_bindings[old_len] = ',';
+                        strcpy(new_bindings + old_len + 1, val);
+                    }
+                }
+                if (!new_bindings) {
+                    log(LL_ERROR, "Out of memory while parsing static-bindings");
+                    exit(EXIT_FAILURE);
+                }
+                config->static_bindings = new_bindings;
+                config->static_bindings_set = 1;
+            }
             break;
         case 'k':
             strncpy(config->xor_key, val, sizeof(config->xor_key));

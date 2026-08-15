@@ -163,7 +163,7 @@ The obfuscator can be run with a command line configuration or using a configura
 * `-a <type>` or `--masking=<type>`  
   Protocol masking type to disguise traffic. Optional, default is `AUTO`. Supported values: `STUN`, `AUTO`, `NONE`. See ["Masking"](#masking) for details.
 * `-b <bindings>` or `--static-bindings=<bindings>`  
-  Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. See ["Two-way mode"](#two-way-mode) for details.
+  Comma-separated static bindings for two-way mode, in the format `<client_ip>:<client_port>:<forward_port>`. You can also repeat this option (on the command line or on multiple lines in the configuration file) instead of writing one very long line. See ["Two-way mode"](#two-way-mode) for details.
 * `-f <mark>` or `--fwmark=<mark>`  
   Firewall mark to set on all packets. Can be used to prevent routing loops. Optional, default is `0`, (i.e. disabled). Can be `0`-`65535` or `0x0000`-`0xFFFF`.
 * `-v <level>` or `--verbose=<level>`  
@@ -315,6 +315,8 @@ In some setups, both WireGuard peers have public IP addresses and can each initi
 
 A **static binding** tells the obfuscator, right from startup, which peer IPs and ports should be mapped to which local ports. This allows the obfuscator to know exactly how to route packets from the server to the correct local WireGuard instance - **even if that peer hasn’t sent any packets yet.**
 Without static bindings, the obfuscator only learns how to forward packets after seeing traffic from a client.
+
+The `static-bindings` option accepts a comma-separated list. You can also repeat the option (on the command line or on multiple lines in the configuration file) instead of writing one very long line.
 
 #### Example: Two-way WireGuard with Obfuscation
 

@@ -270,7 +270,7 @@ void print_version(void) {
 }
 
 int main(int argc, char *argv[]) {
-    obfuscator_config_t config;
+    obfuscator_config_t config = {0};
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
@@ -454,7 +454,7 @@ int main(int argc, char *argv[]) {
     log(LL_INFO, "Target: %s:%d", target_host, target_port);
 
     /* Add static bindings if provided */
-    if (config.static_bindings[0]) {
+    if (config.static_bindings) {
         // Parse static bindings
         char *binding = strtok(config.static_bindings, ",");
         while (binding) {
@@ -510,6 +510,8 @@ int main(int argc, char *argv[]) {
 
             binding = strtok(NULL, ",");
         }
+        free(config.static_bindings);
+        config.static_bindings = NULL;
     }
 
     log(LL_INFO, "WireGuard obfuscator successfully started");
