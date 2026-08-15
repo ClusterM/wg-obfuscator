@@ -28,6 +28,7 @@ static const mini_argp_opt options[] = {
     { "in-timeout", 'n', 1 },
     { "max-dummy", 'd', 1 },
     { "fwmark", 'f', 1 },
+    { "allow-clean", 'e', 0 },
     { "verbose", 'v', 1 },
     { 0 }
 };
@@ -67,7 +68,8 @@ static void show_usage(void)
         "  -l, --idle-timeout=<sec>   Idle timeout in seconds (default: 300)\n"
         "  -n, --in-timeout=<sec>     Incoming timeout in seconds (default: 0 - disabled)\n"
         "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
-        "                             (default: 4)\n");
+        "                             (default: 4)\n"
+        "  -e, --allow-clean          For servers, allow non-obfuscated incoming connections\n");
 }
 
 static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
@@ -108,6 +110,31 @@ static uint8_t is_integer(const char *str)
         str++;
     }
     return 1; // All characters are digits
+}
+
+/**
+ * Parses a boolean value from a string.
+ *
+ * @param str Pointer to the null-terminated string to parse.
+ * @return 1 for true values ("true", "yes", "on", "1"),
+ *         0 for false values ("false", "no", "off", "0"),
+ *         -1 if the string is not a valid boolean value.
+ */
+static int parse_bool(const char *str)
+{
+    char lower[16];
+    if (!str || !*str || strlen(str) >= sizeof(lower)) {
+        return -1;
+    }
+    strcpy(lower, str);
+    for (char *p = lower; *p; ++p) *p = tolower((unsigned char)*p);
+    if (!strcmp(lower, "true") || !strcmp(lower, "yes") || !strcmp(lower, "on") || !strcmp(lower, "1")) {
+        return 1;
+    }
+    if (!strcmp(lower, "false") || !strcmp(lower, "no") || !strcmp(lower, "off") || !strcmp(lower, "0")) {
+        return 0;
+    }
+    return -1;
 }
 
 /**
@@ -198,8 +225,16 @@ static void read_config_file(const char *filename, obfuscator_config_t *config)
             exit(EXIT_FAILURE);
         }
         if (!o->has_arg) {
-            log(LL_ERROR, "Configuration key '%s' does not accept a value", key);
-            exit(EXIT_FAILURE);
+            // Flag options are represented as booleans in the config file
+            int b = parse_bool(value);
+            if (b < 0) {
+                log(LL_ERROR, "Configuration key '%s' accepts only boolean values (true/yes/on/1 or false/no/off/0)", key);
+                exit(EXIT_FAILURE);
+            }
+            if (!b) {
+                continue;
+            }
+            value = NULL;
         }
         parse_opt(o->long_name, o->short_name, value, config);
     }
@@ -302,6 +337,9 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                 log(LL_ERROR, "Invalid maximum dummy length for data packets: %s (must be between 0 and %d)", val, MAX_DUMMY_LENGTH_TOTAL);
                 exit(EXIT_FAILURE);
             }
+            break;
+        case 'e':
+            config->allow_clean = 1;
             break;
         case 'f':
             // parse string with decimal and hexadecimal support

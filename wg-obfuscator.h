@@ -85,6 +85,7 @@ typedef struct {
     int max_dummy_length_data;                  // Maximum length of dummy data for data packets
     uint32_t fwmark;                            // Firewall mark
     masking_handler_t *masking_handler;         // Masking handler to use
+    uint8_t allow_clean;                        // 1 if non-obfuscated (clean) clients are allowed, 0 otherwise
 
     uint8_t listen_port_set;                    // 1 if the listen port is set, 0 otherwise
     uint8_t forward_host_port_set;              // 1 if the forward host and port are set, 0 otherwise
@@ -110,6 +111,7 @@ typedef struct {
     uint8_t handshake_direction : 1;            // 1 if the handshake is from client to server, 0 if from server to client
     uint8_t client_obfuscated   : 1;            // 1 if the client is obfuscated, 0 otherwise
     uint8_t server_obfuscated   : 1;            // 1 if the server is obfuscated, 0 otherwise
+    uint8_t client_clean        : 1;            // 1 if the client speaks plain (non-obfuscated) WireGuard, traffic is passed through as is (allow-clean mode)
     uint8_t is_static           : 1;            // 1 if this is a static binding entry, 0 otherwise
     UT_hash_handle hh;
 } client_entry_t;

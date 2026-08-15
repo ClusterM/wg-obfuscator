@@ -351,6 +351,13 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // 'allow-clean' is incompatible with static bindings: for a static binding
+    // there is no way to know in advance whether the client's traffic must be obfuscated
+    if (config.allow_clean && config.static_bindings_set) {
+        log(LL_ERROR, "'allow-clean' cannot be used together with 'static-bindings'");
+        exit(EXIT_FAILURE);
+    }
+
     // Check the client interface
     if (config.client_interface_set) {
         s_listen_addr_client = inet_addr(config.client_interface);
@@ -403,6 +410,10 @@ int main(int argc, char *argv[]) {
 
     if (config.masking_handler_set) {
         log(LL_INFO, "Using masking type: %s", config.masking_handler ? config.masking_handler->name : "none");
+    }
+
+    if (config.allow_clean) {
+        log(LL_INFO, "Non-obfuscated (clean) clients are allowed, their traffic will be forwarded as is");
     }
 
     /* Use epoll for events if enabled */
@@ -629,7 +640,20 @@ int main(int argc, char *argv[]) {
                         client_entry->last_incoming_time = 0;
                         client_entry->masking_handler = masking_handler;
                     }
-                    if (!obfuscated) {
+                    if (config.allow_clean) {
+                        // Remember whether this client speaks plain WireGuard,
+                        // its traffic will be forwarded as is in both directions
+                        if (!obfuscated && !client_entry->client_clean) {
+                            log(LL_INFO, "Client %s:%d is not obfuscated, forwarding its traffic as is",
+                                inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+                        }
+                        client_entry->client_clean = !obfuscated;
+                        if (client_entry->client_clean) {
+                            // No masking for clean clients
+                            client_entry->masking_handler = NULL;
+                        }
+                    }
+                    if (!obfuscated && !client_entry->client_clean) {
                         masking_on_handshake_req_from_client(&config, client_entry, listen_sock, &sender_addr, &forward_addr);
                     }
                     client_entry->handshake_direction = DIR_CLIENT_TO_SERVER;
@@ -685,7 +709,7 @@ int main(int argc, char *argv[]) {
                     client_entry->version = version;
                 }
 
-                if (!obfuscated) {
+                if (!obfuscated && !client_entry->client_clean) {
                     // If the packet is not obfuscated, we need to encode it
                     length = encode(buffer, length, config.xor_key, key_length, client_entry->version, config.max_dummy_length_data);
                     if (length < 4) {
@@ -697,7 +721,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (verbose >= LL_TRACE) {
-                    if (!obfuscated) {
+                    if (!obfuscated && !client_entry->client_clean) {
                         trace("X->: ");
                     } else {
                         trace("O->: ");
@@ -783,7 +807,7 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         length, 
                         obfuscated ? "yes" : "no");
-                    if (!obfuscated) {
+                    if (!obfuscated && !client_entry->client_clean) {
                         // Send STUN binding request before the obfuscated handshake
                         masking_on_handshake_req_from_server(&config, client_entry, listen_sock, &client_entry->client_addr, &forward_addr);
                     }
@@ -817,7 +841,7 @@ int main(int argc, char *argv[]) {
                         log(LL_INFO, "Autodetected masking handler for client %s:%d: %s", inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port), client_entry->masking_handler->name);
                     }
                     client_entry->handshaked = 1;
-                    client_entry->client_obfuscated = !obfuscated;
+                    client_entry->client_obfuscated = !obfuscated && !client_entry->client_clean;
                     client_entry->server_obfuscated = obfuscated;
                     client_entry->last_handshake_time = now;
                 }
@@ -837,7 +861,7 @@ int main(int argc, char *argv[]) {
                     client_entry->version = version;
                 }
 
-                if (!obfuscated) {
+                if (!obfuscated && !client_entry->client_clean) {
                     // If the packet is not obfuscated, we need to encode it
                     length = encode(buffer, length, config.xor_key, key_length, client_entry->version, config.max_dummy_length_data);
                     if (length < 4) {
@@ -848,7 +872,7 @@ int main(int argc, char *argv[]) {
                 }
                 
                 if (verbose >= LL_TRACE) {
-                    if (!obfuscated) {
+                    if (!obfuscated && !client_entry->client_clean) {
                         trace("<-X: ");
                     } else {
                         trace("<-O: ");

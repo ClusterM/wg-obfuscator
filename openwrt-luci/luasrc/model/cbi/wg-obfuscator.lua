@@ -108,6 +108,11 @@ max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"),
 max_dummy.datatype = "range(0,255)"
 max_dummy.default = "4"
 
+allow_clean = s:option(Flag, "allow_clean", translate("Allow Non-Obfuscated Clients"),
+    translate("For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."))
+allow_clean.default = "0"
+allow_clean.rmempty = false
+
 static_bindings = s:option(TextValue, "static_bindings", translate("Static Bindings"), 
     translate("Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."))
 static_bindings.rows = 3

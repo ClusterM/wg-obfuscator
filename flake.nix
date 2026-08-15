@@ -140,6 +140,12 @@
                 default = 4;
                 description = "Maximum dummy data length for data packets (0-1024)";
               };
+
+              allowClean = mkOption {
+                type = types.bool;
+                default = false;
+                description = "For servers: accept non-obfuscated (clean) clients and forward their traffic as is (not compatible with staticBindings)";
+              };
             };
           };
 
@@ -158,6 +164,7 @@
               max-clients = ${toString inst.maxClients}
               idle-timeout = ${toString inst.idleTimeout}
               max-dummy = ${toString inst.maxDummy}
+              ${optionalString inst.allowClean "allow-clean = true"}
             '') (filterAttrs (_: inst: inst.enable) instances)
           );
 
@@ -272,6 +279,7 @@
                       max-clients = ${toString inst.maxClients}
                       idle-timeout = ${toString inst.idleTimeout}
                       max-dummy = ${toString inst.maxDummy}
+                      ${optionalString inst.allowClean "allow-clean = true"}
                     '') instances
                   )}
                   EOF

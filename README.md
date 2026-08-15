@@ -17,6 +17,7 @@ Table of Contents:
 - [Configuration](#configuration)
   - [Avoiding Routing Loops](#avoiding-routing-loops)
   - [Masking](#masking)
+  - [Allowing Non-Obfuscated Clients](#allowing-non-obfuscated-clients)
   - [Two-way Mode](#two-way-mode)
 - [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
@@ -182,6 +183,8 @@ Additional arguments for advanced users:
   Incoming timeout in seconds. Same as `idle-timeout`, but it only counts data received from the target. If nothing arrives from the target for this period, the session is disconnected. This is meant for **client-side** setups, to detect a dead or silently blocked server. If the local client is still sending traffic and `static-bindings` are not used, a new session is created immediately — with a fresh outbound UDP port. That can restore connectivity when a particular source IP:port pair has been banned by DPI. Optional, default is `0` (disabled).
 * `-d <length>` or `--max-dummy=<length>`  
   Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. Used to obfuscate traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added. Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
+* `-e` or `--allow-clean`  
+  Allow non-obfuscated (clean) incoming connections. Intended for the **server side** only. When enabled, clients that send plain (non-obfuscated) WireGuard traffic are accepted too - their traffic is forwarded to the target as is, in both directions. In the configuration file this option is written as a boolean value: `allow-clean = true`. Not compatible with `static-bindings`. See ["Allowing Non-Obfuscated Clients"](#allowing-non-obfuscated-clients) for details. Disabled by default.
 
 You can use the `--config` argument to specify a configuration file, which allows you to set all these parameters in the `key=value` format. For example:
 ```
@@ -288,6 +291,20 @@ At the moment, the only available option is STUN emulation. Since STUN is common
   The obfuscator will not mask outgoing traffic by default. However, if the first packet from the client (on the 'source-lport' side) is masked, the server will autodetect the masking type and switch to it, allowing the client to choose the masking mode independently.
 * `STUN`  
   Forces the use of the STUN protocol for outgoing traffic and only accepts incoming traffic that is STUN-masked.
+
+### Allowing Non-Obfuscated Clients
+
+Sometimes not all of your devices can run the obfuscator. A typical example: your main connection goes through a censored network and needs obfuscation, but you'd also like to occasionally connect to the same WireGuard server directly from a phone (without a local obfuscator instance) over a network where WireGuard is not blocked.
+
+For this case, there is the `allow-clean` option (`-e` / `--allow-clean` on the command line, `allow-clean = true` in the configuration file). When it is enabled on the **server-side** obfuscator, clients that send plain (non-obfuscated) WireGuard traffic are accepted alongside obfuscated ones:
+* Whether a client is obfuscated or not is detected by its first WireGuard handshake packet and remembered for the whole session.
+* Traffic of a "clean" client is forwarded to the WireGuard server as is, in both directions - no obfuscation, no masking.
+* Obfuscated clients keep working exactly as before, both types can be connected at the same time.
+
+Keep in mind:
+* This option is intended for the **server side** only. It disables the automatic obfuscation direction detection for incoming packets: an instance with `allow-clean` enabled can no longer be used as a client-side obfuscator (a plain packet from the source is now treated as "clean client traffic" instead of "traffic to obfuscate").
+* It is **not compatible** with `static-bindings` (two-way mode): for a static binding, there is no way to know in advance whether the client's traffic must be obfuscated. The obfuscator will refuse to start if both options are set.
+* Security note: with this option enabled, the obfuscator port also accepts plain WireGuard traffic. Your tunnel is still protected by WireGuard's own cryptography, but the traffic of clean clients is fully visible to DPI as WireGuard, so it can be detected and blocked on their path.
 
 ### Two-Way Mode
 (for advanced users)
@@ -573,6 +590,8 @@ The documentation covers:
   If you experience issues with packet loss (you can see `recv` or `recvfrom` errors in DEBUG level logs), ensure that your WireGuard configuration has appropriate MTU settings. Especially when using masking (it adds extra bytes to each packet), you may need to reduce the MTU. A common setting is `MTU = 1420`, but you may need to reduce it based on your network conditions.
 * **IPv6 Support:**  
   The obfuscator does not currently support IPv6. It only works with IPv4 addresses and ports.
+* **Non-obfuscated clients:**  
+  If you use the `allow-clean` option, remember that the traffic of non-obfuscated clients is fully visible to DPI as WireGuard, and the obfuscator port accepts plain WireGuard traffic from anyone. See ["Allowing Non-Obfuscated Clients"](#allowing-non-obfuscated-clients) for details.
 * **Check debug logs:**  
   If you encounter issues, run the obfuscator with `--verbose=DEBUG` (DEBUG level) to see detailed logs. This can help diagnose many common problems.
 

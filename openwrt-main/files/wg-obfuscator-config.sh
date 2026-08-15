@@ -158,6 +158,11 @@ generate_instance_config() {
     if [ "$fwmark" != "0" ]; then
         echo "fwmark = $fwmark"
     fi
+
+    local allow_clean=$(get_uci_value "$section" "allow_clean" "0")
+    if [ "$allow_clean" = "1" ]; then
+        echo "allow-clean = true"
+    fi
     
     echo ""
 }

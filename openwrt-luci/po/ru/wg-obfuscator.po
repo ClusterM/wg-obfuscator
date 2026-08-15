@@ -129,6 +129,12 @@ msgstr "Макс. пустых данных"
 msgid "Maximum dummy data length for packets (0-255)"
 msgstr "Максимальная длина пустых данных в пакетах (0-255)"
 
+msgid "Allow Non-Obfuscated Clients"
+msgstr "Разрешить необфусцированных клиентов"
+
+msgid "For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."
+msgstr "Только для серверов: принимать клиентов, отправляющих обычный (необфусцированный) трафик WireGuard, и пересылать его как есть в обе стороны. Отключает автоматическое определение направления обфускации, поэтому не включайте на стороне клиента. Несовместимо со статическими привязками."
+
 msgid "Firewall Mark"
 msgstr "Метка фаервола"
 
