@@ -3,9 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include "wg-obfuscator.h"
 #include "masking.h"
 #include "masking_stun.h"
+
+// Bytes prepended in front of the payload when wrapping data in a STUN Data Indication
+// (20-byte STUN header + 4-byte attribute header). Must fit into PREBUFFER_SIZE so that
+// wrapping can be done by shifting the buffer pointer instead of moving the payload.
+#define STUN_WRAP_OVERHEAD 24
+_Static_assert(STUN_WRAP_OVERHEAD <= PREBUFFER_SIZE,
+               "PREBUFFER_SIZE is too small to hold the STUN wrap header");
 
 static void rand_bytes(uint8_t* p, size_t n){ for(size_t i=0;i<n;i++) p[i]=rand()&0xFF; }
 
@@ -112,18 +120,30 @@ static int stun_build_binding_success(uint8_t *out,
     return (int)(20 + mlen);
 }
 
-static int stun_wrap(uint8_t *buf, size_t data_len) {
+static int stun_wrap(uint8_t **buf_ptr, size_t data_len) {
     const size_t header_size = 20;      // STUN header
     const size_t attr_header = 4;       // type + length
     size_t total_add = header_size + attr_header;
     size_t mlen = 0;
 
-    if (data_len + total_add > BUFFER_SIZE) {
+    // The header is prepended into the prebuffer (pointer shift, no payload copy),
+    // so it must fit into PREBUFFER_SIZE.
+    if (total_add > PREBUFFER_SIZE) {
+        log(LL_WARN, "Can't wrap data in STUN, header is too large (%zu bytes)", total_add);
+        return -ENOMEM;
+    }
+
+    // The caller guarantees the payload already fits into the main buffer (it was
+    // received/encoded within BUFFER_SIZE), so the wrapped packet cannot overflow
+    // the tail of full_buffer. The attribute length field is also 16-bit only.
+    if (data_len > BUFFER_SIZE || data_len > 0xFFFF) {
         log(LL_WARN, "Can't wrap data in STUN, data too large (%zu bytes)", data_len);
         return -ENOMEM;
     }
 
-    memmove(buf + total_add, buf, data_len);
+    // Move the buffer pointer to avoid moving the data
+    *buf_ptr -= total_add;
+    uint8_t *buf = *buf_ptr;
 
     uint8_t txid[12];
     rand_bytes(txid,12);
@@ -134,10 +154,11 @@ static int stun_wrap(uint8_t *buf, size_t data_len) {
     buf[mlen + 2] = data_len >> 8;
     buf[mlen + 3] = data_len & 0xFF;
 
-    return header_size + attr_header + data_len;
+    return total_add + data_len;
 }
 
-static int stun_unwrap(uint8_t *buf, size_t len) {
+static int stun_unwrap(uint8_t **buf_ptr, size_t len) {
+    uint8_t *buf = *buf_ptr;
     if (len < 20 + 4) return -1; // header + attr
 
     uint16_t msg_type = (buf[0] << 8) | buf[1];
@@ -152,7 +173,8 @@ static int stun_unwrap(uint8_t *buf, size_t len) {
     uint16_t data_len = (buf[22] << 8) | buf[23];
     if (data_len + 24 > len) return -1;
 
-    memmove(buf, buf + 24, data_len);
+    // Move the buffer pointer to avoid moving the data
+    *buf_ptr += 24;
 
     return data_len;
 }
@@ -178,7 +200,7 @@ static void stun_on_handshake_req(obfuscator_config_t *config,
     }
 }
 
-static int stun_on_data_unwrap(uint8_t *buffer, int length,
+static int stun_on_data_unwrap(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 direction_t direction,
@@ -186,21 +208,21 @@ static int stun_on_data_unwrap(uint8_t *buffer, int length,
                                 const struct sockaddr_in *dest_addr,
                                 send_data_callback_t send_back_callback,
                                 send_data_callback_t send_forward_callback) {
-    if (!stun_check_magic(buffer, length)) {
+    if (!stun_check_magic(*buffer_ptr, length)) {
             return -EINVAL;
     }
 
-    uint16_t stun_type = stun_peek_type(buffer);
+    uint16_t stun_type = stun_peek_type(*buffer_ptr);
 
     switch (stun_type) {
     case STUN_BINDING_REQ: {
         // Received STUN Binding Request from client, send Binding Success Response
         log(LL_TRACE, "Received STUN Binding Request from %s:%d", inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port));
         uint8_t txid[12];
-        memcpy(txid, buffer + 8, 12);
-        int resp_len = stun_build_binding_success(buffer, txid, src_addr);
+        memcpy(txid, (*buffer_ptr) + 8, 12);
+        int resp_len = stun_build_binding_success(*buffer_ptr, txid, src_addr);
         if (resp_len > 0) {
-            int sent = send_back_callback(buffer, resp_len);
+            int sent = send_back_callback(*buffer_ptr, resp_len);
             if (sent < 0) {
                 serror("sendto STUN response to %s:%d", inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port));
             } else if (sent != resp_len) {
@@ -217,7 +239,7 @@ static int stun_on_data_unwrap(uint8_t *buffer, int length,
         log(LL_TRACE, "Received STUN Binding Success Response from %s:%d, ignoring", inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port));
         return 0;
     case STUN_TYPE_DATA_IND:
-        length = stun_unwrap(buffer, length);
+        length = stun_unwrap(buffer_ptr, length);
         if (length < 0) {
             log(LL_DEBUG, "Failed to unwrap STUN Data Indication from %s:%d", inet_ntoa(src_addr->sin_addr), ntohs(src_addr->sin_port));
             return length;
@@ -230,7 +252,7 @@ static int stun_on_data_unwrap(uint8_t *buffer, int length,
     }
 }
 
-static int stun_on_data_wrap(uint8_t *buffer, int length,
+static int stun_on_data_wrap(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 direction_t direction,
@@ -238,7 +260,7 @@ static int stun_on_data_wrap(uint8_t *buffer, int length,
                                 const struct sockaddr_in *dest_addr,
                                 send_data_callback_t send_back_callback,
                                 send_data_callback_t send_forward_callback) {
-    return stun_wrap(buffer, length);
+    return stun_wrap(buffer_ptr, length);
 }
 
 static void stun_on_timer(obfuscator_config_t *config,

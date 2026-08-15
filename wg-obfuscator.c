@@ -274,7 +274,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in 
         listen_addr, // Address for listening socket, for receiving data from the client
         forward_addr; // Address for forwarding socket, for sending data to the server
-    uint8_t buffer[BUFFER_SIZE];
+    uint8_t full_buffer[BUFFER_SIZE + PREBUFFER_SIZE];
     char target_host[256] = {0};
     int target_port = -1;
     int key_length = 0;
@@ -548,6 +548,7 @@ int main(int argc, char *argv[]) {
             if (pollfds[e].fd == listen_sock) {
 #endif
                 /* *** Handle incoming data from the clients *** */
+                uint8_t *buffer = full_buffer + PREBUFFER_SIZE;
                 struct sockaddr_in sender_addr = {0};
                 socklen_t sender_addr_len = sizeof(sender_addr);
                 int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC, (struct sockaddr *)&sender_addr, &sender_addr_len);
@@ -569,7 +570,7 @@ int main(int argc, char *argv[]) {
                 // Is it masked packet maybe?
                 masking_handler_t *masking_handler = config.masking_handler;
                 if (obfuscated) {
-                    length = masking_unwrap_from_client(buffer, length, &config, client_entry, listen_sock, &sender_addr, &forward_addr, &masking_handler);
+                    length = masking_unwrap_from_client(&buffer, length, &config, client_entry, listen_sock, &sender_addr, &forward_addr, &masking_handler);
                     if (length <= 0) {
                         // Nothing to do
                         continue;
@@ -692,7 +693,7 @@ int main(int argc, char *argv[]) {
                             inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port), length);
                         continue;
                     }
-                    length = masking_data_wrap_to_server(buffer, length, &config, client_entry, listen_sock, &forward_addr);
+                    length = masking_data_wrap_to_server(&buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
 
                 if (verbose >= LL_TRACE) {
@@ -720,6 +721,7 @@ int main(int argc, char *argv[]) {
 #else
                 client_entry_t *client_entry = find_by_server_sock(pollfds[e].fd);
 #endif
+                uint8_t *buffer = full_buffer + PREBUFFER_SIZE;
                 int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC);
                 if (length < 0) {
                     serror_level(LL_DEBUG, "recv from server");
@@ -733,7 +735,7 @@ int main(int argc, char *argv[]) {
                 uint8_t obfuscated = length >= 4 && is_obfuscated(buffer);
                 if (obfuscated) {
                     // Is it masked packet maybe?
-                    length = masking_unwrap_from_server(buffer, length, &config, client_entry, listen_sock, &forward_addr);
+                    length = masking_unwrap_from_server(&buffer, length, &config, client_entry, listen_sock, &forward_addr);
                     if (length <= 0) {
                         // Nothing to do
                         continue;
@@ -842,7 +844,7 @@ int main(int argc, char *argv[]) {
                         log(LL_ERROR, "Failed to encode packet from %s:%d", target_host, target_port);
                         continue;
                     }
-                    length = masking_data_wrap_to_client(buffer, length, &config, client_entry, listen_sock, &forward_addr);
+                    length = masking_data_wrap_to_client(&buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
                 
                 if (verbose >= LL_TRACE) {

@@ -65,7 +65,7 @@ void masking_on_handshake_req_from_server(obfuscator_config_t *config,
     client->masking_handler->on_handshake_req(config, client, DIR_SERVER_TO_CLIENT, server_addr, client_addr, send_to_server_cb, send_to_client_cb);
 }
 
-int masking_unwrap_from_client(uint8_t *buffer, int length,
+int masking_unwrap_from_client(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client, // can be NULL!
                                 int listen_sock,
@@ -79,15 +79,20 @@ int masking_unwrap_from_client(uint8_t *buffer, int length,
     if (!client && !config->masking_handler_set) {
         // Brueteforce detection of masking type if no client entry and no default masking handler
         for (int i = 0; masking_handlers[i]; ++i) {
-            int r = masking_handlers[i]->on_data_unwrap(buffer, length, config, NULL, DIR_CLIENT_TO_SERVER, client_addr, server_addr, send_to_client_cb, send_to_server_cb);
-            if (r >= 0) {
-                // Found a matching masking handler
-                log(LL_TRACE, "Autodetected masking handler for packet from %s:%d: %s", inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port), masking_handlers[i]->name);
-                if (masking_handler_out) {
-                    *masking_handler_out = masking_handlers[i];
-                }
-                return r;
+            // A handler may move *buffer_ptr while unwrapping. If it does not match
+            // (returns < 0), restore the pointer so the next handler sees the original data.
+            uint8_t *saved_buffer = *buffer_ptr;
+            int r = masking_handlers[i]->on_data_unwrap(buffer_ptr, length, config, NULL, DIR_CLIENT_TO_SERVER, client_addr, server_addr, send_to_client_cb, send_to_server_cb);
+            if (r < 0) {
+                *buffer_ptr = saved_buffer;
+                continue;
             }
+            // Found a matching masking handler
+            log(LL_TRACE, "Autodetected masking handler for packet from %s:%d: %s", inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port), masking_handlers[i]->name);
+            if (masking_handler_out) {
+                *masking_handler_out = masking_handlers[i];
+            }
+            return r;
         }
 
         // No matching masking handler found
@@ -102,10 +107,10 @@ int masking_unwrap_from_client(uint8_t *buffer, int length,
         return length; // no masking handler, nothing to do
     }
 
-    return handler->on_data_unwrap(buffer, length, config, client, DIR_CLIENT_TO_SERVER, client_addr, server_addr, send_to_client_cb, client ? send_to_server_cb : NULL);
+    return handler->on_data_unwrap(buffer_ptr, length, config, client, DIR_CLIENT_TO_SERVER, client_addr, server_addr, send_to_client_cb, client ? send_to_server_cb : NULL);
 }
 
-int masking_unwrap_from_server(uint8_t *buffer, int length,
+int masking_unwrap_from_server(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
@@ -117,10 +122,10 @@ int masking_unwrap_from_server(uint8_t *buffer, int length,
     g_send_ctx.listen_sock = listen_sock;
     g_send_ctx.sender_addr = &client->client_addr;
     g_send_ctx.server_sock = client->server_sock;
-    return client->masking_handler->on_data_unwrap(buffer, length, config, client, DIR_SERVER_TO_CLIENT, server_addr, &client->client_addr, send_to_server_cb, send_to_client_cb);
+    return client->masking_handler->on_data_unwrap(buffer_ptr, length, config, client, DIR_SERVER_TO_CLIENT, server_addr, &client->client_addr, send_to_server_cb, send_to_client_cb);
 }
 
-int masking_data_wrap_to_client(uint8_t *buffer, int length,
+int masking_data_wrap_to_client(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
@@ -132,10 +137,10 @@ int masking_data_wrap_to_client(uint8_t *buffer, int length,
     g_send_ctx.listen_sock = listen_sock;
     g_send_ctx.sender_addr = &client->client_addr;
     g_send_ctx.server_sock = client->server_sock;
-    return client->masking_handler->on_data_wrap(buffer, length, config, client, DIR_SERVER_TO_CLIENT, server_addr, &client->client_addr, send_to_server_cb, send_to_client_cb);
+    return client->masking_handler->on_data_wrap(buffer_ptr, length, config, client, DIR_SERVER_TO_CLIENT, server_addr, &client->client_addr, send_to_server_cb, send_to_client_cb);
 }
 
-int masking_data_wrap_to_server(uint8_t *buffer, int length,
+int masking_data_wrap_to_server(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
@@ -147,7 +152,7 @@ int masking_data_wrap_to_server(uint8_t *buffer, int length,
     g_send_ctx.listen_sock = listen_sock;
     g_send_ctx.sender_addr = &client->client_addr;
     g_send_ctx.server_sock = client->server_sock;
-    return client->masking_handler->on_data_wrap(buffer, length, config, client, DIR_CLIENT_TO_SERVER, &client->client_addr, server_addr, send_to_client_cb, send_to_server_cb);
+    return client->masking_handler->on_data_wrap(buffer_ptr, length, config, client, DIR_CLIENT_TO_SERVER, &client->client_addr, server_addr, send_to_client_cb, send_to_server_cb);
 }
 
 void masking_on_timer(obfuscator_config_t *config,

@@ -17,7 +17,7 @@ typedef void (*masking_event_handler_t)(obfuscator_config_t *config,
                                 send_data_callback_t send_back_callback,
                                 send_data_callback_t send_forward_callback);
 
-typedef int (*masking_data_handler_t)(uint8_t *buffer, int length,
+typedef int (*masking_data_handler_t)(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 direction_t direction,
@@ -57,19 +57,19 @@ void masking_on_handshake_req_from_server(obfuscator_config_t *config,
                                 struct sockaddr_in *client_addr,
                                 struct sockaddr_in *server_addr);
 
-int masking_data_wrap_to_client(uint8_t *buffer, int length,
+int masking_data_wrap_to_client(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
                                 struct sockaddr_in *server_addr);
 
-int masking_data_wrap_to_server(uint8_t *buffer, int length,
+int masking_data_wrap_to_server(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
                                 struct sockaddr_in *server_addr);
 
-int masking_unwrap_from_client(uint8_t *buffer, int length,
+int masking_unwrap_from_client(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
@@ -77,7 +77,7 @@ int masking_unwrap_from_client(uint8_t *buffer, int length,
                                 struct sockaddr_in *server_addr,
                                 masking_handler_t **masking_handler_out);
 
-int masking_unwrap_from_server(uint8_t *buffer, int length,
+int masking_unwrap_from_server(uint8_t **buffer_ptr, int length,
                                 obfuscator_config_t *config,
                                 client_entry_t *client,
                                 int listen_sock,
