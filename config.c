@@ -30,6 +30,8 @@ static const mini_argp_opt options[] = {
     { "fwmark", 'f', 1 },
     { "allow-clean", 'e', 0 },
     { "verbose", 'v', 1 },
+    { "log-file", 'L', 1 },
+    { "log-timestamps", 'T', 1 },
     { 0 }
 };
 
@@ -63,6 +65,12 @@ static void show_usage(void)
         "                             3 - DEBUG (detailed debug messages)\n"
         "                             4 - TRACE (very detailed debug messages, including\n"
         "                                       packet dumps)\n"
+        "  -L, --log-file=<path>      Write the log to this file instead of stderr\n"
+        "                             (optional, the file is reopened on SIGHUP)\n"
+        "  -T, --log-timestamps=<val> Prefix log lines with a timestamp\n"
+        "                             (optional, default - AUTO, e.g. only when\n"
+        "                             writing to a log file)\n"
+        "                             Supported values: AUTO, TRUE, FALSE\n"
         "\n"
         "Additional options:\n"
         "  -m, --max-clients=<number> Maximum number of clients (default: 1024)\n"
@@ -93,6 +101,7 @@ static void reset_config(obfuscator_config_t *config)
     config->idle_timeout = IDLE_TIMEOUT_DEFAULT;
     config->in_timeout = IN_TIMEOUT_DEFAULT;
     config->max_dummy_length_data = MAX_DUMMY_LENGTH_DATA_DEFAULT;
+    config->log_timestamps = -1; // auto
     verbose = LL_DEFAULT;
 }
 
@@ -186,12 +195,19 @@ static void read_config_file(const char *filename, obfuscator_config_t *config)
         if (line[0] == '[' && line[strlen(line) - 1] == ']') {
             if (!first_section) {
                 // new config, need to fork the process
-                if (fork() == 0) {
+                pid_t pid = fork();
+                if (pid < 0) {
+                    log(LL_ERROR, "Can't fork a new instance - %s (%d)", strerror(errno), errno);
+                    exit(EXIT_FAILURE);
+                }
+                if (pid == 0) {
                     // Close in the child process
                     fclose(config_file);
                     // Stop config file processing for this instance
                     return;
                 }
+                // Remember the instance to be able to forward signals to it
+                register_child_instance(pid);
             }
             size_t len = strlen(line) - 2;
             if (len > sizeof(section_name) - 1) {
@@ -426,6 +442,32 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                     log(LL_ERROR, "Invalid verbosity level: %s (must be one of 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE')", val);
                     exit(EXIT_FAILURE);
                 }            
+            }
+            break;
+        case 'L':
+            strncpy(config->log_file, val, sizeof(config->log_file) - 1);
+            config->log_file[sizeof(config->log_file) - 1] = 0; // Ensure null-termination
+            if (strlen(config->log_file) == 0) {
+                log(LL_ERROR, "Log file path cannot be empty");
+                exit(EXIT_FAILURE);
+            }
+            config->log_file_set = 1;
+            break;
+        case 'T':
+            {
+                strncpy(val_lower, val, sizeof(val_lower) - 1);
+                val_lower[sizeof(val_lower) - 1] = 0;
+                for (char *p = val_lower; *p; ++p) *p = tolower((unsigned char)*p);
+                if (strcmp(val_lower, "auto") == 0) {
+                    config->log_timestamps = -1;
+                    break;
+                }
+                int b = parse_bool(val_lower);
+                if (b < 0) {
+                    log(LL_ERROR, "Invalid log timestamps mode: %s (must be one of 'AUTO', 'TRUE', 'FALSE')", val);
+                    exit(EXIT_FAILURE);
+                }
+                config->log_timestamps = b;
             }
             break;
         default:

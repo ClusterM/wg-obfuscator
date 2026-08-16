@@ -19,6 +19,7 @@ Table of Contents:
   - [Masking](#masking)
   - [Allowing Non-Obfuscated Clients](#allowing-non-obfuscated-clients)
   - [Two-way Mode](#two-way-mode)
+  - [Logging](#logging)
 - [How to download, build and install](#how-to-download-build-and-install)
   - [Linux](#linux)
   - [Windows](#windows)
@@ -173,6 +174,10 @@ The obfuscator can be run with a command line configuration or using a configura
     `INFO` (informational messages: status messages, connection established, etc.)  
     `DEBUG` (detailed debug messages)  
     `TRACE` (very detailed debug messages, including packet dumps)  
+* `-L <path>` or `--log-file=<path>`  
+  Write the log to this file instead of stderr. The file is opened in append mode and reopened on `SIGHUP`, so it can be rotated by `logrotate`. Optional, by default the log goes to stderr. See ["Logging"](#logging) for details.
+* `-T <value>` or `--log-timestamps=<value>`  
+  Prefix every log line with a timestamp. Optional, default is `AUTO`, which adds timestamps only when writing to a log file. Supported values: `AUTO`, `TRUE`, `FALSE`.
 
 Additional arguments for advanced users:
 * `-m <max_clients>` or `--max-clients=<max_clients>`  
@@ -435,6 +440,51 @@ When **Peer B** initiates a handshake with **Peer A**, the process is the same b
 #### Summary
 
 With static bindings, each obfuscator knows in advance how to forward packets between the server and local WireGuard, regardless of which peer initiates the connection. This enables fully bidirectional, peer-to-peer WireGuard tunnels - *even if both sides can initiate connections at any time.*
+
+
+### Logging
+
+By default the obfuscator writes its log to stderr. In most setups this is exactly what you want, because the service manager already collects it: `journalctl -u wg-obfuscator` on systemd, `logread` on OpenWrt, `docker logs` in a container. All of them add their own timestamps.
+
+If you would rather keep the log yourself, use the `log-file` option:
+
+```
+log-file = /var/log/wg-obfuscator.log
+log-timestamps = AUTO
+```
+
+When a log file is set, the log goes **only** to the file, and every line gets a timestamp:
+
+```
+2025-08-16 04:05:12.345 [main][I] Starting WireGuard Obfuscator v1.5
+2025-08-16 04:05:12.346 [main][I] Listening on port 0.0.0.0:13255 for source
+2025-08-16 04:05:19.881 [main][I] New client connected: 192.168.1.10:51820
+```
+
+Each line contains the timestamp, the instance name (the configuration file section), and a single letter for the logging level: `E`rror, `W`arning, `I`nfo, `D`ebug or `T`race.
+
+Timestamps are controlled by the `log-timestamps` option. The default, `AUTO`, adds them only when writing to a log file, since the service manager adds its own timestamps to stderr output. Set it to `TRUE` if you redirect stderr to a file yourself, or to `FALSE` if you do not want timestamps in the log file at all.
+
+If several configuration sections are used, all of them can share the same log file: every line is written in one piece, so lines never interleave, and they can be told apart by the instance name in the prefix.
+
+The obfuscator does not rotate the log itself, but it reopens the file on `SIGHUP`, which is all an external rotator needs:
+
+```
+/var/log/wg-obfuscator.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    postrotate
+        systemctl reload wg-obfuscator 2>/dev/null || killall -HUP wg-obfuscator 2>/dev/null || true
+    endscript
+}
+```
+
+`systemctl reload` sends `SIGHUP` to the main process, which forwards it to the instances of the other configuration sections, so a single signal is enough regardless of how many instances are running.
+
+If the log file cannot be opened at startup, the obfuscator reports the error and exits instead of silently logging into nowhere.
 
 
 ## How to download, build and install

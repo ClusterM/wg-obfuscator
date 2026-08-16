@@ -308,6 +308,21 @@ Run multiple obfuscators for different VPN servers:
 | `inTimeout` | int | 0 | Incoming timeout in seconds (0 = disabled; for clients) |
 | `maxDummy` | int | 4 | Max dummy data bytes (0-1024) |
 | `allowClean` | bool | false | For servers: accept non-obfuscated clients (not compatible with staticBindings) |
+| `logFile` | string | null | Write the log to this file instead of the journal |
+| `logTimestamps` | bool | null | Prefix log lines with a timestamp (null = only when `logFile` is used) |
+
+By default the log goes to the journal (`journalctl -u wg-obfuscator`), which already adds timestamps. Set `logFile` only if you want to keep the log yourself:
+
+```nix
+services.wg-obfuscator.instances.client = {
+  # ...
+  logFile = "/var/log/wg-obfuscator.log";
+};
+```
+
+The module adds the directory of every configured log file to `ReadWritePaths`, since the service runs with `ProtectSystem = "strict"`. Note that `PrivateTmp` is enabled, so a log file placed in `/tmp` would only be visible inside the service namespace.
+
+There is no built-in rotation, but the file is reopened on `SIGHUP`, so `systemctl reload wg-obfuscator` can be used from a logrotate `postrotate` script. The signal is forwarded to the instances of all the other configuration sections automatically.
 
 ### Service Options
 

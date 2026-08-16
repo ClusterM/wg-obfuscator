@@ -21,6 +21,11 @@ char section_name[256] = DEFAULT_INSTANCE_NAME;
 static int listen_sock = 0;
 // Hash table for client connections
 static client_entry_t *conn_table = NULL;
+// PIDs of the other instances, filled by the parent process only
+static pid_t *child_pids = NULL;
+static int child_pids_count = 0;
+// Set by the SIGHUP handler, the log file is reopened from the main loop
+static volatile sig_atomic_t log_reopen_pending = 0;
 
 #ifdef USE_EPOLL
     static int epfd = 0;
@@ -57,6 +62,45 @@ static void signal_handler(int signal) {
     exit(signal != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 #define FAILURE() signal_handler(-1)
+
+/**
+ * @brief Remembers the PID of a forked instance.
+ *
+ * Called by the configuration parser for every additional section, so that the
+ * parent process can forward signals to all the instances.
+ *
+ * @param pid PID of the forked instance.
+ */
+void register_child_instance(pid_t pid)
+{
+    pid_t *new_pids = realloc(child_pids, (child_pids_count + 1) * sizeof(pid_t));
+    if (!new_pids) {
+        log(LL_WARN, "Out of memory, instance with PID %ld will not receive forwarded signals", (long)pid);
+        return;
+    }
+    child_pids = new_pids;
+    child_pids[child_pids_count++] = pid;
+}
+
+#ifdef SIGHUP
+/**
+ * @brief Handles SIGHUP: schedules reopening of the log file.
+ *
+ * The actual reopening is done by the main loop, the handler only sets a flag
+ * and forwards the signal to the instances of the other configuration sections.
+ *
+ * @param sig Signal number received by the process.
+ */
+static void sighup_handler(int sig)
+{
+    (void)sig;
+    log_reopen_pending = 1;
+    // The list is filled before the handler is installed, so it can't change here
+    for (int i = 0; i < child_pids_count; i++) {
+        kill(child_pids[i], SIGHUP);
+    }
+}
+#endif
 
 /**
  * @brief Creates a new client_entry_t structure and initializes it with the provided client and forward addresses.
@@ -253,20 +297,24 @@ static client_entry_t *find_by_server_sock(int fd) {
  * This function outputs the current version of the application to the standard output.
  * Typically used to inform users about the build or release version.
  */
-void print_version(void) {
+const char *version_string(void) {
 #ifdef COMMIT
 #ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")\n");
+    return "WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ")";
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ") (" ARCH ")\n");
+    return "WireGuard Obfuscator (commit " COMMIT " @ " WG_OBFUSCATOR_GIT_REPO ") (" ARCH ")";
 #endif
 #else
 #ifndef ARCH
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION "\n");
+    return "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION;
 #else
-    fprintf(stderr, "Starting WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")\n");
+    return "WireGuard Obfuscator v" WG_OBFUSCATOR_VERSION " (" ARCH ")";
 #endif
 #endif
+}
+
+void print_version(void) {
+    fprintf(stderr, "Starting %s\n", version_string());
 }
 
 int main(int argc, char *argv[]) {
@@ -292,6 +340,10 @@ int main(int argc, char *argv[]) {
     if (parse_config(argc, argv, &config) != 0) {
         exit(EXIT_FAILURE);
     }
+
+    /* Start writing to the log file before validating the rest of the parameters,
+       so that configuration errors are logged there too */
+    log_init(config.log_file_set ? config.log_file : NULL, config.log_timestamps);
 
 #ifdef USE_EPOLL
     struct epoll_event events[MAX_EVENTS];
@@ -375,6 +427,9 @@ int main(int argc, char *argv[]) {
     /* Set up signal handlers */
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+#ifdef SIGHUP
+    signal(SIGHUP, sighup_handler);
+#endif
 
     /* Create listening socket */
     if ((listen_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -518,10 +573,20 @@ int main(int argc, char *argv[]) {
 
     /* Main loop */
     while (1) {
+        // Reopen the log file after it has been rotated, requested by SIGHUP
+        if (log_reopen_pending) {
+            log_reopen_pending = 0;
+            log_reopen();
+        }
+
         // Using epoll or poll to wait for events
 #ifdef USE_EPOLL
         int events_n = epoll_wait(epfd, events, MAX_EVENTS, POLL_TIMEOUT);
         if (events_n < 0) {
+            if (errno == EINTR) {
+                // Interrupted by a signal, e.g. SIGHUP
+                continue;
+            }
             serror("epoll_wait");
             FAILURE();
         }
@@ -542,6 +607,10 @@ int main(int argc, char *argv[]) {
         }
         int ret = poll(pollfds, nfds, POLL_TIMEOUT);
         if (ret < 0) {
+            if (errno == EINTR) {
+                // Interrupted by a signal, e.g. SIGHUP
+                continue;
+            }
             serror("poll");
             FAILURE();
         }
@@ -603,15 +672,7 @@ int main(int argc, char *argv[]) {
                         inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port),
                         target_host, target_port,
                         client_entry ? "yes" : "no", obfuscated ? "yes" : "no");
-                    if (obfuscated) {
-                        trace("X->: ");
-                    } else {
-                        trace("O->: ");
-                    }
-                    for (int i = 0; i < length; ++i) {
-                        trace("%02X ", buffer[i]);
-                    }
-                    trace("\n");
+                    log_hexdump(LL_TRACE, obfuscated ? "X->: " : "O->: ", buffer, length);
                 }
 
                 if (obfuscated) {
@@ -722,17 +783,7 @@ int main(int argc, char *argv[]) {
                     length = masking_data_wrap_to_server(&buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
 
-                if (verbose >= LL_TRACE) {
-                    if (!obfuscated && !client_entry->client_clean) {
-                        trace("X->: ");
-                    } else {
-                        trace("O->: ");
-                    }
-                    for (int i = 0; i < length; ++i) {
-                        trace("%02X ", buffer[i]);
-                    }
-                    trace("\n");
-                }
+                log_hexdump(LL_TRACE, (!obfuscated && !client_entry->client_clean) ? "X->: " : "O->: ", buffer, length);
 
                 length = send(client_entry->server_sock, buffer, length, 0);
                 if (length < 0) {
@@ -781,15 +832,7 @@ int main(int argc, char *argv[]) {
                         target_host, target_port, 
                         inet_ntoa(client_entry->client_addr.sin_addr), ntohs(client_entry->client_addr.sin_port),
                         obfuscated ? "yes" : "no");
-                    if (obfuscated) {
-                        trace("<-X: ");
-                    } else {
-                        trace("<-O: ");
-                    }
-                    for (int i = 0; i < length; ++i) {
-                        trace("%02X ", buffer[i]);
-                    }
-                    trace("\n");
+                    log_hexdump(LL_TRACE, obfuscated ? "<-X: " : "<-O: ", buffer, length);
                 }
 
                 if (obfuscated) {
@@ -873,17 +916,7 @@ int main(int argc, char *argv[]) {
                     length = masking_data_wrap_to_client(&buffer, length, &config, client_entry, listen_sock, &forward_addr);
                 }
                 
-                if (verbose >= LL_TRACE) {
-                    if (!obfuscated && !client_entry->client_clean) {
-                        trace("<-X: ");
-                    } else {
-                        trace("<-O: ");
-                    }
-                    for (int i = 0; i < length; ++i) {
-                        trace("%02X ", buffer[i]);
-                    }
-                    trace("\n");
-                }
+                log_hexdump(LL_TRACE, (!obfuscated && !client_entry->client_clean) ? "<-X: " : "<-O: ", buffer, length);
 
                 // Send the response back to the original client
                 length = sendto(listen_sock, buffer, length, 0, (struct sockaddr *)&client_entry->client_addr, sizeof(client_entry->client_addr));

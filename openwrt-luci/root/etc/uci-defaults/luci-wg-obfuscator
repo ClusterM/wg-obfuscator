@@ -22,6 +22,8 @@ set wg-obfuscator.main.max_dummy='4'
 set wg-obfuscator.main.allow_clean='0'
 set wg-obfuscator.main.fwmark='0'
 set wg-obfuscator.main.static_bindings=''
+set wg-obfuscator.main.log_file=''
+set wg-obfuscator.main.log_timestamps='AUTO'
 EOF
 fi
 

@@ -163,6 +163,17 @@ generate_instance_config() {
     if [ "$allow_clean" = "1" ]; then
         echo "allow-clean = true"
     fi
+
+    # Omit when empty: the log goes to stderr and is picked up by procd/logread
+    local log_file=$(get_uci_value "$section" "log_file" "")
+    if [ -n "$log_file" ]; then
+        echo "log-file = $log_file"
+    fi
+
+    local log_timestamps=$(get_uci_value "$section" "log_timestamps" "AUTO")
+    if [ "$log_timestamps" != "AUTO" ]; then
+        echo "log-timestamps = $log_timestamps"
+    fi
     
     echo ""
 }

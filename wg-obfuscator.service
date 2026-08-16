@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 ExecStart=wg-obfuscator -c /etc/wg-obfuscator.conf
+ExecReload=/bin/kill -HUP $MAINPID
 StandardOutput=inherit
 StandardError=inherit
 Restart=always

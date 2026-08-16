@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include "uthash.h"
 
 // on Linux, use epoll for better performance
@@ -48,18 +49,10 @@
 #define LL_DEBUG        3
 #define LL_TRACE        4
 
-#define log(level, fmt, ...) { if (verbose >= (level))       \
-    fprintf(stderr, "[%s][%c] " fmt "\n", section_name,      \
-    (                                                               \
-          (level) == LL_ERROR ? 'E'                                 \
-        : (level) == LL_WARN  ? 'W'                                 \
-        : (level) == LL_INFO  ? 'I'                                 \
-        : (level) == LL_DEBUG ? 'D'                                 \
-        : (level) == LL_TRACE ? 'T'                                 \
-        : '?'                                                       \
-    ), ##__VA_ARGS__);                                              \
-}
-#define trace(fmt, ...) if (verbose >= LL_TRACE) fprintf(stderr, fmt, ##__VA_ARGS__)
+// Maximum length of a single log line, longer hex dumps are split into several lines
+#define LOG_LINE_MAX    16384
+
+#define log(level, fmt, ...) do { if (verbose >= (level)) log_printf((level), fmt, ##__VA_ARGS__); } while (0)
 #define serror_level(level, fmt, ...) log(level, fmt " - %s (%d)", ##__VA_ARGS__, strerror(errno), errno)
 #define serror(fmt, ...) serror_level(LL_ERROR, fmt, ##__VA_ARGS__)
 
@@ -86,7 +79,10 @@ typedef struct {
     uint32_t fwmark;                            // Firewall mark
     masking_handler_t *masking_handler;         // Masking handler to use
     uint8_t allow_clean;                        // 1 if non-obfuscated (clean) clients are allowed, 0 otherwise
+    char log_file[512];                         // Path of the log file
+    int8_t log_timestamps;                      // 1 to force timestamps on, 0 to force them off, -1 for auto
 
+    uint8_t log_file_set;                       // 1 if the log file is set, 0 otherwise
     uint8_t listen_port_set;                    // 1 if the listen port is set, 0 otherwise
     uint8_t forward_host_port_set;              // 1 if the forward host and port are set, 0 otherwise
     uint8_t xor_key_set;                        // 1 if the XOR key is set, 0 otherwise
@@ -121,6 +117,17 @@ extern int verbose;
 // Section name (for multiple instances)
 extern char section_name[256];
 
+const char *version_string(void);
 void print_version(void);
+void register_child_instance(pid_t pid);
+
+void log_init(const char *path, int8_t timestamps_mode);
+void log_reopen(void);
+#ifdef __GNUC__
+void log_printf(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+#else
+void log_printf(int level, const char *fmt, ...);
+#endif
+void log_hexdump(int level, const char *prefix, const uint8_t *data, int length);
 
 #endif

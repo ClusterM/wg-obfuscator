@@ -101,6 +101,10 @@ uci commit wg-obfuscator
 | `max_dummy` | Max dummy data length | `4` | `0`-`255` |
 | `allow_clean` | For servers: accept non-obfuscated clients and forward their traffic as is (not compatible with static bindings) | `0` | `1` |
 | `static_bindings` | Static bindings (two-way mode) | - | `1.2.3.4:12883:6670` |
+| `log_file` | Write the log to this file instead of the system log | - | `/tmp/wg-obfuscator.log` |
+| `log_timestamps` | Prefix log lines with a timestamp (`AUTO` = only when a log file is used) | `AUTO` | `AUTO`, `TRUE`, `FALSE` |
+
+> **Note:** by default the log goes to the system log and is available via `logread`, which is usually what you want. If you set `log_file`, avoid pointing it to the router flash memory - constant writes wear it out. Use `/tmp` (kept in RAM, lost on reboot) or an external drive instead. There is no built-in rotation, but the file is reopened on `SIGHUP`, so `killall -HUP wg-obfuscator` can be used after rotating it.
 
 ### Two-Way Mode (Static Bindings)
 

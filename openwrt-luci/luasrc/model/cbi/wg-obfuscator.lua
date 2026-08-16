@@ -88,6 +88,30 @@ verbose:value("DEBUG", translate("Debug"))
 verbose:value("TRACE", translate("Trace"))
 verbose.default = "INFO"
 
+log_file = s:option(Value, "log_file", translate("Log File"),
+    translate("Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."))
+log_file.placeholder = "/tmp/wg-obfuscator.log"
+log_file.rmempty = true
+
+function log_file.validate(self, value, section)
+    if not value or value == "" then
+        return value
+    end
+
+    if not value:match("^/") then
+        return nil, translate("Log file path must be absolute")
+    end
+
+    return value
+end
+
+log_timestamps = s:option(ListValue, "log_timestamps", translate("Log Timestamps"),
+    translate("Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."))
+log_timestamps:value("AUTO", translate("Automatic"))
+log_timestamps:value("TRUE", translate("Always"))
+log_timestamps:value("FALSE", translate("Never"))
+log_timestamps.default = "AUTO"
+
 max_clients = s:option(Value, "max_clients", translate("Max Clients"), 
     translate("Maximum number of concurrent clients"))
 max_clients.datatype = "uinteger"

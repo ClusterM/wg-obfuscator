@@ -104,6 +104,30 @@ msgstr "Отладка"
 msgid "Trace"
 msgstr "Трассировка"
 
+msgid "Log File"
+msgstr "Файл лога"
+
+msgid "Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."
+msgstr "Писать лог в этот файл вместо системного лога. Оставьте пустым, чтобы продолжать использовать системный лог (logread). Не пишите лог во флеш-память роутера, используйте /tmp или внешний накопитель."
+
+msgid "Log file path must be absolute"
+msgstr "Путь к файлу лога должен быть абсолютным"
+
+msgid "Log Timestamps"
+msgstr "Метки времени в логе"
+
+msgid "Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."
+msgstr "Добавлять метку времени в начало каждой строки лога. «Автоматически» означает, что метки добавляются только при записи в файл, так как системный лог добавляет свои."
+
+msgid "Automatic"
+msgstr "Автоматически"
+
+msgid "Always"
+msgstr "Всегда"
+
+msgid "Never"
+msgstr "Никогда"
+
 # Advanced settings
 msgid "Max Clients"
 msgstr "Макс. клиентов"

@@ -152,6 +152,24 @@
                 default = false;
                 description = "For servers: accept non-obfuscated (clean) clients and forward their traffic as is (not compatible with staticBindings)";
               };
+
+              logFile = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = ''
+                  Write the log to this file instead of stderr. By default the log goes to
+                  the journal, which is usually what you want. The file is reopened on SIGHUP,
+                  so it can be rotated by logrotate, and its directory is made writable for
+                  the service automatically.
+                '';
+                example = "/var/log/wg-obfuscator.log";
+              };
+
+              logTimestamps = mkOption {
+                type = types.nullOr types.bool;
+                default = null;
+                description = "Prefix log lines with a timestamp, null means only when logFile is used";
+              };
             };
           };
 
@@ -172,6 +190,8 @@
               ${optionalString (inst.inTimeout > 0) "in-timeout = ${toString inst.inTimeout}"}
               max-dummy = ${toString inst.maxDummy}
               ${optionalString inst.allowClean "allow-clean = true"}
+              ${optionalString (inst.logFile != null) "log-file = ${inst.logFile}"}
+              ${optionalString (inst.logTimestamps != null) "log-timestamps = ${boolToString inst.logTimestamps}"}
             '') (filterAttrs (_: inst: inst.enable) instances)
           );
 
@@ -179,6 +199,11 @@
 
           # Check if any instance uses keyFile
           anyKeyFile = any (inst: inst.enable && inst.keyFile != null) (attrValues cfg.instances);
+
+          # ProtectSystem = "strict" makes everything read-only, so the directories
+          # of the configured log files have to be allowed explicitly
+          logDirs = unique (map (inst: dirOf inst.logFile)
+            (filter (inst: inst.enable && inst.logFile != null) (attrValues cfg.instances)));
 
         in
         {
@@ -242,6 +267,9 @@
                 RestartSec = 10;
                 User = "root"; # Required for fwmark and low-level networking
 
+                # Reopen the log files, e.g. after they have been rotated
+                ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+
                 # Security hardening
                 NoNewPrivileges = true;
                 PrivateTmp = true;
@@ -256,6 +284,7 @@
                 RestrictRealtime = true;
                 RestrictSUIDSGID = true;
                 PrivateMounts = true;
+                ReadWritePaths = logDirs;
 
                 # Capabilities needed for networking and fwmark
                 AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" "CAP_NET_RAW" ];
@@ -288,6 +317,8 @@
                       ${optionalString (inst.inTimeout > 0) "in-timeout = ${toString inst.inTimeout}"}
                       max-dummy = ${toString inst.maxDummy}
                       ${optionalString inst.allowClean "allow-clean = true"}
+                      ${optionalString (inst.logFile != null) "log-file = ${inst.logFile}"}
+                      ${optionalString (inst.logTimestamps != null) "log-timestamps = ${boolToString inst.logTimestamps}"}
                     '') instances
                   )}
                   EOF
