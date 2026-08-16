@@ -6,6 +6,13 @@
 // Current obfuscation version
 #define OBFUSCATION_VERSION     1
 
+// Maximum length (in bytes) of a single cached keystream row.
+// The keystream depends only on (key, length mod 256), so it is cached in 256
+// lazily-grown rows. Packets longer than this limit are still handled correctly:
+// the part beyond the limit is computed on the fly. Worst-case cache memory is
+// 256 * KEYSTREAM_ROW_MAX bytes. 2048 covers a typical MTU plus masking overhead.
+#define KEYSTREAM_ROW_MAX       2048
+
 // WireGuard packet types
 #define WG_TYPE_HANDSHAKE       0x01
 #define WG_TYPE_HANDSHAKE_RESP  0x02
@@ -29,38 +36,19 @@ static inline uint8_t is_obfuscated(uint8_t *data) {
 }
 
 /**
- * @brief XORs the data in the given buffer with the provided key.
+ * @brief XORs the data in the given buffer with the key-derived keystream.
  *
- * This function applies a repeating XOR operation to each byte in the buffer
- * using the specified key. The key is repeated as necessary to match the length
- * of the buffer.
+ * The keystream is a per-byte CRC8 value derived from the key, the byte position
+ * and the packet length; it depends only on (key, length mod 256), so it is
+ * cached (see obfuscation.c). The on-the-wire result is byte-for-byte identical
+ * to the original bit-by-bit implementation.
  *
  * @param buffer Pointer to the data buffer to be XORed.
  * @param length Length of the data buffer in bytes.
  * @param key Pointer to the key used for XOR operation.
  * @param key_length Length of the key in bytes.
  */
-static inline void xor_data(uint8_t *buffer, int length, char *key, int key_length) {
-    // Calculate the CRC8 based on the key
-    uint8_t crc = 0, j;
-    int i;
-    for (i = 0; i < length; i++) 
-    {
-        // Get key byte and add the data length and the key length
-        uint8_t inbyte = key[i % key_length] + length + key_length;
-        for (j = 0; j < 8; j++) 
-        {
-            uint8_t mix = (crc ^ inbyte) & 0x01;
-            crc >>= 1;
-            if (mix) {
-                crc ^= 0x8C;
-            }
-            inbyte >>= 1;
-        }
-        // XOR the data with the CRC
-        buffer[i] ^= crc;
-    }
-}
+void xor_data(uint8_t *buffer, int length, char *key, int key_length);
 
 /**
  * @brief Encodes the given buffer using the specified key and version.

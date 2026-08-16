@@ -14,7 +14,7 @@ else
   CFLAGS   = -O2 -Wall
   LDFLAGS += -s
 endif
-OBJS = wg-obfuscator.o config.o masking.o masking_stun.o
+OBJS = wg-obfuscator.o config.o masking.o masking_stun.o obfuscation.o
 EXEDIR = .
 
 EXTRA_CFLAGS =
