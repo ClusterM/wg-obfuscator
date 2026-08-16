@@ -633,9 +633,13 @@ int main(int argc, char *argv[]) {
                 uint8_t *buffer = full_buffer + PREBUFFER_SIZE;
                 struct sockaddr_in sender_addr = {0};
                 socklen_t sender_addr_len = sizeof(sender_addr);
-                int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC, (struct sockaddr *)&sender_addr, &sender_addr_len);
+                int length = recvfrom(listen_sock, buffer, BUFFER_SIZE, MSG_TRUNC | MSG_DONTWAIT, (struct sockaddr *)&sender_addr, &sender_addr_len);
                 if (length < 0) {
-                    serror_level(LL_DEBUG, "recvfrom client");
+                    // A readiness notification does not guarantee that there is something
+                    // to read by the time we get here, so an empty socket is not an error
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        serror_level(LL_DEBUG, "recvfrom client");
+                    }
                     continue;
                 }
                 if (length > BUFFER_SIZE) {
@@ -799,9 +803,11 @@ int main(int argc, char *argv[]) {
                 client_entry_t *client_entry = find_by_server_sock(pollfds[e].fd);
 #endif
                 uint8_t *buffer = full_buffer + PREBUFFER_SIZE;
-                int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC);
+                int length = recv(client_entry->server_sock, buffer, BUFFER_SIZE, MSG_TRUNC | MSG_DONTWAIT);
                 if (length < 0) {
-                    serror_level(LL_DEBUG, "recv from server");
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        serror_level(LL_DEBUG, "recv from server");
+                    }
                     continue;
                 }
                 if (length > BUFFER_SIZE) {
@@ -952,6 +958,7 @@ int main(int argc, char *argv[]) {
                     close(current_entry->server_sock);
                     HASH_DEL(conn_table, current_entry);
                     free(current_entry);
+                    continue;
                 }
 
                 // Check if we need to call masking timer
