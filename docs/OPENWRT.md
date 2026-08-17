@@ -11,13 +11,24 @@ WireGuard Obfuscator is available as native OpenWrt packages with full UCI integ
 Once packages are submitted to OpenWrt feeds:
 
 ```bash
+# OpenWrt 24 and earlier (opkg)
 opkg update
 opkg install wg-obfuscator luci-app-wg-obfuscator
+
+# OpenWrt 25 and later (apk)
+apk update
+apk add wg-obfuscator luci-app-wg-obfuscator
 ```
 
 ### Building and Installing from Source
 
-Since `.ipk` packages are architecture-specific (arm, mips, x86, etc.), you need to build them for your specific router platform. See the [Building from Source](#building-from-source) section below for detailed instructions.
+Packages are architecture-specific (arm, mips, x86, etc.), so you need to build them for your router platform.
+
+**Package format by OpenWrt version:**
+- **OpenWrt 24 and earlier** — `.ipk` packages (install with `opkg`)
+- **OpenWrt 25 and later** — `.apk` packages (install with `apk add --allow-untrusted` or via LuCI)
+
+See the [Building from Source](#building-from-source) section below for detailed instructions.
 
 ## Configuration
 
@@ -214,7 +225,7 @@ cat /etc/wg-obfuscator/wg-obfuscator.conf
 
 ## Building from Source
 
-Since `.ipk` packages are architecture-specific and must be built for your router's exact platform, you need to build them using the OpenWrt build system. This section explains how to build packages using the OpenWrt source code.
+Packages are architecture-specific and must be built for your router's exact platform using the OpenWrt build system. OpenWrt **24 and earlier** produce `.ipk` files; OpenWrt **25 and later** produce `.apk` files. The `build.sh` scripts accept both formats.
 
 ### Using OpenWrt Source Code
 
@@ -222,13 +233,13 @@ This method uses the full OpenWrt source code, which allows you to configure eve
 
 #### Step 1: Get OpenWrt Source Code
 
-Download the latest OpenWrt release from [GitHub releases](https://github.com/openwrt/openwrt/releases):
+Download a recent OpenWrt release from [GitHub releases](https://github.com/openwrt/openwrt/releases). Examples below use **v25.12.5** (apk packaging). For OpenWrt 24.x (ipk packaging), use a `v24.10.x` tag instead.
 
 ```bash
-# Download and extract OpenWrt source code
-wget https://github.com/openwrt/openwrt/archive/refs/tags/v24.10.4.tar.gz
-tar xzf v24.10.4.tar.gz
-cd openwrt-24.10.4
+# Download and extract OpenWrt source code (25.x example)
+wget https://github.com/openwrt/openwrt/archive/refs/tags/v25.12.5.tar.gz
+tar xzf v25.12.5.tar.gz
+cd openwrt-25.12.5
 ```
 
 Or clone the repository:
@@ -236,7 +247,7 @@ Or clone the repository:
 ```bash
 git clone https://github.com/openwrt/openwrt.git
 cd openwrt
-git checkout v24.10.4  # or latest release tag
+git checkout v25.12.5  # or v24.10.x for OpenWrt 24 / .ipk
 ```
 
 #### Step 2: Update and Install Feeds
@@ -318,16 +329,18 @@ The scripts will:
 
 #### Step 6: Install Built Packages
 
-After successful build, the `.ipk` files will be in `bin/packages/*/base/`.
+After a successful build, package files are under `bin/packages/*/base/` (and sometimes other feed dirs):
+- OpenWrt ≤24: `*.ipk`
+- OpenWrt ≥25: `*.apk`
 
 ##### Using LuCI Web Interface (Recommended)
 
 1. Find the built packages:
    ```bash
-   find bin/packages -name "*.ipk" | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
+   find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
    ```
 
-2. Copy `.ipk` files to your computer (if building on a remote machine)
+2. Copy the package files to your computer (if building on a remote machine)
 
 3. Log into LuCI web interface on your router
 
@@ -335,9 +348,9 @@ After successful build, the `.ipk` files will be in `bin/packages/*/base/`.
 
 5. Click **Upload Package...**
 
-6. Select and upload each `.ipk` file:
-   - `wg-obfuscator_*.ipk`
-   - `luci-app-wg-obfuscator_*.ipk`
+6. Select and upload each package file, for example:
+   - `wg-obfuscator_*.ipk` or `wg-obfuscator-*.apk`
+   - `luci-app-wg-obfuscator_*.ipk` or `luci-app-wg-obfuscator-*.apk`
 
 7. Click **Install** for each package
 
@@ -346,17 +359,23 @@ After successful build, the `.ipk` files will be in `bin/packages/*/base/`.
 If you prefer using SSH:
 
 ```bash
-# Find built packages
-find bin/packages -name "*.ipk" | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
+# Find built packages (.ipk and/or .apk)
+find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
 
 # Copy to router (adjust paths and router IP)
-scp bin/packages/*/base/wg-obfuscator*.ipk root@192.168.1.1:/tmp/
-scp bin/packages/*/base/luci-app-wg-obfuscator*.ipk root@192.168.1.1:/tmp/
+scp bin/packages/*/base/wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
+scp bin/packages/*/base/luci-app-wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
 
 # Install on router (via SSH)
 ssh root@192.168.1.1
+
+# OpenWrt 24 and earlier:
 opkg install /tmp/wg-obfuscator*.ipk
 opkg install /tmp/luci-app-wg-obfuscator*.ipk
+
+# OpenWrt 25 and later:
+apk add --allow-untrusted /tmp/wg-obfuscator*.apk
+apk add --allow-untrusted /tmp/luci-app-wg-obfuscator*.apk
 ```
 
 ### Troubleshooting Build Issues
@@ -402,7 +421,7 @@ Here's a complete example using OpenWrt source code:
 # 1. Download OpenWrt source code
 git clone https://github.com/openwrt/openwrt.git
 cd openwrt
-git checkout v24.10.4  # or latest release
+git checkout v25.12.5  # or v24.10.x for .ipk packaging
 
 # 2. Update and install feeds
 ./scripts/feeds update -a
@@ -423,8 +442,8 @@ cd /path/to/wg-obfuscator/openwrt-main
 cd ../openwrt-luci
 ./build.sh
 
-# 6. Find built packages
-find ../openwrt/bin/packages -name "*.ipk" | grep wg-obfuscator
+# 6. Find built packages (.ipk on 24.x, .apk on 25.x)
+find ../openwrt/bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep wg-obfuscator
 ```
 
 ## Important Notes

@@ -599,7 +599,7 @@ docker run -d \
 
 WireGuard Obfuscator is available as native OpenWrt packages with full UCI integration and optional LuCI web interface.
 
-> **Note:** `.ipk` packages are architecture-specific and must be built for your router's platform. See the documentation for build instructions.
+> **Note:** Packages are architecture-specific (`.ipk` on OpenWrt ≤24, `.apk` on OpenWrt ≥25) and must be built for your router's platform. See the documentation for build instructions.
 
 **📖 [Complete OpenWrt Documentation](docs/OPENWRT.md)**
 

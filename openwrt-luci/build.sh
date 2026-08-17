@@ -95,7 +95,7 @@ if ! grep -q "CONFIG_PACKAGE_$PACKAGE_NAME=y" .config 2>/dev/null; then
     make defconfig
 fi
 
-# Build package (install is not needed - .ipk is created during compile)
+# Build package (install is not needed - package file is created during compile)
 make package/$PACKAGE_NAME/{clean,compile} \
     CONFIG_PACKAGE_$PACKAGE_NAME=y \
     V=s \
@@ -103,28 +103,32 @@ make package/$PACKAGE_NAME/{clean,compile} \
 
 BUILD_STATUS=$?
 
-# Check if .ipk was created
-if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || \
-   grep -q "Packaged contents.*$PACKAGE_NAME.*\.ipk" /tmp/$PACKAGE_NAME-build.log; then
-    IPK_FILE=$(find bin/packages -name "${PACKAGE_NAME}*.ipk" 2>/dev/null | head -1)
-    if [ -n "$IPK_FILE" ]; then
+# Soft success signal from log (opkg .ipk or apk packaging)
+LOG_PACKAGED=0
+if grep -qE "Packaged contents.*$PACKAGE_NAME|apk mkpkg.*name:$PACKAGE_NAME|--output \".*$PACKAGE_NAME.*\.apk\"" /tmp/$PACKAGE_NAME-build.log 2>/dev/null; then
+    LOG_PACKAGED=1
+fi
+
+# Accept both OpenWrt ≤24 (.ipk / opkg) and OpenWrt ≥25 (.apk / apk)
+if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || [ $LOG_PACKAGED -eq 1 ]; then
+    mapfile -t PKG_FILES < <(find bin/packages \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \) 2>/dev/null | sort)
+    if [ ${#PKG_FILES[@]} -gt 0 ] && [ -n "${PKG_FILES[0]}" ]; then
         print_status "Package built successfully!"
-        print_status "Package file: $IPK_FILE"
-        FILE_SIZE=$(ls -lh "$IPK_FILE" | awk '{print $5}')
-        print_status "Package size: $FILE_SIZE"
-        
+        for PKG_FILE in "${PKG_FILES[@]}"; do
+            FILE_SIZE=$(ls -lh "$PKG_FILE" | awk '{print $5}')
+            print_status "Package file: $PKG_FILE ($FILE_SIZE)"
+        done
+
         # Update package index
         print_status "Updating package index..."
         make package/index >/dev/null 2>&1
-        
+
         exit 0
     else
-        print_error ".ipk file was not created!"
+        print_error "Package file (.ipk or .apk) was not created!"
         exit 1
     fi
 else
     print_error "Package build failed!"
     exit 1
 fi
-
-
