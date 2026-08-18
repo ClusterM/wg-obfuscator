@@ -127,6 +127,11 @@ in_timeout = s:option(Value, "in_timeout", translate("Incoming Timeout"),
 in_timeout.datatype = "uinteger"
 in_timeout.default = "0"
 
+resolve_interval = s:option(Value, "resolve_interval", translate("Resolve Interval"),
+    translate("Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."))
+resolve_interval.datatype = "uinteger"
+resolve_interval.default = "0"
+
 max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"), 
     translate("Maximum dummy data length for packets (0-255)"))
 max_dummy.datatype = "range(0,255)"

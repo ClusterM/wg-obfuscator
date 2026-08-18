@@ -109,6 +109,7 @@ uci commit wg-obfuscator
 | `max_clients` | Max concurrent clients | `1024` | `512` |
 | `idle_timeout` | Idle timeout (seconds) | `300` | `600` |
 | `in_timeout` | Same as idle_timeout, but only counts data received from the target (0 = disabled) | `0` | `60` |
+| `resolve_interval` | Re-resolve target and static-binding hostnames every N seconds (0 = only at start / on reload; non-zero also retries a failed startup resolve) | `0` | `60` |
 | `max_dummy` | Max dummy data length | `4` | `0`-`255` |
 | `allow_clean` | For servers: accept non-obfuscated clients and forward their traffic as is (not compatible with static bindings) | `0` | `1` |
 | `static_bindings` | Static bindings (two-way mode) | - | `1.2.3.4:12883:6670` |

@@ -32,6 +32,7 @@ static const mini_argp_opt options[] = {
     { "verbose", 'v', 1 },
     { "log-file", 'L', 1 },
     { "log-timestamps", 'T', 1 },
+    { "resolve-interval", 'R', 1 },
     { 0 }
 };
 
@@ -78,7 +79,13 @@ static void show_usage(void)
         "  -n, --in-timeout=<sec>     Incoming timeout in seconds (default: 0 - disabled)\n"
         "  -d, --max-dummy=<bytes>    Maximum length of dummy bytes for data packets\n" 
         "                             (default: 4)\n"
-        "  -e, --allow-clean          For servers, allow non-obfuscated incoming connections\n");
+        "  -e, --allow-clean          For servers, allow non-obfuscated incoming connections\n"
+        "  -R, --resolve-interval=<sec>\n"
+        "                             Re-resolve target and static-binding hostnames\n"
+        "                             every N seconds (default: 0 - disabled).\n"
+        "                             SIGHUP always triggers a refresh.\n"
+        "                             If non-zero, a failed resolve at startup is retried\n"
+        "                             instead of exiting.\n");
 }
 
 static int parse_opt(const char *lname, char sname, const char *val, void *ctx);
@@ -469,6 +476,18 @@ static int parse_opt(const char *lname, char sname, const char *val, void *ctx)
                 }
                 config->log_timestamps = b;
             }
+            break;
+        case 'R':
+            if (!is_integer(val)) {
+                log(LL_ERROR, "Invalid resolve interval: %s (must be an integer)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->resolve_interval = atol(val);
+            if (config->resolve_interval < 0) {
+                log(LL_ERROR, "Invalid resolve interval: %s (must be 0 or greater)", val);
+                exit(EXIT_FAILURE);
+            }
+            config->resolve_interval *= 1000; // Convert to milliseconds
             break;
         default:
             // should never happen

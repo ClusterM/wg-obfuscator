@@ -17,6 +17,9 @@ endif
 OBJS = wg-obfuscator.o config.o masking.o masking_stun.o obfuscation.o logging.o
 EXEDIR = .
 
+CFLAGS  += -pthread
+LDFLAGS += -pthread
+
 EXTRA_CFLAGS =
 
 ifeq ($(OS),Windows_NT)

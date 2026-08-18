@@ -306,6 +306,7 @@ Run multiple obfuscators for different VPN servers:
 | `maxClients` | int | 1024 | Maximum simultaneous clients |
 | `idleTimeout` | int | 300 | Idle timeout in seconds |
 | `inTimeout` | int | 0 | Incoming timeout in seconds (0 = disabled; for clients) |
+| `resolveInterval` | int | 0 | Re-resolve target and static-binding hostnames every N seconds (0 = only at start / on SIGHUP; non-zero also retries a failed startup resolve) |
 | `maxDummy` | int | 4 | Max dummy data bytes (0-1024) |
 | `allowClean` | bool | false | For servers: accept non-obfuscated clients (not compatible with staticBindings) |
 | `logFile` | string | null | Write the log to this file instead of the journal |

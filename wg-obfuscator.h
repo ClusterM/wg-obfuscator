@@ -81,6 +81,7 @@ typedef struct {
     uint8_t allow_clean;                        // 1 if non-obfuscated (clean) clients are allowed, 0 otherwise
     char log_file[512];                         // Path of the log file
     int8_t log_timestamps;                      // 1 to force timestamps on, 0 to force them off, -1 for auto
+    long resolve_interval;                      // Hostname re-resolve interval in milliseconds, 0 to disable periodic refresh
 
     uint8_t log_file_set;                       // 1 if the log file is set, 0 otherwise
     uint8_t listen_port_set;                    // 1 if the listen port is set, 0 otherwise
@@ -109,6 +110,7 @@ typedef struct {
     uint8_t server_obfuscated   : 1;            // 1 if the server is obfuscated, 0 otherwise
     uint8_t client_clean        : 1;            // 1 if the client speaks plain (non-obfuscated) WireGuard, traffic is passed through as is (allow-clean mode)
     uint8_t is_static           : 1;            // 1 if this is a static binding entry, 0 otherwise
+    char bind_host[256];                        // Original hostname of a static binding, empty if the address is a literal or the entry is dynamic
     UT_hash_handle hh;
 } client_entry_t;
 

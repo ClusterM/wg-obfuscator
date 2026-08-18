@@ -170,6 +170,12 @@
                 default = null;
                 description = "Prefix log lines with a timestamp, null means only when logFile is used";
               };
+
+              resolveInterval = mkOption {
+                type = types.int;
+                default = 0;
+                description = "Re-resolve target and static-binding hostnames every N seconds (0 = only on SIGHUP / at start; non-zero also retries a failed startup resolve)";
+              };
             };
           };
 
@@ -192,6 +198,7 @@
               ${optionalString inst.allowClean "allow-clean = true"}
               ${optionalString (inst.logFile != null) "log-file = ${inst.logFile}"}
               ${optionalString (inst.logTimestamps != null) "log-timestamps = ${boolToString inst.logTimestamps}"}
+              ${optionalString (inst.resolveInterval > 0) "resolve-interval = ${toString inst.resolveInterval}"}
             '') (filterAttrs (_: inst: inst.enable) instances)
           );
 
@@ -258,7 +265,8 @@
 
             systemd.services.wg-obfuscator = {
               description = "WireGuard Obfuscator";
-              after = [ "network.target" ];
+              after = [ "network-online.target" ];
+              wants = [ "network-online.target" ];
               wantedBy = [ "multi-user.target" ];
 
               serviceConfig = {
@@ -319,6 +327,7 @@
                       ${optionalString inst.allowClean "allow-clean = true"}
                       ${optionalString (inst.logFile != null) "log-file = ${inst.logFile}"}
                       ${optionalString (inst.logTimestamps != null) "log-timestamps = ${boolToString inst.logTimestamps}"}
+                      ${optionalString (inst.resolveInterval > 0) "resolve-interval = ${toString inst.resolveInterval}"}
                     '') instances
                   )}
                   EOF

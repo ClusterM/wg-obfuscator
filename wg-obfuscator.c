@@ -7,6 +7,9 @@
 #include <signal.h>
 #include <time.h>
 #include <stdarg.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <poll.h>
 #include "wg-obfuscator.h"
 #include "config.h"
 #include "obfuscation.h"
@@ -26,6 +29,24 @@ static pid_t *child_pids = NULL;
 static int child_pids_count = 0;
 // Set by the SIGHUP handler, the log file is reopened from the main loop
 static volatile sig_atomic_t log_reopen_pending = 0;
+
+// Hostname re-resolve: the blocking getaddrinfo() runs in a helper thread
+#define RESOLVE_TAG_TARGET (-1)
+typedef struct {
+    int32_t tag;     // RESOLVE_TAG_TARGET or index into resolve_bindings
+    int32_t err;     // getaddrinfo() error, 0 on success
+    uint32_t addr;   // IPv4 address in network byte order
+} resolve_result_t;
+
+static int resolve_wake_rd = -1;
+static int resolve_wake_wr = -1;
+static int resolve_result_rd = -1;
+static int resolve_result_wr = -1;
+static char resolve_target_host[256];
+static int resolve_target_is_name = 0;
+static long resolve_interval_ms = 0;
+static client_entry_t **resolve_bindings = NULL;
+static int resolve_bindings_count = 0;
 
 #ifdef USE_EPOLL
     static int epfd = 0;
@@ -64,6 +85,293 @@ static void signal_handler(int signal) {
 #define FAILURE() signal_handler(-1)
 
 /**
+ * @brief Returns 1 if the string is a dotted IPv4 address, 0 otherwise.
+ */
+static int is_ipv4_literal(const char *host)
+{
+    struct in_addr tmp;
+    return host && *host && inet_pton(AF_INET, host, &tmp) == 1;
+}
+
+/**
+ * @brief Resolves a hostname to an IPv4 address.
+ *
+ * @param host Hostname or IPv4 literal.
+ * @param out Filled with the first IPv4 address on success.
+ * @return 0 on success, a getaddrinfo() error code otherwise.
+ */
+static int resolve_hostname(const char *host, struct in_addr *out)
+{
+    struct addrinfo hints = {
+        .ai_family = AF_INET,
+        .ai_socktype = SOCK_DGRAM,
+    };
+    struct addrinfo *addr = NULL;
+    int err = getaddrinfo(host, NULL, &hints, &addr);
+    if (err != 0 || addr == NULL) {
+        if (addr) {
+            freeaddrinfo(addr);
+        }
+        return err ? err : EAI_NONAME;
+    }
+    *out = ((struct sockaddr_in *)addr->ai_addr)->sin_addr;
+    freeaddrinfo(addr);
+    return 0;
+}
+
+/**
+ * @brief Resolves a hostname at startup.
+ *
+ * On failure: if interval_ms is 0, returns the error immediately. Otherwise
+ * retries every interval_ms until the name resolves, so the daemon can start
+ * before the network or DNS is up. Sleep is interruptible by SIGINT/SIGTERM.
+ *
+ * @param host Hostname or IPv4 literal.
+ * @param out Filled with the first IPv4 address on success.
+ * @param interval_ms Retry interval in milliseconds, 0 to fail immediately.
+ * @param what Short label for the log, e.g. "target" or "static binding".
+ * @return 0 on success, a getaddrinfo() error code if interval_ms is 0 and resolve failed.
+ */
+static int resolve_hostname_startup(const char *host, struct in_addr *out, long interval_ms, const char *what)
+{
+    while (1) {
+        int err = resolve_hostname(host, out);
+        if (err == 0) {
+            return 0;
+        }
+        if (interval_ms <= 0) {
+            return err;
+        }
+        log(LL_WARN, "Can't resolve %s hostname '%s': %s, retrying in %ld seconds",
+            what, host, gai_strerror(err), interval_ms / 1000);
+        struct timespec ts = {
+            .tv_sec = interval_ms / 1000,
+            .tv_nsec = (interval_ms % 1000) * 1000000L,
+        };
+        while (nanosleep(&ts, &ts) < 0 && errno == EINTR) {
+        }
+    }
+}
+
+/**
+ * @brief Sends one resolve result to the main thread. The write is at most
+ * PIPE_BUF bytes, so it is atomic and cannot interleave with another result.
+ */
+static void resolve_send_result(int32_t tag, int32_t err, uint32_t addr)
+{
+    resolve_result_t r = { .tag = tag, .err = err, .addr = addr };
+    const char *p = (const char *)&r;
+    size_t left = sizeof(r);
+    while (left) {
+        ssize_t n = write(resolve_result_wr, p, left);
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return;
+        }
+        p += n;
+        left -= (size_t)n;
+    }
+}
+
+static void resolve_one(int32_t tag, const char *host)
+{
+    struct in_addr addr;
+    int err = resolve_hostname(host, &addr);
+    resolve_send_result(tag, err, err ? 0 : addr.s_addr);
+}
+
+/**
+ * @brief Resolver thread: waits for SIGHUP (wake pipe) or the refresh interval,
+ * then re-resolves every non-literal hostname. Never calls log().
+ */
+static void *resolve_thread_fn(void *arg)
+{
+    (void)arg;
+    struct pollfd pfd = { .fd = resolve_wake_rd, .events = POLLIN };
+    while (1) {
+        int timeout = resolve_interval_ms > 0 ? (int)resolve_interval_ms : -1;
+        int ret = poll(&pfd, 1, timeout);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            continue;
+        }
+        if (ret > 0 && (pfd.revents & POLLIN)) {
+            char buf[64];
+            while (read(resolve_wake_rd, buf, sizeof(buf)) > 0) {
+            }
+        }
+        if (resolve_target_is_name) {
+            resolve_one(RESOLVE_TAG_TARGET, resolve_target_host);
+        }
+        for (int i = 0; i < resolve_bindings_count; i++) {
+            if (resolve_bindings[i] && resolve_bindings[i]->bind_host[0]) {
+                resolve_one(i, resolve_bindings[i]->bind_host);
+            }
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Wakes the resolver thread. Safe to call from a signal handler.
+ */
+static void resolve_wake(void)
+{
+    char c = 1;
+    if (resolve_wake_wr < 0) {
+        return;
+    }
+    if (write(resolve_wake_wr, &c, 1) < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+        // Nothing useful can be done from a signal handler
+    }
+}
+
+/**
+ * @brief Applies one re-resolve result on the main thread.
+ */
+static void apply_resolve_result(const resolve_result_t *r, struct sockaddr_in *forward_addr)
+{
+    if (r->err != 0) {
+        const char *name = "?";
+        if (r->tag == RESOLVE_TAG_TARGET) {
+            name = resolve_target_host;
+        } else if (r->tag >= 0 && r->tag < resolve_bindings_count && resolve_bindings[r->tag]) {
+            name = resolve_bindings[r->tag]->bind_host;
+        }
+        log(LL_WARN, "Can't re-resolve hostname '%s': %s", name, gai_strerror(r->err));
+        return;
+    }
+
+    if (r->tag == RESOLVE_TAG_TARGET) {
+        if (forward_addr->sin_addr.s_addr == r->addr) {
+            return;
+        }
+        char old_ip[INET_ADDRSTRLEN], new_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &forward_addr->sin_addr, old_ip, sizeof(old_ip));
+        forward_addr->sin_addr.s_addr = r->addr;
+        inet_ntop(AF_INET, &forward_addr->sin_addr, new_ip, sizeof(new_ip));
+        log(LL_INFO, "Target address changed: %s -> %s", old_ip, new_ip);
+
+        client_entry_t *e, *tmp;
+        HASH_ITER(hh, conn_table, e, tmp) {
+            if (connect(e->server_sock, (struct sockaddr *)forward_addr, sizeof(*forward_addr)) < 0) {
+                serror_level(LL_WARN, "Failed to update target address for client %s:%d",
+                    inet_ntoa(e->client_addr.sin_addr), ntohs(e->client_addr.sin_port));
+            }
+        }
+        return;
+    }
+
+    if (r->tag < 0 || r->tag >= resolve_bindings_count) {
+        return;
+    }
+    client_entry_t *entry = resolve_bindings[r->tag];
+    if (!entry || !entry->is_static) {
+        return;
+    }
+    if (entry->client_addr.sin_addr.s_addr == r->addr) {
+        return;
+    }
+
+    struct sockaddr_in new_addr = entry->client_addr;
+    new_addr.sin_addr.s_addr = r->addr;
+
+    client_entry_t *collision = NULL;
+    HASH_FIND(hh, conn_table, &new_addr, sizeof(new_addr), collision);
+    if (collision && collision != entry) {
+        log(LL_WARN, "Static binding '%s' re-resolved to %s:%d, but that address is already in use",
+            entry->bind_host, inet_ntoa(new_addr.sin_addr), ntohs(new_addr.sin_port));
+        return;
+    }
+
+    char old_ip[INET_ADDRSTRLEN], new_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &entry->client_addr.sin_addr, old_ip, sizeof(old_ip));
+    inet_ntop(AF_INET, &new_addr.sin_addr, new_ip, sizeof(new_ip));
+
+    HASH_DEL(conn_table, entry);
+    entry->client_addr.sin_addr.s_addr = r->addr;
+    HASH_ADD(hh, conn_table, client_addr, sizeof(entry->client_addr), entry);
+    log(LL_INFO, "Static binding '%s' address changed: %s -> %s", entry->bind_host, old_ip, new_ip);
+}
+
+/**
+ * @brief Reads every queued re-resolve result. Each write is atomic, so one
+ * read of sizeof(resolve_result_t) is one message.
+ */
+static void drain_resolve_results(struct sockaddr_in *forward_addr)
+{
+    resolve_result_t r;
+    while (1) {
+        ssize_t n = read(resolve_result_rd, &r, sizeof(r));
+        if (n < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break;
+            }
+            serror_level(LL_WARN, "Failed to read hostname re-resolve result");
+            break;
+        }
+        if (n == 0) {
+            break;
+        }
+        if (n != (ssize_t)sizeof(r)) {
+            log(LL_WARN, "Short read from hostname resolver (%zd bytes)", n);
+            break;
+        }
+        apply_resolve_result(&r, forward_addr);
+    }
+}
+
+/**
+ * @brief Starts the resolver thread if there is at least one hostname to refresh.
+ */
+static void resolve_start_thread(void)
+{
+    int wake[2], result[2];
+    pthread_t thread;
+
+    if (!resolve_target_is_name && resolve_bindings_count == 0) {
+        return;
+    }
+
+    if (pipe(wake) < 0 || pipe(result) < 0) {
+        log(LL_WARN, "Can't create pipes for hostname re-resolve, periodic refresh disabled");
+        return;
+    }
+    resolve_wake_rd = wake[0];
+    resolve_wake_wr = wake[1];
+    resolve_result_rd = result[0];
+    resolve_result_wr = result[1];
+
+    fcntl(resolve_wake_rd, F_SETFL, O_NONBLOCK);
+    fcntl(resolve_wake_wr, F_SETFL, O_NONBLOCK);
+    fcntl(resolve_result_rd, F_SETFL, O_NONBLOCK);
+
+    if (pthread_create(&thread, NULL, resolve_thread_fn, NULL) != 0) {
+        log(LL_WARN, "Can't start hostname resolver thread, periodic refresh disabled");
+        close(resolve_wake_rd);
+        close(resolve_wake_wr);
+        close(resolve_result_rd);
+        close(resolve_result_wr);
+        resolve_wake_rd = resolve_wake_wr = resolve_result_rd = resolve_result_wr = -1;
+        return;
+    }
+    pthread_detach(thread);
+
+    if (resolve_interval_ms > 0) {
+        log(LL_INFO, "Re-resolving hostnames every %ld seconds (and on SIGHUP)", resolve_interval_ms / 1000);
+    } else {
+        log(LL_INFO, "Re-resolving hostnames on SIGHUP");
+    }
+}
+
+/**
  * @brief Remembers the PID of a forked instance.
  *
  * Called by the configuration parser for every additional section, so that the
@@ -95,6 +403,7 @@ static void sighup_handler(int sig)
 {
     (void)sig;
     log_reopen_pending = 1;
+    resolve_wake();
     // The list is filled before the handler is installed, so it can't change here
     for (int i = 0; i < child_pids_count; i++) {
         kill(child_pids[i], SIGHUP);
@@ -191,9 +500,10 @@ static client_entry_t * new_client_entry(obfuscator_config_t *config, struct soc
  * @param client_addr Pointer to a sockaddr_in structure representing the client's address.
  * @param forward_addr Pointer to a sockaddr_in structure representing the address to forward to.
  * @param local_port The local port number to connect to the server.
+ * @param bind_host Original hostname from the configuration, stored if it is not an IPv4 literal.
  * @return Pointer to the newly created client_entry_t structure, or NULL on failure.
  */
-static client_entry_t * new_client_entry_static(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port) {
+static client_entry_t * new_client_entry_static(obfuscator_config_t *config, struct sockaddr_in *client_addr, struct sockaddr_in *forward_addr, uint16_t local_port, const char *bind_host) {
     if (HASH_COUNT(conn_table) >= config->max_clients) {
         log(LL_ERROR, "Maximum number of clients reached (%d), cannot add new client", config->max_clients);
         return NULL;
@@ -275,6 +585,9 @@ static client_entry_t * new_client_entry_static(obfuscator_config_t *config, str
 #endif
 
     client_entry->is_static = 1;
+    if (bind_host && !is_ipv4_literal(bind_host)) {
+        strncpy(client_entry->bind_host, bind_host, sizeof(client_entry->bind_host) - 1);
+    }
 
     HASH_ADD(hh, conn_table, client_addr, sizeof(*client_addr), client_entry);
 
@@ -348,7 +661,7 @@ int main(int argc, char *argv[]) {
 #ifdef USE_EPOLL
     struct epoll_event events[MAX_EVENTS];
 #else
-    struct pollfd pollfds[config.max_clients + 1];
+    struct pollfd pollfds[config.max_clients + 2];
 #endif
 
     /* Check the parameters */
@@ -493,13 +806,12 @@ int main(int argc, char *argv[]) {
     /* Set up forward address */
     memset(&forward_addr, 0, sizeof(forward_addr));
     forward_addr.sin_family = AF_INET;
-    err = getaddrinfo(target_host, NULL, &hints, &addr);
-    if (err != 0 || addr == NULL) {
+    resolve_interval_ms = config.resolve_interval;
+    err = resolve_hostname_startup(target_host, &forward_addr.sin_addr, resolve_interval_ms, "target");
+    if (err != 0) {
         log(LL_ERROR, "Can't resolve hostname '%s': %s", target_host, gai_strerror(err));
         FAILURE();
     }
-    forward_addr.sin_addr = ((struct sockaddr_in *)addr->ai_addr)->sin_addr;
-    freeaddrinfo(addr);
     log(LL_DEBUG, "Resolved target hostname '%s' to %s", target_host, inet_ntoa(forward_addr.sin_addr));
     if (target_port <= 0 || target_port > 65535) {
         log(LL_ERROR, "Invalid target port: %d", target_port);
@@ -507,6 +819,8 @@ int main(int argc, char *argv[]) {
     }
     forward_addr.sin_port = htons(target_port);
     log(LL_INFO, "Target: %s:%d", target_host, target_port);
+    strncpy(resolve_target_host, target_host, sizeof(resolve_target_host) - 1);
+    resolve_target_is_name = !is_ipv4_literal(target_host);
 
     /* Add static bindings if provided */
     if (config.static_bindings) {
@@ -530,14 +844,12 @@ int main(int argc, char *argv[]) {
 
             struct sockaddr_in client_addr = {0};
             client_addr.sin_family = AF_INET;
-            err = getaddrinfo(binding, NULL, &hints, &addr);
-            if (err != 0 || addr == NULL) {
+            err = resolve_hostname_startup(binding, &client_addr.sin_addr, resolve_interval_ms, "static binding");
+            if (err != 0) {
                 log(LL_ERROR, "Can't resolve hostname '%s' for static binding '%s:%s:%s': %s", 
                     binding, binding, colon1 + 1, colon2 + 1, gai_strerror(err));
                 FAILURE();
             }
-            client_addr.sin_addr = ((struct sockaddr_in *)addr->ai_addr)->sin_addr;
-            freeaddrinfo(addr);
             log(LL_DEBUG, "Resolved static binding hostname '%s' to %s", binding, inet_ntoa(client_addr.sin_addr));
             int remote_port = atoi(colon1 + 1);
             if (remote_port <= 0 || remote_port > 65535) {
@@ -553,7 +865,7 @@ int main(int argc, char *argv[]) {
             }
             client_addr.sin_port = htons(remote_port);
 
-            if (!new_client_entry_static(&config, &client_addr, &forward_addr, local_port)) {
+            if (!new_client_entry_static(&config, &client_addr, &forward_addr, local_port, binding)) {
                 log(LL_ERROR, "Failed to create static binding: %s:%s:%s",
                     binding, colon1 + 1, colon2 + 1);
                 FAILURE();
@@ -567,6 +879,41 @@ int main(int argc, char *argv[]) {
         }
         free(config.static_bindings);
         config.static_bindings = NULL;
+    }
+
+    {
+        client_entry_t *e, *tmp;
+        int n = 0;
+        HASH_ITER(hh, conn_table, e, tmp) {
+            if (e->is_static && e->bind_host[0]) {
+                n++;
+            }
+        }
+        if (n > 0) {
+            resolve_bindings = calloc((size_t)n, sizeof(*resolve_bindings));
+            if (!resolve_bindings) {
+                log(LL_WARN, "Out of memory, static binding hostnames will not be re-resolved");
+            } else {
+                HASH_ITER(hh, conn_table, e, tmp) {
+                    if (e->is_static && e->bind_host[0]) {
+                        resolve_bindings[resolve_bindings_count++] = e;
+                    }
+                }
+            }
+        }
+        resolve_start_thread();
+#ifdef USE_EPOLL
+        if (resolve_result_rd >= 0) {
+            struct epoll_event ev = {
+                .events = EPOLLIN,
+                .data.fd = resolve_result_rd
+            };
+            if (epoll_ctl(epfd, EPOLL_CTL_ADD, resolve_result_rd, &ev) != 0) {
+                serror("epoll_ctl for hostname resolver");
+                FAILURE();
+            }
+        }
+#endif
     }
 
     log(LL_INFO, "WireGuard obfuscator successfully started");
@@ -595,9 +942,14 @@ int main(int argc, char *argv[]) {
         pollfds[nfds].fd = listen_sock;
         pollfds[nfds].events = POLLIN;
         nfds++;
+        if (resolve_result_rd >= 0) {
+            pollfds[nfds].fd = resolve_result_rd;
+            pollfds[nfds].events = POLLIN;
+            nfds++;
+        }
         client_entry_t *entry, *tmp;
         HASH_ITER(hh, conn_table, entry, tmp) {
-            if (nfds >= config.max_clients) {
+            if (nfds >= config.max_clients + 2) {
                 log(LL_DEBUG, "Too many clients, cannot add more");
                 break;
             }
@@ -624,9 +976,17 @@ int main(int argc, char *argv[]) {
 #ifdef USE_EPOLL
         for (int e = 0; e < events_n; e++) {
             struct epoll_event *event = &events[e];
+            if (resolve_result_rd >= 0 && event->data.fd == resolve_result_rd) {
+                drain_resolve_results(&forward_addr);
+                continue;
+            }
             if (event->data.fd == listen_sock) {
 #else
         for (int e = 0; e < nfds; e++) if (pollfds[e].revents & POLLIN) {
+            if (resolve_result_rd >= 0 && pollfds[e].fd == resolve_result_rd) {
+                drain_resolve_results(&forward_addr);
+                continue;
+            }
             if (pollfds[e].fd == listen_sock) {
 #endif
                 /* *** Handle incoming data from the clients *** */

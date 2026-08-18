@@ -146,6 +146,15 @@ generate_instance_config() {
     if [ "$in_timeout" -gt 0 ] 2>/dev/null; then
         echo "in-timeout = $in_timeout"
     fi
+
+    local resolve_interval=$(get_uci_value "$section" "resolve_interval" "0")
+    if [ "$resolve_interval" -lt 0 ] 2>/dev/null; then
+        echo "WARNING: Invalid resolve-interval value for section '$section', using default 0" >&2
+        resolve_interval=0
+    fi
+    if [ "$resolve_interval" -gt 0 ] 2>/dev/null; then
+        echo "resolve-interval = $resolve_interval"
+    fi
     
     local max_dummy=$(get_uci_value "$section" "max_dummy" "4")
     if [ "$max_dummy" -lt 0 ] || [ "$max_dummy" -gt 255 ] 2>/dev/null; then

@@ -190,6 +190,8 @@ Additional arguments for advanced users:
   Maximum dummy length for data packets. This is the maximum length of dummy data in bytes that can be added to data packets. Used to obfuscate traffic and make it harder to detect. The value must be between `0` and `1024`. If set to `0`, no dummy data will be added. Default is `4`. Note: total packet size with dummy bytes will be limited to 1024 bytes.
 * `-e` or `--allow-clean`  
   Allow non-obfuscated (clean) incoming connections. Intended for the **server side** only. When enabled, clients that send plain (non-obfuscated) WireGuard traffic are accepted too - their traffic is forwarded to the target as is, in both directions. In the configuration file this option is written as a boolean value: `allow-clean = true`. Not compatible with `static-bindings`. See ["Allowing Non-Obfuscated Clients"](#allowing-non-obfuscated-clients) for details. Disabled by default.
+* `-R <sec>` or `--resolve-interval=<sec>`  
+  Re-resolve the `target` hostname and any hostnames in `static-bindings` every N seconds. Optional, default is `0` (disabled). Lookups run in a background thread so a slow DNS server cannot stall packet forwarding. IPv4 literals are never re-queried. `SIGHUP` (`systemctl reload`) always triggers a refresh, even when the interval is `0`. If the interval is non-zero and a hostname cannot be resolved at startup (the network is not up yet), the obfuscator waits and retries instead of exiting. A change of address is logged at INFO. Use this for DDNS or split-horizon DNS, when the address of the peer can change without restarting the obfuscator.
 
 You can use the `--config` argument to specify a configuration file, which allows you to set all these parameters in the `key=value` format. For example:
 ```

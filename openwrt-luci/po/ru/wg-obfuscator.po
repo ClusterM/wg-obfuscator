@@ -141,6 +141,12 @@ msgstr "Таймаут простоя"
 msgid "Idle timeout in seconds"
 msgstr "Таймаут простоя в секундах"
 
+msgid "Resolve Interval"
+msgstr "Интервал резолва"
+
+msgid "Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."
+msgstr "Повторно резолвить имя target и имена в статических привязках каждые N секунд (0 = только при старте и при перезагрузке службы). Ненулевое значение также повторяет неудачный резолв при старте вместо выхода. Запросы идут в фоне и не тормозят трафик."
+
 msgid "Incoming Timeout"
 msgstr "Входящий таймаут"
 
