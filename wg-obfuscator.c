@@ -1310,7 +1310,7 @@ int main(int argc, char *argv[]) {
                     } else if (incoming_timeout) {
                         log(LL_INFO, "Removing client %s:%d due to incoming timeout", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
                     } else if (handshake_timeout) {
-                        log(LL_INFO, "Removing client %s:%d due to handshake timeout", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
+                        log(LL_DEBUG, "Removing client %s:%d due to handshake timeout", inet_ntoa(current_entry->client_addr.sin_addr), ntohs(current_entry->client_addr.sin_port));
                     }
 #ifdef USE_EPOLL
                     epoll_ctl(epfd, EPOLL_CTL_DEL, current_entry->server_sock, NULL);
