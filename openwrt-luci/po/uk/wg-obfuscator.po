@@ -1,0 +1,247 @@
+# Ukrainian translation for WireGuard Obfuscator LuCI application
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
+# This file is distributed under the same license as the wg-obfuscator package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wg-obfuscator 1.6\n"
+"POT-Creation-Date: 2026-09-03 00:00+0000\n"
+"PO-Revision-Date: 2026-09-03 00:00+0000\n"
+"Last-Translator: AI Assistant\n"
+"Language-Team: Ukrainian\n"
+"Language: uk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+# Main configuration page
+msgid "WireGuard Obfuscator Configuration"
+msgstr "Налаштування WireGuard Obfuscator"
+
+msgid "Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."
+msgstr "Налаштування екземплярів WireGuard Obfuscator для обфускації трафіку WireGuard."
+
+msgid "Instances"
+msgstr "Екземпляри"
+
+msgid "Configure individual obfuscator instances. Each instance can have different settings."
+msgstr "Налаштування окремих екземплярів обфускатора. Кожен екземпляр може мати власні параметри."
+
+msgid "Add instance"
+msgstr "Додати екземпляр"
+
+msgid "Name"
+msgstr "Назва"
+
+# Enable/Disable
+msgid "Enable"
+msgstr "Увімкнути"
+
+msgid "Enable this instance"
+msgstr "Увімкнути цей екземпляр"
+
+# Network settings
+msgid "Source Port"
+msgstr "Вихідний порт"
+
+msgid "Local port to listen for incoming connections"
+msgstr "Локальний порт для вхідних з'єднань"
+
+msgid "Target"
+msgstr "Цільовий сервер"
+
+msgid "Target server in format host:port"
+msgstr "Цільовий сервер у форматі хост:порт"
+
+msgid "Source Interface"
+msgstr "Вихідний інтерфейс"
+
+msgid "Interface to bind to (0.0.0.0 for all interfaces)"
+msgstr "Інтерфейс для прив'язки (0.0.0.0 для всіх інтерфейсів)"
+
+# Security settings
+msgid "Obfuscation Key"
+msgstr "Ключ обфускації"
+
+msgid "Key used for obfuscation (must be the same on both sides)"
+msgstr "Ключ для обфускації (має збігатися з обох боків)"
+
+msgid "Masking Type"
+msgstr "Тип маскування"
+
+msgid "Protocol masking for DPI evasion"
+msgstr "Маскування протоколу для обходу DPI"
+
+msgid "None"
+msgstr "Немає"
+
+msgid "Auto-detect"
+msgstr "Автовизначення"
+
+msgid "STUN"
+msgstr "STUN"
+
+# Logging settings
+msgid "Log Level"
+msgstr "Рівень журналювання"
+
+msgid "Verbosity level for logging"
+msgstr "Рівень деталізації журналу"
+
+msgid "Errors only"
+msgstr "Лише помилки"
+
+msgid "Warnings"
+msgstr "Попередження"
+
+msgid "Info"
+msgstr "Інформація"
+
+msgid "Debug"
+msgstr "Налагодження"
+
+msgid "Trace"
+msgstr "Трасування"
+
+msgid "Log File"
+msgstr "Файл журналу"
+
+msgid "Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."
+msgstr "Писати журнал у цей файл замість системного журналу. Залиште порожнім, щоб і надалі використовувати системний журнал (logread). Не пишіть у флеш-пам'ять роутера, використовуйте /tmp або зовнішній носій."
+
+msgid "Log file path must be absolute"
+msgstr "Шлях до файлу журналу має бути абсолютним"
+
+msgid "Log Timestamps"
+msgstr "Позначки часу в журналі"
+
+msgid "Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."
+msgstr "Додавати позначку часу на початку кожного рядка журналу. «Автоматично» означає, що позначки додаються лише під час запису у файл, оскільки системний журнал додає власні."
+
+msgid "Automatic"
+msgstr "Автоматично"
+
+msgid "Always"
+msgstr "Завжди"
+
+msgid "Never"
+msgstr "Ніколи"
+
+# Advanced settings
+msgid "Max Clients"
+msgstr "Макс. клієнтів"
+
+msgid "Maximum number of concurrent clients"
+msgstr "Максимальна кількість одночасних клієнтів"
+
+msgid "Idle Timeout"
+msgstr "Тайм-аут простою"
+
+msgid "Idle timeout in seconds"
+msgstr "Тайм-аут простою в секундах"
+
+msgid "Resolve Interval"
+msgstr "Інтервал резолвінгу"
+
+msgid "Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."
+msgstr "Повторно розв'язувати ім'я target та імена у статичних прив'язках кожні N секунд (0 = лише під час запуску та перезавантаження служби). Ненульове значення також повторює невдалий резолвінг під час запуску замість виходу. Запити виконуються у фоні й не блокують трафік."
+
+msgid "Incoming Timeout"
+msgstr "Вхідний тайм-аут"
+
+msgid "Same as Idle Timeout, but only counts data received from the target (0 = disabled). Intended for clients: detects a dead or silently blocked server. If the client is still active and static bindings are not used, a new session is created with a fresh outbound UDP port. Useful when DPI bans a particular IP:port pair."
+msgstr "Те саме, що тайм-аут простою, але враховує лише дані від цільового сервера (0 = вимкнено). Для клієнтів: виявляє мертвий або мовчки заблокований сервер. Якщо клієнт ще активний і статичні прив'язки не використовуються, одразу створюється новий сеанс з новим вихідним UDP-портом. Корисно, коли DPI банить конкретну пару IP:порт."
+
+msgid "Max Dummy Data"
+msgstr "Макс. порожніх даних"
+
+msgid "Maximum dummy data length for packets (0-255)"
+msgstr "Максимальна довжина порожніх даних у пакетах (0-255)"
+
+msgid "Allow Non-Obfuscated Clients"
+msgstr "Дозволити необфусковані клієнти"
+
+msgid "For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."
+msgstr "Лише для серверів: приймати клієнтів, які надсилають звичайний (необфускований) трафік WireGuard, і пересилати його як є в обидва боки. Вимикає автоматичне визначення напрямку обфускації, тому не вмикайте на боці клієнта. Несумісно зі статичними прив'язками."
+
+msgid "Firewall Mark"
+msgstr "Позначка фаєрвола"
+
+msgid "Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."
+msgstr "Позначка (SO_MARK), яка встановлюється на пакети, що надсилає обфускатор, 0 = вимкнено. Корисна разом із правилом маршрутизації, яке виводить трафік до VPN-сервера за межі тунелю."
+
+msgid "Static Bindings"
+msgstr "Статичні прив'язки"
+
+msgid "Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."
+msgstr "Статичні прив'язки для двостороннього режиму. Вводьте кожну прив'язку як ip:порт:локальний_порт, по одній на рядок."
+
+# Service status template
+msgid "Service Status"
+msgstr "Стан служби"
+
+msgid "Running"
+msgstr "Працює"
+
+msgid "Stopped"
+msgstr "Зупинено"
+
+msgid "Configuration"
+msgstr "Конфігурація"
+
+msgid "Exists"
+msgstr "Існує"
+
+msgid "Not found"
+msgstr "Не знайдено"
+
+msgid "Enabled instances"
+msgstr "Увімкнено екземплярів"
+
+# Control buttons template
+msgid "Restart Service"
+msgstr "Перезапустити службу"
+
+msgid "Refresh Status"
+msgstr "Оновити стан"
+
+msgid "Processing..."
+msgstr "Обробка..."
+
+msgid "Action completed successfully"
+msgstr "Дію виконано успішно"
+
+msgid "Action failed"
+msgstr "Дію не виконано"
+
+msgid "Connection error"
+msgstr "Помилка з'єднання"
+
+msgid "Restart WireGuard Obfuscator service?"
+msgstr "Перезапустити службу WireGuard Obfuscator?"
+
+# Validation messages
+msgid "Target cannot be empty"
+msgstr "Цільовий сервер не може бути порожнім"
+
+msgid "Invalid format. Expected: host:port (e.g., example.com:51820)"
+msgstr "Неправильний формат. Очікується: хост:порт (наприклад, example.com:51820)"
+
+msgid "Host cannot be empty"
+msgstr "Хост не може бути порожнім"
+
+msgid "Invalid port. Must be between 1 and 65535"
+msgstr "Неправильний порт. Має бути від 1 до 65535"
+
+msgid "Invalid format. Expected: ip:port:localport"
+msgstr "Неправильний формат. Очікується: ip:порт:локальний_порт"
+
+msgid "Invalid IP address: "
+msgstr "Неправильна IP-адреса: "
+
+msgid "Invalid remote port: "
+msgstr "Неправильний віддалений порт: "
+
+msgid "Invalid local port: "
+msgstr "Неправильний локальний порт: "

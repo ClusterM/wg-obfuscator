@@ -1,0 +1,247 @@
+# Spanish translation for WireGuard Obfuscator LuCI application
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
+# This file is distributed under the same license as the wg-obfuscator package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wg-obfuscator 1.6\n"
+"POT-Creation-Date: 2026-09-03 00:00+0000\n"
+"PO-Revision-Date: 2026-09-03 00:00+0000\n"
+"Last-Translator: AI Assistant\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Main configuration page
+msgid "WireGuard Obfuscator Configuration"
+msgstr "Configuración de WireGuard Obfuscator"
+
+msgid "Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."
+msgstr "Configure instancias de WireGuard Obfuscator para ofuscar el tráfico de WireGuard."
+
+msgid "Instances"
+msgstr "Instancias"
+
+msgid "Configure individual obfuscator instances. Each instance can have different settings."
+msgstr "Configure cada instancia del ofuscador. Cada instancia puede tener sus propios ajustes."
+
+msgid "Add instance"
+msgstr "Añadir instancia"
+
+msgid "Name"
+msgstr "Nombre"
+
+# Enable/Disable
+msgid "Enable"
+msgstr "Activar"
+
+msgid "Enable this instance"
+msgstr "Activar esta instancia"
+
+# Network settings
+msgid "Source Port"
+msgstr "Puerto de origen"
+
+msgid "Local port to listen for incoming connections"
+msgstr "Puerto local en el que escuchar las conexiones entrantes"
+
+msgid "Target"
+msgstr "Destino"
+
+msgid "Target server in format host:port"
+msgstr "Servidor de destino con el formato host:puerto"
+
+msgid "Source Interface"
+msgstr "Interfaz de origen"
+
+msgid "Interface to bind to (0.0.0.0 for all interfaces)"
+msgstr "Interfaz a la que enlazar (0.0.0.0 para todas las interfaces)"
+
+# Security settings
+msgid "Obfuscation Key"
+msgstr "Clave de ofuscación"
+
+msgid "Key used for obfuscation (must be the same on both sides)"
+msgstr "Clave usada para la ofuscación (debe ser la misma en ambos lados)"
+
+msgid "Masking Type"
+msgstr "Tipo de enmascaramiento"
+
+msgid "Protocol masking for DPI evasion"
+msgstr "Enmascaramiento de protocolo para evadir el DPI"
+
+msgid "None"
+msgstr "Ninguno"
+
+msgid "Auto-detect"
+msgstr "Detección automática"
+
+msgid "STUN"
+msgstr "STUN"
+
+# Logging settings
+msgid "Log Level"
+msgstr "Nivel de registro"
+
+msgid "Verbosity level for logging"
+msgstr "Nivel de detalle del registro"
+
+msgid "Errors only"
+msgstr "Solo errores"
+
+msgid "Warnings"
+msgstr "Advertencias"
+
+msgid "Info"
+msgstr "Información"
+
+msgid "Debug"
+msgstr "Depuración"
+
+msgid "Trace"
+msgstr "Traza"
+
+msgid "Log File"
+msgstr "Archivo de registro"
+
+msgid "Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."
+msgstr "Escribir el registro en este archivo en lugar del registro del sistema. Déjelo vacío para seguir usando el registro del sistema (logread). Evite escribir en la memoria flash del router; use /tmp o una unidad externa."
+
+msgid "Log file path must be absolute"
+msgstr "La ruta del archivo de registro debe ser absoluta"
+
+msgid "Log Timestamps"
+msgstr "Marcas de tiempo en el registro"
+
+msgid "Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."
+msgstr "Anteponer una marca de tiempo a cada línea del registro. «Automático» significa que solo se añaden cuando se usa un archivo de registro, ya que el registro del sistema añade las suyas."
+
+msgid "Automatic"
+msgstr "Automático"
+
+msgid "Always"
+msgstr "Siempre"
+
+msgid "Never"
+msgstr "Nunca"
+
+# Advanced settings
+msgid "Max Clients"
+msgstr "Clientes máx."
+
+msgid "Maximum number of concurrent clients"
+msgstr "Número máximo de clientes simultáneos"
+
+msgid "Idle Timeout"
+msgstr "Tiempo de espera por inactividad"
+
+msgid "Idle timeout in seconds"
+msgstr "Tiempo de espera por inactividad en segundos"
+
+msgid "Resolve Interval"
+msgstr "Intervalo de resolución"
+
+msgid "Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."
+msgstr "Volver a resolver el nombre de host de destino y los de los enlaces estáticos cada N segundos (0 = solo al iniciar y al recargar el servicio). Un valor distinto de cero también reintenta una resolución fallida al inicio en lugar de salir. Las consultas se ejecutan en segundo plano y no detienen el tráfico."
+
+msgid "Incoming Timeout"
+msgstr "Tiempo de espera de entrada"
+
+msgid "Same as Idle Timeout, but only counts data received from the target (0 = disabled). Intended for clients: detects a dead or silently blocked server. If the client is still active and static bindings are not used, a new session is created with a fresh outbound UDP port. Useful when DPI bans a particular IP:port pair."
+msgstr "Igual que el tiempo de espera por inactividad, pero solo cuenta los datos recibidos del destino (0 = desactivado). Pensado para clientes: detecta un servidor caído o bloqueado en silencio. Si el cliente sigue activo y no se usan enlaces estáticos, se crea una sesión nueva con un puerto UDP de salida nuevo. Útil cuando el DPI bloquea un par IP:puerto concreto."
+
+msgid "Max Dummy Data"
+msgstr "Datos de relleno máx."
+
+msgid "Maximum dummy data length for packets (0-255)"
+msgstr "Longitud máxima de los datos de relleno en los paquetes (0-255)"
+
+msgid "Allow Non-Obfuscated Clients"
+msgstr "Permitir clientes sin ofuscar"
+
+msgid "For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."
+msgstr "Solo para servidores: aceptar clientes que envían tráfico WireGuard sin ofuscar y reenviarlo tal cual en ambos sentidos. Desactiva la detección automática del sentido de la ofuscación, así que no lo active en el lado del cliente. No es compatible con los enlaces estáticos."
+
+msgid "Firewall Mark"
+msgstr "Marca de cortafuegos"
+
+msgid "Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."
+msgstr "Marca (SO_MARK) aplicada a los paquetes que envía el ofuscador, 0 = desactivado. Útil junto con una regla de enrutamiento que mantenga el tráfico hacia el servidor VPN fuera del túnel."
+
+msgid "Static Bindings"
+msgstr "Enlaces estáticos"
+
+msgid "Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."
+msgstr "Enlaces estáticos para el modo bidireccional. Introduzca cada enlace como ip:puerto:puertolocal, uno por línea."
+
+# Service status template
+msgid "Service Status"
+msgstr "Estado del servicio"
+
+msgid "Running"
+msgstr "En ejecución"
+
+msgid "Stopped"
+msgstr "Detenido"
+
+msgid "Configuration"
+msgstr "Configuración"
+
+msgid "Exists"
+msgstr "Existe"
+
+msgid "Not found"
+msgstr "No encontrada"
+
+msgid "Enabled instances"
+msgstr "Instancias activadas"
+
+# Control buttons template
+msgid "Restart Service"
+msgstr "Reiniciar servicio"
+
+msgid "Refresh Status"
+msgstr "Actualizar estado"
+
+msgid "Processing..."
+msgstr "Procesando..."
+
+msgid "Action completed successfully"
+msgstr "Acción completada correctamente"
+
+msgid "Action failed"
+msgstr "La acción ha fallado"
+
+msgid "Connection error"
+msgstr "Error de conexión"
+
+msgid "Restart WireGuard Obfuscator service?"
+msgstr "¿Reiniciar el servicio WireGuard Obfuscator?"
+
+# Validation messages
+msgid "Target cannot be empty"
+msgstr "El destino no puede estar vacío"
+
+msgid "Invalid format. Expected: host:port (e.g., example.com:51820)"
+msgstr "Formato no válido. Se esperaba: host:puerto (p. ej., example.com:51820)"
+
+msgid "Host cannot be empty"
+msgstr "El host no puede estar vacío"
+
+msgid "Invalid port. Must be between 1 and 65535"
+msgstr "Puerto no válido. Debe estar entre 1 y 65535"
+
+msgid "Invalid format. Expected: ip:port:localport"
+msgstr "Formato no válido. Se esperaba: ip:puerto:puertolocal"
+
+msgid "Invalid IP address: "
+msgstr "Dirección IP no válida: "
+
+msgid "Invalid remote port: "
+msgstr "Puerto remoto no válido: "
+
+msgid "Invalid local port: "
+msgstr "Puerto local no válido: "

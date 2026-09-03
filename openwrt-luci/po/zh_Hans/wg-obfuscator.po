@@ -1,0 +1,247 @@
+# Simplified Chinese translation for WireGuard Obfuscator LuCI application
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
+# This file is distributed under the same license as the wg-obfuscator package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wg-obfuscator 1.6\n"
+"POT-Creation-Date: 2026-09-03 00:00+0000\n"
+"PO-Revision-Date: 2026-09-03 00:00+0000\n"
+"Last-Translator: AI Assistant\n"
+"Language-Team: Simplified Chinese\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# Main configuration page
+msgid "WireGuard Obfuscator Configuration"
+msgstr "WireGuard Obfuscator 配置"
+
+msgid "Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."
+msgstr "配置 WireGuard Obfuscator 实例以混淆 WireGuard 流量。"
+
+msgid "Instances"
+msgstr "实例"
+
+msgid "Configure individual obfuscator instances. Each instance can have different settings."
+msgstr "配置各个混淆器实例。每个实例可以有不同的设置。"
+
+msgid "Add instance"
+msgstr "添加实例"
+
+msgid "Name"
+msgstr "名称"
+
+# Enable/Disable
+msgid "Enable"
+msgstr "启用"
+
+msgid "Enable this instance"
+msgstr "启用此实例"
+
+# Network settings
+msgid "Source Port"
+msgstr "源端口"
+
+msgid "Local port to listen for incoming connections"
+msgstr "用于监听传入连接的本地端口"
+
+msgid "Target"
+msgstr "目标"
+
+msgid "Target server in format host:port"
+msgstr "目标服务器，格式为 主机:端口"
+
+msgid "Source Interface"
+msgstr "源接口"
+
+msgid "Interface to bind to (0.0.0.0 for all interfaces)"
+msgstr "要绑定的接口（0.0.0.0 表示所有接口）"
+
+# Security settings
+msgid "Obfuscation Key"
+msgstr "混淆密钥"
+
+msgid "Key used for obfuscation (must be the same on both sides)"
+msgstr "用于混淆的密钥（两端必须相同）"
+
+msgid "Masking Type"
+msgstr "伪装类型"
+
+msgid "Protocol masking for DPI evasion"
+msgstr "用于规避 DPI 的协议伪装"
+
+msgid "None"
+msgstr "无"
+
+msgid "Auto-detect"
+msgstr "自动检测"
+
+msgid "STUN"
+msgstr "STUN"
+
+# Logging settings
+msgid "Log Level"
+msgstr "日志级别"
+
+msgid "Verbosity level for logging"
+msgstr "日志的详细程度"
+
+msgid "Errors only"
+msgstr "仅错误"
+
+msgid "Warnings"
+msgstr "警告"
+
+msgid "Info"
+msgstr "信息"
+
+msgid "Debug"
+msgstr "调试"
+
+msgid "Trace"
+msgstr "跟踪"
+
+msgid "Log File"
+msgstr "日志文件"
+
+msgid "Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."
+msgstr "将日志写入此文件而不是系统日志。留空则继续使用系统日志（logread）。请勿写入路由器的闪存，建议使用 /tmp 或外部存储设备。"
+
+msgid "Log file path must be absolute"
+msgstr "日志文件路径必须是绝对路径"
+
+msgid "Log Timestamps"
+msgstr "日志时间戳"
+
+msgid "Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."
+msgstr "在每行日志前加上时间戳。“自动”表示仅在使用日志文件时添加时间戳，因为系统日志会自带时间戳。"
+
+msgid "Automatic"
+msgstr "自动"
+
+msgid "Always"
+msgstr "总是"
+
+msgid "Never"
+msgstr "从不"
+
+# Advanced settings
+msgid "Max Clients"
+msgstr "最大客户端数"
+
+msgid "Maximum number of concurrent clients"
+msgstr "并发客户端的最大数量"
+
+msgid "Idle Timeout"
+msgstr "空闲超时"
+
+msgid "Idle timeout in seconds"
+msgstr "空闲超时（秒）"
+
+msgid "Resolve Interval"
+msgstr "解析间隔"
+
+msgid "Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."
+msgstr "每 N 秒重新解析目标主机名以及静态绑定中的主机名（0 = 仅在启动和重载服务时解析）。非零值还会在启动时重试失败的解析，而不是直接退出。解析在后台进行，不会阻塞流量。"
+
+msgid "Incoming Timeout"
+msgstr "接收超时"
+
+msgid "Same as Idle Timeout, but only counts data received from the target (0 = disabled). Intended for clients: detects a dead or silently blocked server. If the client is still active and static bindings are not used, a new session is created with a fresh outbound UDP port. Useful when DPI bans a particular IP:port pair."
+msgstr "与空闲超时相同，但只统计从目标接收到的数据（0 = 禁用）。适用于客户端：可检测已失效或被静默封锁的服务器。如果客户端仍然活跃且未使用静态绑定，将使用新的出站 UDP 端口创建新会话。当 DPI 封禁特定的 IP:端口 组合时很有用。"
+
+msgid "Max Dummy Data"
+msgstr "最大填充数据"
+
+msgid "Maximum dummy data length for packets (0-255)"
+msgstr "数据包中填充数据的最大长度（0-255）"
+
+msgid "Allow Non-Obfuscated Clients"
+msgstr "允许未混淆的客户端"
+
+msgid "For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."
+msgstr "仅适用于服务端：接受发送明文（未混淆）WireGuard 流量的客户端，并在两个方向上原样转发。这会禁用混淆方向的自动检测，因此请勿在客户端启用。与静态绑定不兼容。"
+
+msgid "Firewall Mark"
+msgstr "防火墙标记"
+
+msgid "Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."
+msgstr "为混淆器发出的数据包设置的标记（SO_MARK），0 = 禁用。与将 VPN 服务器流量保持在隧道之外的路由规则配合使用时很有用。"
+
+msgid "Static Bindings"
+msgstr "静态绑定"
+
+msgid "Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."
+msgstr "双向模式的静态绑定。每行输入一条，格式为 ip:端口:本地端口。"
+
+# Service status template
+msgid "Service Status"
+msgstr "服务状态"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Configuration"
+msgstr "配置"
+
+msgid "Exists"
+msgstr "存在"
+
+msgid "Not found"
+msgstr "未找到"
+
+msgid "Enabled instances"
+msgstr "已启用的实例"
+
+# Control buttons template
+msgid "Restart Service"
+msgstr "重启服务"
+
+msgid "Refresh Status"
+msgstr "刷新状态"
+
+msgid "Processing..."
+msgstr "处理中..."
+
+msgid "Action completed successfully"
+msgstr "操作已成功完成"
+
+msgid "Action failed"
+msgstr "操作失败"
+
+msgid "Connection error"
+msgstr "连接错误"
+
+msgid "Restart WireGuard Obfuscator service?"
+msgstr "确定重启 WireGuard Obfuscator 服务吗？"
+
+# Validation messages
+msgid "Target cannot be empty"
+msgstr "目标不能为空"
+
+msgid "Invalid format. Expected: host:port (e.g., example.com:51820)"
+msgstr "格式无效。应为：主机:端口（例如 example.com:51820）"
+
+msgid "Host cannot be empty"
+msgstr "主机不能为空"
+
+msgid "Invalid port. Must be between 1 and 65535"
+msgstr "端口无效。必须介于 1 和 65535 之间"
+
+msgid "Invalid format. Expected: ip:port:localport"
+msgstr "格式无效。应为：ip:端口:本地端口"
+
+msgid "Invalid IP address: "
+msgstr "IP 地址无效："
+
+msgid "Invalid remote port: "
+msgstr "远程端口无效："
+
+msgid "Invalid local port: "
+msgstr "本地端口无效："

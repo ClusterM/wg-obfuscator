@@ -397,9 +397,22 @@ the architecture-independent LuCI packages land in
 - OpenWrt ≤24: `*.ipk`
 - OpenWrt ≥25: `*.apk`
 
-Three packages are produced: `wg-obfuscator` (the daemon),
-`luci-app-wg-obfuscator` (the web interface) and `luci-i18n-wg-obfuscator-ru`
-(the Russian translation, optional).
+The build produces `wg-obfuscator` (the daemon), `luci-app-wg-obfuscator` (the
+web interface) and one optional `luci-i18n-wg-obfuscator-<lang>` package per
+translation. Install only the languages you need; the interface falls back to
+English when no translation is installed.
+
+| Language | Package suffix | Language | Package suffix |
+| --- | --- | --- | --- |
+| German | `de` | Russian | `ru` |
+| Spanish | `es` | Turkish | `tr` |
+| French | `fr` | Ukrainian | `uk` |
+| Brazilian Portuguese | `pt-br` | Simplified Chinese | `zh-cn` |
+
+To add a language, drop a `wg-obfuscator.po` into `openwrt-luci/po/<code>/` using
+one of the codes `luci.mk` knows; the build picks it up automatically. Note that
+CI requires every catalog to cover every translatable string, so a new string in
+the interface has to be added to all of them.
 
 ##### Using Command Line (Recommended)
 
@@ -542,7 +555,7 @@ After applying, you can verify the route is active by going to **Status → Rout
 
 - **Main Package**: `wg-obfuscator` - Binary, init script and UCI configuration
 - **LuCI Package**: `luci-app-wg-obfuscator` - Web interface (optional)
-- **Translation Package**: `luci-i18n-wg-obfuscator-ru` - Russian translation (optional)
+- **Translation Packages**: `luci-i18n-wg-obfuscator-<lang>` - one per language, optional (`de`, `es`, `fr`, `pt-br`, `ru`, `tr`, `uk`, `zh-cn`)
 - **Architecture**: Built for specific OpenWrt targets (arm, mips, x86, etc.)
 - **Dependencies**: libc only for the daemon; the LuCI app pulls in `luci-base`, `luci-compat` and `luci-lua-runtime`
 - **Size**: ~500KB (main), ~10KB (LuCI)

@@ -145,7 +145,18 @@ jobs:
           {
             echo "CONFIG_PACKAGE_wg-obfuscator=y"
             echo "CONFIG_PACKAGE_luci-app-wg-obfuscator=y"
-            echo "CONFIG_PACKAGE_luci-i18n-wg-obfuscator-ru=y"
+            # One translation package per po/<lang>, named after the alias
+            # luci.mk assigns to region-qualified codes
+            for lang in $(ls "$GITHUB_WORKSPACE/openwrt-luci/po"); do
+              case "$lang" in
+                templates) continue ;;
+                pt_BR)   suffix=pt-br ;;
+                zh_Hans) suffix=zh-cn ;;
+                zh_Hant) suffix=zh-tw ;;
+                *)       suffix="$lang" ;;
+              esac
+              echo "CONFIG_PACKAGE_luci-i18n-wg-obfuscator-$suffix=y"
+            done
           } >> .config
           make defconfig
 
@@ -257,8 +268,17 @@ jobs:
             www/luci-static/resources/wg-obfuscator.js \
             www/luci-static/resources/wg-obfuscator.css
 
-          check_files luci-i18n-wg-obfuscator-ru \
-            usr/lib/lua/luci/i18n/wg-obfuscator.ru.lmo
+          for lang in $(ls "$GITHUB_WORKSPACE/openwrt-luci/po"); do
+            case "$lang" in
+              templates) continue ;;
+              pt_BR)   suffix=pt-br ;;
+              zh_Hans) suffix=zh-cn ;;
+              zh_Hant) suffix=zh-tw ;;
+              *)       suffix="$lang" ;;
+            esac
+            check_files "luci-i18n-wg-obfuscator-$suffix" \
+              "usr/lib/lua/luci/i18n/wg-obfuscator.$suffix.lmo"
+          done
 
           echo "=== built package files ==="
           found=0
@@ -324,16 +344,31 @@ jobs:
             echo "ok $f"
           done
 
+      - name: Validate translation catalogs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext > /dev/null
+
+          status=0
+          for po in openwrt-luci/po/*/*.po; do
+            if msgfmt -c -o /dev/null "$po"; then
+              echo "ok $po"
+            else
+              echo "::error::$po is not a valid gettext catalog"
+              status=1
+            fi
+          done
+
+          exit $status
+
       - name: Check translations are in sync
         run: |
           pip install --quiet polib
           python3 - <<'PY'
-          import glob, re, sys
+          import glob, os, re, sys
           import polib
 
-          ids = {e.msgid for e in polib.pofile('openwrt-luci/po/ru/wg-obfuscator.po')}
           found = set()
-
           for path in glob.glob('openwrt-luci/luasrc/**/*', recursive=True):
               if not path.endswith(('.lua', '.htm')):
                   continue
@@ -341,16 +376,33 @@ jobs:
               found |= set(re.findall(r'translate\("((?:[^"\\]|\\.)*)"\)', text))
               found |= set(re.findall(r'<%:((?:[^%]|%(?!>))*?)%>', text))
 
-          missing = sorted(found - ids)
-          unused = sorted(i for i in ids - found if i)
+          catalogs = sorted(glob.glob('openwrt-luci/po/*/wg-obfuscator.po'))
+          if not catalogs:
+              print('::error::no translation catalogs found')
+              sys.exit(1)
 
-          for s in missing:
-              print(f'::error::string is not in the ru catalog: {s}')
-          for s in unused:
-              print(f'::warning::ru catalog has an unused string: {s}')
+          failed = False
+          for path in catalogs:
+              lang = os.path.basename(os.path.dirname(path))
+              entries = polib.pofile(path)
+              ids = {e.msgid for e in entries}
 
-          print(f'{len(found)} translatable strings, {len(missing)} missing')
-          sys.exit(1 if missing else 0)
+              for s in sorted(found - ids):
+                  print(f'::error::{lang}: string is missing from the catalog: {s}')
+                  failed = True
+              for s in sorted(i for i in ids - found if i):
+                  print(f'::warning::{lang}: catalog has an unused string: {s}')
+              for e in entries:
+                  if e.msgid and not e.msgstr:
+                      print(f'::error::{lang}: string is untranslated: {e.msgid}')
+                      failed = True
+                  if 'fuzzy' in e.flags:
+                      print(f'::warning::{lang}: string is marked fuzzy: {e.msgid}')
+
+              print(f'{lang}: {len(ids)} entries')
+
+          print(f'{len(found)} translatable strings across {len(catalogs)} catalogs')
+          sys.exit(1 if failed else 0)
           PY
 
       - name: Test Makefile structure

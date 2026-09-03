@@ -1,0 +1,247 @@
+# Turkish translation for WireGuard Obfuscator LuCI application
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
+# This file is distributed under the same license as the wg-obfuscator package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wg-obfuscator 1.6\n"
+"POT-Creation-Date: 2026-09-03 00:00+0000\n"
+"PO-Revision-Date: 2026-09-03 00:00+0000\n"
+"Last-Translator: AI Assistant\n"
+"Language-Team: Turkish\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Main configuration page
+msgid "WireGuard Obfuscator Configuration"
+msgstr "WireGuard Obfuscator Yapılandırması"
+
+msgid "Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic."
+msgstr "WireGuard trafiğini gizlemek için WireGuard Obfuscator örneklerini yapılandırın."
+
+msgid "Instances"
+msgstr "Örnekler"
+
+msgid "Configure individual obfuscator instances. Each instance can have different settings."
+msgstr "Her bir gizleyici örneğini yapılandırın. Her örnek farklı ayarlara sahip olabilir."
+
+msgid "Add instance"
+msgstr "Örnek ekle"
+
+msgid "Name"
+msgstr "Ad"
+
+# Enable/Disable
+msgid "Enable"
+msgstr "Etkinleştir"
+
+msgid "Enable this instance"
+msgstr "Bu örneği etkinleştir"
+
+# Network settings
+msgid "Source Port"
+msgstr "Kaynak Bağlantı Noktası"
+
+msgid "Local port to listen for incoming connections"
+msgstr "Gelen bağlantıların dinleneceği yerel bağlantı noktası"
+
+msgid "Target"
+msgstr "Hedef"
+
+msgid "Target server in format host:port"
+msgstr "host:port biçiminde hedef sunucu"
+
+msgid "Source Interface"
+msgstr "Kaynak Arayüzü"
+
+msgid "Interface to bind to (0.0.0.0 for all interfaces)"
+msgstr "Bağlanılacak arayüz (tüm arayüzler için 0.0.0.0)"
+
+# Security settings
+msgid "Obfuscation Key"
+msgstr "Gizleme Anahtarı"
+
+msgid "Key used for obfuscation (must be the same on both sides)"
+msgstr "Gizleme için kullanılan anahtar (her iki tarafta da aynı olmalıdır)"
+
+msgid "Masking Type"
+msgstr "Maskeleme Türü"
+
+msgid "Protocol masking for DPI evasion"
+msgstr "DPI atlatma için protokol maskeleme"
+
+msgid "None"
+msgstr "Yok"
+
+msgid "Auto-detect"
+msgstr "Otomatik algıla"
+
+msgid "STUN"
+msgstr "STUN"
+
+# Logging settings
+msgid "Log Level"
+msgstr "Günlük Düzeyi"
+
+msgid "Verbosity level for logging"
+msgstr "Günlük kaydının ayrıntı düzeyi"
+
+msgid "Errors only"
+msgstr "Yalnızca hatalar"
+
+msgid "Warnings"
+msgstr "Uyarılar"
+
+msgid "Info"
+msgstr "Bilgi"
+
+msgid "Debug"
+msgstr "Hata ayıklama"
+
+msgid "Trace"
+msgstr "İzleme"
+
+msgid "Log File"
+msgstr "Günlük Dosyası"
+
+msgid "Write the log to this file instead of the system log. Leave empty to keep using the system log (logread). Avoid writing to the router flash memory, use /tmp or an external drive instead."
+msgstr "Günlüğü sistem günlüğü yerine bu dosyaya yaz. Sistem günlüğünü (logread) kullanmaya devam etmek için boş bırakın. Yönlendiricinin flash belleğine yazmaktan kaçının, bunun yerine /tmp veya harici bir sürücü kullanın."
+
+msgid "Log file path must be absolute"
+msgstr "Günlük dosyası yolu mutlak olmalıdır"
+
+msgid "Log Timestamps"
+msgstr "Günlük Zaman Damgaları"
+
+msgid "Prefix log lines with a timestamp. Automatic means timestamps are added only when a log file is used, since the system log adds its own."
+msgstr "Her günlük satırının başına bir zaman damgası ekle. “Otomatik”, zaman damgalarının yalnızca bir günlük dosyası kullanıldığında ekleneceği anlamına gelir; sistem günlüğü kendi damgasını ekler."
+
+msgid "Automatic"
+msgstr "Otomatik"
+
+msgid "Always"
+msgstr "Her zaman"
+
+msgid "Never"
+msgstr "Asla"
+
+# Advanced settings
+msgid "Max Clients"
+msgstr "Maks. İstemci"
+
+msgid "Maximum number of concurrent clients"
+msgstr "Eş zamanlı en fazla istemci sayısı"
+
+msgid "Idle Timeout"
+msgstr "Boşta Kalma Zaman Aşımı"
+
+msgid "Idle timeout in seconds"
+msgstr "Saniye cinsinden boşta kalma zaman aşımı"
+
+msgid "Resolve Interval"
+msgstr "Çözümleme Aralığı"
+
+msgid "Re-resolve the target hostname and hostnames in static bindings every N seconds (0 = only at start and on service reload). A non-zero value also retries a failed resolve at startup instead of exiting. Lookups run in the background and do not stall traffic."
+msgstr "Hedef ana bilgisayar adını ve statik bağlamalardaki adları her N saniyede bir yeniden çözümle (0 = yalnızca başlangıçta ve servis yeniden yüklendiğinde). Sıfır olmayan bir değer, başlangıçta başarısız olan çözümlemeyi çıkmak yerine yeniden dener. Sorgular arka planda çalışır ve trafiği durdurmaz."
+
+msgid "Incoming Timeout"
+msgstr "Gelen Veri Zaman Aşımı"
+
+msgid "Same as Idle Timeout, but only counts data received from the target (0 = disabled). Intended for clients: detects a dead or silently blocked server. If the client is still active and static bindings are not used, a new session is created with a fresh outbound UDP port. Useful when DPI bans a particular IP:port pair."
+msgstr "Boşta kalma zaman aşımıyla aynıdır, ancak yalnızca hedeften alınan verileri sayar (0 = devre dışı). İstemciler içindir: ölü ya da sessizce engellenmiş bir sunucuyu algılar. İstemci hâlâ etkinse ve statik bağlamalar kullanılmıyorsa, yeni bir giden UDP bağlantı noktasıyla yeni bir oturum oluşturulur. DPI belirli bir IP:port çiftini yasakladığında kullanışlıdır."
+
+msgid "Max Dummy Data"
+msgstr "Maks. Dolgu Verisi"
+
+msgid "Maximum dummy data length for packets (0-255)"
+msgstr "Paketlerdeki en fazla dolgu verisi uzunluğu (0-255)"
+
+msgid "Allow Non-Obfuscated Clients"
+msgstr "Gizlenmemiş İstemcilere İzin Ver"
+
+msgid "For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."
+msgstr "Yalnızca sunucular için: düz (gizlenmemiş) WireGuard trafiği gönderen istemcileri kabul et ve trafiği her iki yönde olduğu gibi ilet. Gizleme yönünün otomatik algılanmasını devre dışı bırakır, bu nedenle istemci tarafında etkinleştirmeyin. Statik bağlamalarla uyumlu değildir."
+
+msgid "Firewall Mark"
+msgstr "Güvenlik Duvarı İşareti"
+
+msgid "Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."
+msgstr "Gizleyicinin gönderdiği paketlere uygulanan işaret (SO_MARK), 0 = devre dışı. VPN sunucusuna giden trafiği tünelin dışında tutan bir yönlendirme kuralıyla birlikte kullanışlıdır."
+
+msgid "Static Bindings"
+msgstr "Statik Bağlamalar"
+
+msgid "Static bindings for two-way mode. Enter each binding as ip:port:localport, one per line."
+msgstr "Çift yönlü mod için statik bağlamalar. Her bağlamayı ip:port:yerelport olarak, satır başına bir tane girin."
+
+# Service status template
+msgid "Service Status"
+msgstr "Servis Durumu"
+
+msgid "Running"
+msgstr "Çalışıyor"
+
+msgid "Stopped"
+msgstr "Durduruldu"
+
+msgid "Configuration"
+msgstr "Yapılandırma"
+
+msgid "Exists"
+msgstr "Mevcut"
+
+msgid "Not found"
+msgstr "Bulunamadı"
+
+msgid "Enabled instances"
+msgstr "Etkin örnekler"
+
+# Control buttons template
+msgid "Restart Service"
+msgstr "Servisi Yeniden Başlat"
+
+msgid "Refresh Status"
+msgstr "Durumu Yenile"
+
+msgid "Processing..."
+msgstr "İşleniyor..."
+
+msgid "Action completed successfully"
+msgstr "İşlem başarıyla tamamlandı"
+
+msgid "Action failed"
+msgstr "İşlem başarısız oldu"
+
+msgid "Connection error"
+msgstr "Bağlantı hatası"
+
+msgid "Restart WireGuard Obfuscator service?"
+msgstr "WireGuard Obfuscator servisi yeniden başlatılsın mı?"
+
+# Validation messages
+msgid "Target cannot be empty"
+msgstr "Hedef boş olamaz"
+
+msgid "Invalid format. Expected: host:port (e.g., example.com:51820)"
+msgstr "Geçersiz biçim. Beklenen: host:port (örn. example.com:51820)"
+
+msgid "Host cannot be empty"
+msgstr "Ana bilgisayar boş olamaz"
+
+msgid "Invalid port. Must be between 1 and 65535"
+msgstr "Geçersiz bağlantı noktası. 1 ile 65535 arasında olmalıdır"
+
+msgid "Invalid format. Expected: ip:port:localport"
+msgstr "Geçersiz biçim. Beklenen: ip:port:yerelport"
+
+msgid "Invalid IP address: "
+msgstr "Geçersiz IP adresi: "
+
+msgid "Invalid remote port: "
+msgstr "Geçersiz uzak bağlantı noktası: "
+
+msgid "Invalid local port: "
+msgstr "Geçersiz yerel bağlantı noktası: "

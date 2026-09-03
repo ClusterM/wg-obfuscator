@@ -27,10 +27,29 @@ print_error() {
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="luci-app-wg-obfuscator"
-# luci.mk splits translations into their own package
-I18N_NAME="luci-i18n-wg-obfuscator-ru"
+
+# luci.mk splits every po/<lang> directory into its own translation package and
+# renames a few region-qualified codes on the way (LUCI_LC_ALIAS in luci.mk).
+i18n_suffix() {
+    case "$1" in
+        bn_BD)   echo bn ;;
+        nb_NO)   echo no ;;
+        pt_BR)   echo pt-br ;;
+        zh_Hans) echo zh-cn ;;
+        zh_Hant) echo zh-tw ;;
+        *)       echo "$1" ;;
+    esac
+}
+
+I18N_NAMES=()
+for lang_dir in "$SCRIPT_DIR"/po/*/; do
+    lang="$(basename "$lang_dir")"
+    [ "$lang" = "templates" ] && continue
+    I18N_NAMES+=("luci-i18n-wg-obfuscator-$(i18n_suffix "$lang")")
+done
 
 print_status "Building $PACKAGE_NAME OpenWrt package..."
+print_status "Translations: ${I18N_NAMES[*]#luci-i18n-wg-obfuscator-}"
 
 # Check if OpenWrt build system is available
 if [ -z "$OPENWRT_BUILD_DIR" ]; then
@@ -101,19 +120,22 @@ if [ ! -f .config ]; then
     exit 1
 fi
 
-# Enable the app and its translation in config if not already enabled
+CONFIG_ARGS=("CONFIG_PACKAGE_$PACKAGE_NAME=y")
+for name in "${I18N_NAMES[@]}"; do
+    CONFIG_ARGS+=("CONFIG_PACKAGE_$name=y")
+done
+
+# Enable the app and its translations in config if not already enabled
 if ! grep -q "CONFIG_PACKAGE_$PACKAGE_NAME=y" .config 2>/dev/null; then
-    print_status "Enabling package in .config..."
-    echo "CONFIG_PACKAGE_$PACKAGE_NAME=y" >> .config
-    echo "CONFIG_PACKAGE_$I18N_NAME=y" >> .config
+    print_status "Enabling packages in .config..."
+    printf '%s\n' "${CONFIG_ARGS[@]}" >> .config
     make defconfig
 fi
 
 # Build package (install is not needed - package file is created during compile)
 set +e
 make package/$PACKAGE_NAME/{clean,compile} \
-    CONFIG_PACKAGE_$PACKAGE_NAME=y \
-    CONFIG_PACKAGE_$I18N_NAME=y \
+    "${CONFIG_ARGS[@]}" \
     V=s \
     2>&1 | tee /tmp/$PACKAGE_NAME-build.log | tail -20
 BUILD_STATUS=${PIPESTATUS[0]}
@@ -129,9 +151,11 @@ fi
 if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || [ $LOG_PACKAGED -eq 1 ]; then
     # PKGARCH:=all lands in bin/targets/<target>/<subtarget>/packages rather
     # than in bin/packages/<arch>, so search the whole output tree.
-    mapfile -t PKG_FILES < <(find bin \
-        \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \
-           -o -name "${I18N_NAME}*.ipk" -o -name "${I18N_NAME}*.apk" \) 2>/dev/null | sort)
+    FIND_ARGS=(-name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk")
+    for name in "${I18N_NAMES[@]}"; do
+        FIND_ARGS+=(-o -name "${name}-*.ipk" -o -name "${name}-*.apk")
+    done
+    mapfile -t PKG_FILES < <(find bin \( "${FIND_ARGS[@]}" \) 2>/dev/null | sort)
     if [ ${#PKG_FILES[@]} -gt 0 ] && [ -n "${PKG_FILES[0]}" ]; then
         print_status "Package built successfully!"
         for PKG_FILE in "${PKG_FILES[@]}"; do
