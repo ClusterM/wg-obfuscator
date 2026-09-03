@@ -49,7 +49,7 @@ endef
 # The upstream Makefile appends -pthread to CFLAGS/LDFLAGS, but command line
 # variables take precedence over that, so it has to be passed explicitly.
 define Build/Compile
-	$(MAKE) -C $(PKG_BUILD_DIR) \
+	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
 		CC="$(TARGET_CC)" \
 		CFLAGS="$(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -pthread" \
 		LDFLAGS="$(TARGET_LDFLAGS) -pthread" \

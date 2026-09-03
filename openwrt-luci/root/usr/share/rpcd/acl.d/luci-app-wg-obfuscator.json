@@ -3,7 +3,7 @@
 		"description": "Grant access to WireGuard Obfuscator configuration",
 		"read": {
 			"file": {
-				"/var/etc/wg-obfuscator.conf": [ "read" ]
+				"/var/etc/wg-obfuscator.conf": [ "list" ]
 			},
 			"ubus": {
 				"service": [ "list" ]

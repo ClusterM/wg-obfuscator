@@ -61,6 +61,18 @@ function renderStatus(isRunning, configPresent, enabledCount) {
 	].join('&#160;&#160;|&#160;&#160;');
 }
 
+function updateStatus() {
+	return Promise.all([
+		getServiceStatus(),
+		getConfigPresent()
+	]).then(res => {
+		const view = document.getElementById('service_status');
+
+		if (view)
+			view.innerHTML = renderStatus(res[0], res[1], countEnabledInstances());
+	});
+}
+
 function handleRestart() {
 	return fs.exec(initScript, ['restart']).then(res => {
 		if (res.code === 0)
@@ -93,22 +105,17 @@ return view.extend({
 	render() {
 		let m, s, o;
 
+		// Registered here rather than from the section: Map.save() re-runs the
+		// section render, and poll.add() only dedupes on function identity, so
+		// every Save & Apply would add another poller.
+		poll.add(updateStatus);
+
 		m = new form.Map('wg-obfuscator', _('WireGuard Obfuscator Configuration'),
 			_('Configure WireGuard Obfuscator instances to obfuscate WireGuard traffic.'));
 
 		s = m.section(form.TypedSection);
 		s.anonymous = true;
 		s.render = function () {
-			poll.add(() => Promise.all([
-				getServiceStatus(),
-				getConfigPresent()
-			]).then(res => {
-				const view = document.getElementById('service_status');
-
-				if (view)
-					view.innerHTML = renderStatus(res[0], res[1], countEnabledInstances());
-			}));
-
 			return E('div', { class: 'cbi-section', id: 'status_bar' }, [
 				E('p', { id: 'service_status' }, _('Collecting data...')),
 				E('p', {}, E('button', {
@@ -138,20 +145,19 @@ return view.extend({
 			_('Target server in format host:port'));
 		o.datatype = 'hostport';
 		o.placeholder = 'example.com:13255';
-		o.default = '10.13.1.100:13255';
 		o.rmempty = false;
 
+		// No default on purpose: a prefilled key would be a shared secret
+		// everyone already knows.
 		o = s.option(form.Value, 'key', _('Obfuscation Key'),
 			_('Key used for obfuscation (must be the same on both sides)'));
 		o.password = true;
-		o.default = 'test';
 		o.rmempty = false;
 
 		o = s.option(form.Value, 'source_if', _('Source Interface'),
 			_('Interface to bind to (0.0.0.0 for all interfaces)'));
 		o.datatype = 'ipaddr';
 		o.placeholder = '0.0.0.0';
-		o.default = '0.0.0.0';
 
 		o = s.option(form.ListValue, 'masking', _('Masking Type'),
 			_('Protocol masking for DPI evasion'));
