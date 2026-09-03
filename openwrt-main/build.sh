@@ -111,7 +111,7 @@ if [ $LOCAL_SRC -eq 1 ]; then
     cp "$PROJECT_DIR"/*.c "$PROJECT_DIR"/*.h "$SRC_COPY/"
     MAKE_ARGS+=("USE_SOURCE_DIR=$SRC_COPY")
 else
-    print_status "Building pinned upstream revision from the package Makefile"
+    print_status "Building the release tarball pinned by the package Makefile"
 fi
 
 # Build the package

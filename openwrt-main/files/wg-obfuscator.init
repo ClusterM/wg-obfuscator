@@ -22,12 +22,12 @@ start_service() {
     local enabled_count=0
     config_load wg-obfuscator
     config_foreach check_enabled wg_obfuscator
-    
+
     if [ "$enabled_count" -eq 0 ]; then
         echo "No wg-obfuscator instances are enabled"
         return 0
     fi
-    
+
     # Generate configuration from UCI
     if [ -x "$CONFIG_GENERATOR" ]; then
         echo "Generating configuration from UCI settings..."
@@ -40,13 +40,13 @@ start_service() {
         echo "Configuration generator not found: $CONFIG_GENERATOR"
         return 1
     fi
-    
+
     # Check if configuration file exists
     if [ ! -f "$CONFIG_FILE" ]; then
         echo "Configuration file not found: $CONFIG_FILE"
         return 1
     fi
-    
+
     # Start the service
     procd_open_instance
     procd_set_param command "$PROG" -c "$CONFIG_FILE"

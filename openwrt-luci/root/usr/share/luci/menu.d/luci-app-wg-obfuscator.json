@@ -3,9 +3,8 @@
 		"title": "WireGuard Obfuscator",
 		"order": 60,
 		"action": {
-			"type": "cbi",
-			"path": "wg-obfuscator",
-			"post": { "cbi.submit": true }
+			"type": "view",
+			"path": "wg-obfuscator/settings"
 		},
 		"depends": {
 			"acl": [ "luci-app-wg-obfuscator" ],
@@ -13,4 +12,3 @@
 		}
 	}
 }
-

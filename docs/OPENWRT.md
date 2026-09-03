@@ -372,9 +372,9 @@ The scripts will:
 - Build the packages
 
 Both Makefiles are kept exactly in the shape the official OpenWrt feeds expect,
-so by default the daemon is compiled from the revision pinned in
-`PKG_SOURCE_VERSION` and downloaded from GitHub — not from your working tree.
-To compile local changes instead, pass `--local-src`:
+so by default the daemon is compiled from the release tarball of the tag matching
+`PKG_VERSION`, downloaded from GitHub — not from your working tree. To compile
+local changes instead, pass `--local-src`:
 
 ```bash
 ./openwrt-main/build.sh --local-src
@@ -382,7 +382,7 @@ To compile local changes instead, pass `--local-src`:
 
 That uses OpenWrt's own `USE_SOURCE_DIR` mechanism, which keeps the override out
 of the Makefile. The package version still comes from `PKG_VERSION`, so a
-locally built package is not distinguishable by version from the pinned one.
+locally built package is not distinguishable by version from the released one.
 
 `openwrt-luci/build.sh` copies the app into `feeds/luci/applications/` before
 building, because the LuCI Makefile pulls in `../../luci.mk` and `luci.mk`
@@ -413,6 +413,16 @@ To add a language, drop a `wg-obfuscator.po` into `openwrt-luci/po/<code>/` usin
 one of the codes `luci.mk` knows; the build picks it up automatically. Note that
 CI requires every catalog to cover every translatable string, so a new string in
 the interface has to be added to all of them.
+
+`po/templates/wg-obfuscator.pot` is the string list translators work from, and CI
+fails when it drifts from the interface. After changing any `_()` call, stage the
+app in a LuCI feed checkout and let LuCI regenerate the template and merge it into
+every catalog:
+
+```bash
+cp -r openwrt-luci "$LUCI_FEED/applications/luci-app-wg-obfuscator"
+(cd "$LUCI_FEED" && ./build/i18n-sync.sh applications/luci-app-wg-obfuscator)
+```
 
 ##### Using Command Line (Recommended)
 
@@ -456,7 +466,7 @@ finish over SSH with `apk add --allow-untrusted /tmp/upload.apk`. See
 ls -la package/network/wg-obfuscator  # Should show symlink
 ```
 
-#### Issue: "luci-compat not found" or "No such file or directory: feeds/luci/luci.mk"
+#### Issue: "No such file or directory: feeds/luci/luci.mk"
 
 `luci-app-wg-obfuscator` includes `luci.mk` from the LuCI feed, so the feed has
 to be present in the build tree.
@@ -557,7 +567,7 @@ After applying, you can verify the route is active by going to **Status → Rout
 - **LuCI Package**: `luci-app-wg-obfuscator` - Web interface (optional)
 - **Translation Packages**: `luci-i18n-wg-obfuscator-<lang>` - one per language, optional (`de`, `es`, `fr`, `pt-br`, `ru`, `tr`, `uk`, `zh-cn`)
 - **Architecture**: Built for specific OpenWrt targets (arm, mips, x86, etc.)
-- **Dependencies**: libc only for the daemon; the LuCI app pulls in `luci-base`, `luci-compat` and `luci-lua-runtime`
+- **Dependencies**: libc only for the daemon; the LuCI app pulls in `luci-base` only, since the interface is a client-side JavaScript view and needs no Lua runtime
 - **Size**: ~500KB (main), ~10KB (LuCI)
 
 ## Support

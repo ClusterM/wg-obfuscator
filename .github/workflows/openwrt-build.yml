@@ -160,22 +160,21 @@ jobs:
           } >> .config
           make defconfig
 
-      - name: Verify the pinned revision and its hash
+      - name: Verify the release tarball and its hash
         # The source tarball is the same for every target, so check it once
         if: matrix.release == '25.12.5' && matrix.target[0] == 'x86_64'
         run: |
           cd "${OPENWRT_DIR}"
 
-          # Clones the revision the Makefile pins, repacks it the way the
-          # OpenWrt source mirror does and verifies PKG_MIRROR_HASH against the
-          # result. A stale or missing hash fails the download outright, which
-          # is also how the feed CI would reject the package.
+          # Fetches the tag archive the Makefile points at and verifies PKG_HASH
+          # against it. A stale or missing hash fails the download outright,
+          # which is also how the feed CI would reject the package.
           make package/wg-obfuscator/download V=s || {
-            echo "::error::the pinned revision does not match PKG_MIRROR_HASH"
+            echo "::error::the release tarball does not match PKG_HASH"
             exit 1
           }
 
-          echo "PKG_MIRROR_HASH matches the pinned revision"
+          echo "PKG_HASH matches the release tarball"
 
       - name: Build packages
         run: |
@@ -261,12 +260,9 @@ jobs:
             usr/libexec/wg-obfuscator-config.sh
 
           check_files luci-app-wg-obfuscator \
-            usr/lib/lua/luci/controller/wg-obfuscator.lua \
-            usr/lib/lua/luci/model/cbi/wg-obfuscator.lua \
             usr/share/luci/menu.d/luci-app-wg-obfuscator.json \
             usr/share/rpcd/acl.d/luci-app-wg-obfuscator.json \
-            www/luci-static/resources/wg-obfuscator.js \
-            www/luci-static/resources/wg-obfuscator.css
+            www/luci-static/resources/view/wg-obfuscator/settings.js
 
           for lang in $(ls "$GITHUB_WORKSPACE/openwrt-luci/po"); do
             case "$lang" in
@@ -327,13 +323,10 @@ jobs:
             echo "ok $script"
           done
 
-      - name: Test Lua syntax
+      - name: Test JavaScript syntax
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lua5.1 > /dev/null
-
-          find openwrt-luci/luasrc -name "*.lua" | while read -r f; do
-            luac -p "$f"
+          find openwrt-luci/htdocs -name "*.js" | while read -r f; do
+            node --check "$f"
             echo "ok $f"
           done
 
@@ -365,16 +358,24 @@ jobs:
         run: |
           pip install --quiet polib
           python3 - <<'PY'
-          import glob, os, re, sys
+          import glob, json, os, re, sys
           import polib
 
+          # Mirrors what LuCI's build/i18n-scan.pl collects: _() calls in the
+          # views plus the titles and descriptions in the menu and ACL files.
           found = set()
-          for path in glob.glob('openwrt-luci/luasrc/**/*', recursive=True):
-              if not path.endswith(('.lua', '.htm')):
-                  continue
+          for path in glob.glob('openwrt-luci/htdocs/**/*.js', recursive=True):
               text = open(path).read()
-              found |= set(re.findall(r'translate\("((?:[^"\\]|\\.)*)"\)', text))
-              found |= set(re.findall(r'<%:((?:[^%]|%(?!>))*?)%>', text))
+              found |= set(re.findall(r"_\('((?:[^'\\]|\\.)*)'\)", text))
+              found |= set(re.findall(r'_\("((?:[^"\\]|\\.)*)"\)', text))
+
+          for path in glob.glob('openwrt-luci/root/usr/share/rpcd/acl.d/*.json'):
+              for group in json.load(open(path)).values():
+                  found |= {group[k] for k in ('description',) if group.get(k)}
+
+          for path in glob.glob('openwrt-luci/root/usr/share/luci/menu.d/*.json'):
+              for node in json.load(open(path)).values():
+                  found |= {node[k] for k in ('title',) if node.get(k)}
 
           catalogs = sorted(glob.glob('openwrt-luci/po/*/wg-obfuscator.po'))
           if not catalogs:
@@ -382,9 +383,25 @@ jobs:
               sys.exit(1)
 
           failed = False
+
+          # The template is what translators and Weblate consume, so a stale
+          # one is as much of a defect as a missing translation.
+          template = 'openwrt-luci/po/templates/wg-obfuscator.pot'
+          template_ids = {e.msgid for e in polib.pofile(template)
+                          if e.msgid and not e.obsolete}
+          for s in sorted(found - template_ids):
+              print(f'::error::{template} is stale, run build/i18n-sync.sh: missing {s}')
+              failed = True
+          for s in sorted(template_ids - found):
+              print(f'::error::{template} is stale, run build/i18n-sync.sh: unused {s}')
+              failed = True
+
           for path in catalogs:
               lang = os.path.basename(os.path.dirname(path))
-              entries = polib.pofile(path)
+              # msgmerge parks strings that the interface no longer uses in
+              # "#~" blocks, which is what the rest of the LuCI feed carries
+              # too, so they must not count as catalog content here.
+              entries = [e for e in polib.pofile(path) if not e.obsolete]
               ids = {e.msgid for e in entries}
 
               for s in sorted(found - ids):
@@ -429,8 +446,27 @@ jobs:
           grep -qF 'include ../../luci.mk' openwrt-luci/Makefile || {
             echo "::error::openwrt-luci/Makefile must include ../../luci.mk like every package in the LuCI feed"; status=1; }
 
-          grep -qE '^PKG_MIRROR_HASH:=[0-9a-f]{64}$' openwrt-main/Makefile || {
-            echo "::error::openwrt-main/Makefile needs a real PKG_MIRROR_HASH"; status=1; }
+          # The LuCI feed has no Lua CBI application left, so the interface has
+          # to stay a client-side JS view to remain acceptable upstream.
+          if grep -q 'luci-compat' openwrt-luci/Makefile; then
+            echo "::error::openwrt-luci/Makefile must not depend on luci-compat"
+            status=1
+          fi
+
+          if [ -e openwrt-luci/luasrc ]; then
+            echo "::error::openwrt-luci/luasrc is back, the interface must stay a JS view"
+            status=1
+          fi
+
+          grep -qE '^PKG_HASH:=[0-9a-f]{64}$' openwrt-main/Makefile || {
+            echo "::error::openwrt-main/Makefile needs a real PKG_HASH"; status=1; }
+
+          # The packages feed only accepts a git clone when upstream publishes
+          # no release archive at all, and this one does.
+          if grep -q '^PKG_SOURCE_PROTO:=git' openwrt-main/Makefile; then
+            echo "::error::openwrt-main/Makefile must fetch the release tarball, not clone git"
+            status=1
+          fi
 
           if grep -q 'WG_OBFUSCATOR_SRC' openwrt-main/Makefile; then
             echo "::error::openwrt-main/Makefile carries a local source override, use USE_SOURCE_DIR instead"
@@ -481,7 +517,7 @@ jobs:
         run: |
           CONFIG=openwrt-main/files/wg-obfuscator.config
           GENERATOR=openwrt-main/files/wg-obfuscator-config.sh
-          MODEL=openwrt-luci/luasrc/model/cbi/wg-obfuscator.lua
+          MODEL=openwrt-luci/htdocs/luci-static/resources/view/wg-obfuscator/settings.js
           DOCS=docs/OPENWRT.md
           status=0
 
@@ -505,7 +541,7 @@ jobs:
               echo "::error::option '$opt' is shipped in $CONFIG but ignored by the generator"
               status=1; }
 
-            grep -qF "\"$opt\"" "$MODEL" || {
+            grep -qF "'$opt'" "$MODEL" || {
               echo "::error::option '$opt' is not exposed in the LuCI form ($MODEL)"
               status=1; }
 

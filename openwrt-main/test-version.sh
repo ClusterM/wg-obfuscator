@@ -12,8 +12,8 @@ expected="$2"
 
 output=$(/usr/bin/wg-obfuscator --help 2>&1)
 
-if echo "$output" | grep -qF "WireGuard Obfuscator v$expected"; then
-	echo "wg-obfuscator reports version $expected"
+# Not grep -q on purpose: the CI wants the matched version line in the log.
+if echo "$output" | grep -F "WireGuard Obfuscator v$expected"; then
 	exit 0
 fi
 

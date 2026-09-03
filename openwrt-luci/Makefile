@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI support for WireGuard Obfuscator
 LUCI_DESCRIPTION:=Web interface to configure and control wg-obfuscator, the WireGuard traffic obfuscator.
-LUCI_DEPENDS:=+luci-base +luci-compat +wg-obfuscator
+LUCI_DEPENDS:=+luci-base +wg-obfuscator
 
 PKG_VERSION:=1.6
 PKG_RELEASE:=1

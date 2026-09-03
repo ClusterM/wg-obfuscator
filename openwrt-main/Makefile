@@ -11,10 +11,9 @@ PKG_NAME:=wg-obfuscator
 PKG_VERSION:=1.6
 PKG_RELEASE:=1
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/ClusterM/wg-obfuscator.git
-PKG_SOURCE_VERSION:=v$(PKG_VERSION)
-PKG_MIRROR_HASH:=f674e335d34ddf362bb9b3b2df350b9676e329ae64da85e23669e0d35a6f3094
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/ClusterM/wg-obfuscator/tar.gz/v$(PKG_VERSION)?
+PKG_HASH:=57d7d02a84f198a0fde8bf8f37673b517e27fa83c0ac9305b480ae41e428e4e2
 
 PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
 PKG_LICENSE:=GPL-3.0-only
