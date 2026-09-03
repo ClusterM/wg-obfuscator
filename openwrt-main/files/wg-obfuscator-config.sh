@@ -4,7 +4,9 @@
 # Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
 # Licensed under GPLv3
 
-CONFIG_FILE="/etc/wg-obfuscator/wg-obfuscator.conf"
+# Kept on tmpfs: the file is fully regenerated on every start, and writing it
+# to flash on each boot would wear the router storage out.
+CONFIG_FILE="/var/etc/wg-obfuscator.conf"
 UCI_CONFIG="wg-obfuscator"
 
 # Allow override of UCI config directory for testing

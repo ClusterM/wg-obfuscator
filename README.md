@@ -603,6 +603,8 @@ WireGuard Obfuscator is available as native OpenWrt packages with full UCI integ
 
 > **Note:** Packages are architecture-specific (`.ipk` on OpenWrt ≤24, `.apk` on OpenWrt ≥25) and must be built for your router's platform. See the documentation for build instructions.
 
+> **Note:** On OpenWrt ≥25, a self-built `.apk` carries no signature, so it can only be installed with `apk add --allow-untrusted`. LuCI's *Upload Package* button always rejects it with `UNTRUSTED signature`. See [the OpenWrt documentation](docs/OPENWRT.md#untrusted-signature-on-openwrt-25-and-later).
+
 **📖 [Complete OpenWrt Documentation](docs/OPENWRT.md)**
 
 The documentation covers:

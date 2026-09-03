@@ -137,6 +137,11 @@ max_dummy = s:option(Value, "max_dummy", translate("Max Dummy Data"),
 max_dummy.datatype = "range(0,255)"
 max_dummy.default = "4"
 
+fwmark = s:option(Value, "fwmark", translate("Firewall Mark"),
+    translate("Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."))
+fwmark.datatype = "range(0,65535)"
+fwmark.default = "0"
+
 allow_clean = s:option(Flag, "allow_clean", translate("Allow Non-Obfuscated Clients"),
     translate("For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings."))
 allow_clean.default = "0"

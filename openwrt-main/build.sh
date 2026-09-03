@@ -28,7 +28,12 @@ print_error() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="wg-obfuscator"
 
+# Build the checkout this script lives in rather than the revision pinned in
+# the package Makefile, so local changes end up in the package.
+export WG_OBFUSCATOR_SRC="$(dirname "$SCRIPT_DIR")"
+
 print_status "Building $PACKAGE_NAME OpenWrt package..."
+print_status "Source tree: $WG_OBFUSCATOR_SRC"
 
 # Check if OpenWrt build system is available
 if [ -z "$OPENWRT_BUILD_DIR" ]; then
@@ -100,12 +105,13 @@ if ! grep -q "CONFIG_PACKAGE_$PACKAGE_NAME=y" .config 2>/dev/null; then
 fi
 
 # Build package (install is not needed - package file is created during compile)
+set +e
 make package/$PACKAGE_NAME/{clean,download,prepare,compile} \
     CONFIG_PACKAGE_$PACKAGE_NAME=y \
     V=s \
     2>&1 | tee /tmp/$PACKAGE_NAME-build.log | tail -20
-
-BUILD_STATUS=$?
+BUILD_STATUS=${PIPESTATUS[0]}
+set -e
 
 # Soft success signal from log (opkg .ipk or apk packaging)
 LOG_PACKAGED=0

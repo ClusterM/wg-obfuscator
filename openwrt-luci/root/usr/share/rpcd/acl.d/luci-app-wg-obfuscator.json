@@ -4,21 +4,17 @@
 		"read": {
 			"uci": [ "wg-obfuscator" ],
 			"file": {
-				"/etc/wg-obfuscator/*": [ "read" ],
-				"/usr/bin/wg-obfuscator": [ "exec" ]
+				"/var/etc/wg-obfuscator.conf": [ "read" ]
+			},
+			"ubus": {
+				"service": [ "list" ]
 			}
 		},
 		"write": {
 			"uci": [ "wg-obfuscator" ],
-			"file": {
-				"/etc/wg-obfuscator/*": [ "write" ]
-			},
 			"ubus": {
-				"file": [ "exec" ],
-				"service": [ "list", "event" ]
-			},
-			"cgi-io": [ "exec" ]
+				"service": [ "event" ]
+			}
 		}
 	}
 }
-

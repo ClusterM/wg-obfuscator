@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
 #
 # This is free software, licensed under the GNU General Public License v3.
 # See /LICENSE for more information.
@@ -8,61 +8,25 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-wg-obfuscator
-PKG_VERSION:=1.5
+PKG_VERSION:=1.6
 PKG_RELEASE:=1
 
-PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
-PKG_LICENSE:=GPL-3.0
+PKG_LICENSE:=GPL-3.0-only
 
-include $(INCLUDE_DIR)/package.mk
+# CURDIR resolves to the physical directory (openwrt-luci) rather than to the
+# symlink the OpenWrt tree uses, so the name luci.mk derives everything else
+# from has to be set explicitly.
+LUCI_NAME:=luci-app-wg-obfuscator
+LUCI_TITLE:=LuCI interface for WireGuard Obfuscator
+LUCI_DESCRIPTION:=LuCI web interface for WireGuard Obfuscator configuration and management.
+# luci.mk appends +luci-lua-runtime on its own because this package ships luasrc
+LUCI_DEPENDS:=+wg-obfuscator +luci-base +luci-compat
+LUCI_PKGARCH:=all
+LUCI_URL:=https://github.com/ClusterM/wg-obfuscator
+LUCI_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
 
-define Package/luci-app-wg-obfuscator
-  SECTION:=luci
-  CATEGORY:=LuCI
-  SUBMENU:=3. Applications
-  TITLE:=LuCI interface for WireGuard Obfuscator
-  DEPENDS:=+wg-obfuscator +luci-base +luci-compat
-  PKGARCH:=all
-endef
+# This package lives outside of the LuCI feed, so luci.mk comes from the
+# installed feed instead of a relative path.
+include $(TOPDIR)/feeds/luci/luci.mk
 
-define Package/luci-app-wg-obfuscator/description
-  LuCI web interface for WireGuard Obfuscator configuration and management.
-endef
-
-define Package/luci-app-wg-obfuscator/postinst
-#!/bin/sh
-[ -z "$${IPKG_INSTROOT}" ] || exit 0
-echo "Done."
-exit 0
-endef
-
-define Build/Compile
-endef
-
-define Package/luci-app-wg-obfuscator/install
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci
-	cp -pR ./luasrc/* $(1)/usr/lib/lua/luci/
-	
-	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_BIN) ./root/etc/uci-defaults/luci-wg-obfuscator $(1)/etc/uci-defaults/
-	
-	# Install menu and ACL for ucode LuCI
-	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d
-	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-wg-obfuscator.json $(1)/usr/share/luci/menu.d/
-	
-	$(INSTALL_DIR) $(1)/usr/share/rpcd/acl.d
-	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-wg-obfuscator.json $(1)/usr/share/rpcd/acl.d/
-	
-	# Install CSS and JavaScript
-	$(INSTALL_DIR) $(1)/www/luci-static/resources
-	$(INSTALL_DATA) ./htdocs/luci-static/resources/wg-obfuscator.css $(1)/www/luci-static/resources/
-	$(INSTALL_DATA) ./htdocs/luci-static/resources/wg-obfuscator.js $(1)/www/luci-static/resources/
-	
-	# Install translations if they exist
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
-	@if [ -f ./po/ru/wg-obfuscator.po ] && command -v po2lmo >/dev/null 2>&1; then \
-		po2lmo ./po/ru/wg-obfuscator.po $(1)/usr/lib/lua/luci/i18n/wg-obfuscator.ru.lmo; \
-	fi
-endef
-
-$(eval $(call BuildPackage,luci-app-wg-obfuscator))
+# call BuildPackage - OpenWrt buildroot signature

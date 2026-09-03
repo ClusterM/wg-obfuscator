@@ -10,7 +10,7 @@ local util = require "luci.util"
 local running = sys.call("pgrep -f '/usr/bin/wg-obfuscator' >/dev/null 2>&1") == 0
 
 -- Check if config exists
-local config_exists = nixio.fs.access("/etc/wg-obfuscator/wg-obfuscator.conf")
+local config_exists = nixio.fs.access("/var/etc/wg-obfuscator.conf")
 
 -- Count enabled instances
 local enabled_count = 0

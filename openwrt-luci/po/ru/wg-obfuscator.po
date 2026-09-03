@@ -4,7 +4,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: wg-obfuscator 1.5\n"
+"Project-Id-Version: wg-obfuscator 1.6\n"
 "POT-Creation-Date: 2025-10-27 18:00+0000\n"
 "PO-Revision-Date: 2025-10-27 18:00+0000\n"
 "Last-Translator: AI Assistant\n"
@@ -168,8 +168,8 @@ msgstr "Только для серверов: принимать клиенто�
 msgid "Firewall Mark"
 msgstr "Метка фаервола"
 
-msgid "Firewall mark for packets (0 to disable)"
-msgstr "Метка фаервола для пакетов (0 для отключения)"
+msgid "Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel."
+msgstr "Метка (SO_MARK), устанавливаемая на отправляемые обфускатором пакеты, 0 = выключено. Полезна вместе с правилом маршрутизации, которое выводит трафик до VPN-сервера за пределы туннеля."
 
 msgid "Static Bindings"
 msgstr "Статические привязки"

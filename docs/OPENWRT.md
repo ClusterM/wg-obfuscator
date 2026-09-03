@@ -26,9 +26,46 @@ Packages are architecture-specific (arm, mips, x86, etc.), so you need to build 
 
 **Package format by OpenWrt version:**
 - **OpenWrt 24 and earlier** — `.ipk` packages (install with `opkg`)
-- **OpenWrt 25 and later** — `.apk` packages (install with `apk add --allow-untrusted` or via LuCI)
+- **OpenWrt 25 and later** — `.apk` packages (install with `apk add --allow-untrusted`)
 
 See the [Building from Source](#building-from-source) section below for detailed instructions.
+
+### `UNTRUSTED signature` on OpenWrt 25 and later
+
+Installing a locally built `.apk` always fails with:
+
+```
+ERROR: /tmp/upload.apk: UNTRUSTED signature
+```
+
+This is expected and does not mean the package is broken. The OpenWrt build
+system calls `apk mkpkg` without `--sign`, so individual packages carry no
+signature at all — only the repository index (`packages.adb`) is signed. Since
+there is nothing to verify, **copying a public key into `/etc/apk/keys/` does not
+help**, and LuCI's *Upload Package* button cannot install such a file either,
+because it runs `apk add` without `--allow-untrusted`
+([openwrt/luci#8482](https://github.com/openwrt/luci/issues/8482)).
+
+Install from the command line instead:
+
+```bash
+apk add --allow-untrusted /tmp/wg-obfuscator-1.6-r1-*.apk
+apk add --allow-untrusted /tmp/luci-app-wg-obfuscator-1.6-r1.apk
+```
+
+If you prefer uploading through the web interface, upload the file in
+**System → Software → Upload Package** but **do not press Install** — LuCI stores
+it as `/tmp/upload.apk`, so finish over SSH:
+
+```bash
+apk add --allow-untrusted /tmp/upload.apk
+```
+
+To get a properly trusted installation, publish the packages as a signed feed:
+build with `CONFIG_SIGNED_PACKAGES=y`, serve `bin/packages/<arch>/base/` including
+`packages.adb`, copy the matching `public-key.pem` from the build tree to
+`/etc/apk/keys/` on the router, and add the feed URL to
+`/etc/apk/repositories.d/`. After that plain `apk add wg-obfuscator` works.
 
 ## Configuration
 
@@ -49,6 +86,7 @@ After installing `luci-app-wg-obfuscator`:
    - **Idle Timeout** - Maximum time a session can be idle before it is disconnected
    - **Incoming Timeout** - Same as Idle Timeout, but only counts data received from the target (0 = disabled)
    - **Max Dummy Data** - Random padding length (0-255)
+   - **Firewall Mark** - Mark set on outgoing packets, for policy routing (0 = disabled)
    - **Static Bindings** - For two-way mode (see below)
 3. Click **"Save & Apply"** to save configuration
 4. Click **"Restart Service"** to apply changes
@@ -111,6 +149,7 @@ uci commit wg-obfuscator
 | `in_timeout` | Same as idle_timeout, but only counts data received from the target (0 = disabled) | `0` | `60` |
 | `resolve_interval` | Re-resolve target and static-binding hostnames every N seconds (0 = only at start / on reload; non-zero also retries a failed startup resolve) | `0` | `60` |
 | `max_dummy` | Max dummy data length | `4` | `0`-`255` |
+| `fwmark` | Mark (`SO_MARK`) applied to the packets the obfuscator sends (0 = disabled) | `0` | `57005` |
 | `allow_clean` | For servers: accept non-obfuscated clients and forward their traffic as is (not compatible with static bindings) | `0` | `1` |
 | `static_bindings` | Static bindings (two-way mode) | - | `1.2.3.4:12883:6670` |
 | `log_file` | Write the log to this file instead of the system log | - | `/tmp/wg-obfuscator.log` |
@@ -200,7 +239,7 @@ dmesg | grep wg-obfuscator
 ps | grep wg-obfuscator
 
 # View generated configuration
-cat /etc/wg-obfuscator/wg-obfuscator.conf
+cat /var/etc/wg-obfuscator.conf
 ```
 
 ### Common Issues
@@ -217,12 +256,16 @@ cat /etc/wg-obfuscator/wg-obfuscator.conf
 
 3. **LuCI interface not showing**
    - Ensure `luci-app-wg-obfuscator` is installed
-   - Clear LuCI cache: `rm -rf /tmp/luci-*`
+   - Clear LuCI cache: `rm -rf /tmp/luci-*` and reload rpcd: `/etc/init.d/rpcd reload`
    - Restart uhttpd: `/etc/init.d/uhttpd restart`
 
 4. **Configuration changes not applied**
    - After "Save & Apply", click "Restart Service"
-   - Or use: `/etc/init.d/wg-obfuscator restart`
+   - Or use: `/etc/init.d/wg-obfuscator reload`
+
+5. **`UNTRUSTED signature` while installing**
+   - Expected for locally built `.apk` files, see
+     [the note above](#untrusted-signature-on-openwrt-25-and-later)
 
 ## Building from Source
 
@@ -328,56 +371,50 @@ The scripts will:
 - Enable packages in `.config` if needed
 - Build the packages
 
+`openwrt-main/build.sh` exports `WG_OBFUSCATOR_SRC` so that the daemon is
+compiled from the checkout you are standing in. Without that variable the
+package Makefile falls back to the revision pinned in `PKG_SOURCE_VERSION` and
+downloads it from GitHub, which is what a feed submission needs but is rarely
+what you want when testing local changes.
+
 #### Step 6: Install Built Packages
 
 After a successful build, package files are under `bin/packages/*/base/` (and sometimes other feed dirs):
 - OpenWrt ≤24: `*.ipk`
 - OpenWrt ≥25: `*.apk`
 
-##### Using LuCI Web Interface (Recommended)
+Three packages are produced: `wg-obfuscator` (the daemon),
+`luci-app-wg-obfuscator` (the web interface) and `luci-i18n-wg-obfuscator-ru`
+(the Russian translation, optional).
 
-1. Find the built packages:
-   ```bash
-   find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
-   ```
-
-2. Copy the package files to your computer (if building on a remote machine)
-
-3. Log into LuCI web interface on your router
-
-4. Go to **System → Software**
-
-5. Click **Upload Package...**
-
-6. Select and upload each package file, for example:
-   - `wg-obfuscator_*.ipk` or `wg-obfuscator-*.apk`
-   - `luci-app-wg-obfuscator_*.ipk` or `luci-app-wg-obfuscator-*.apk`
-
-7. Click **Install** for each package
-
-##### Using Command Line (Alternative)
-
-If you prefer using SSH:
+##### Using Command Line (Recommended)
 
 ```bash
 # Find built packages (.ipk and/or .apk)
-find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep -E "wg-obfuscator|luci-app-wg-obfuscator"
+find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep wg-obfuscator
 
 # Copy to router (adjust paths and router IP)
-scp bin/packages/*/base/wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
-scp bin/packages/*/base/luci-app-wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
+scp bin/packages/*/*/*wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
 
 # Install on router (via SSH)
 ssh root@192.168.1.1
 
 # OpenWrt 24 and earlier:
-opkg install /tmp/wg-obfuscator*.ipk
-opkg install /tmp/luci-app-wg-obfuscator*.ipk
+opkg install /tmp/wg-obfuscator_*.ipk /tmp/luci-app-wg-obfuscator_*.ipk
 
-# OpenWrt 25 and later:
-apk add --allow-untrusted /tmp/wg-obfuscator*.apk
-apk add --allow-untrusted /tmp/luci-app-wg-obfuscator*.apk
+# OpenWrt 25 and later (see the UNTRUSTED signature note above):
+apk add --allow-untrusted /tmp/wg-obfuscator-*.apk /tmp/luci-app-wg-obfuscator-*.apk
 ```
+
+##### Using LuCI Web Interface
+
+On OpenWrt **24 and earlier** you can install from **System → Software →
+Upload Package...** and press **Install**.
+
+On OpenWrt **25 and later** the Install button always fails with
+`UNTRUSTED signature`. Upload the file, leave the dialog without installing, and
+finish over SSH with `apk add --allow-untrusted /tmp/upload.apk`. See
+[the note above](#untrusted-signature-on-openwrt-25-and-later) for the reason.
 
 ### Troubleshooting Build Issues
 
@@ -390,10 +427,14 @@ apk add --allow-untrusted /tmp/luci-app-wg-obfuscator*.apk
 ls -la package/network/wg-obfuscator  # Should show symlink
 ```
 
-#### Issue: "luci-compat not found" error
+#### Issue: "luci-compat not found" or "No such file or directory: feeds/luci/luci.mk"
+
+`luci-app-wg-obfuscator` includes `luci.mk` from the LuCI feed, so the feed has
+to be present in the build tree.
 
 **Solution:** Ensure LuCI feed is installed:
 ```bash
+./scripts/feeds update -a
 ./scripts/feeds install -a -p luci
 ```
 
@@ -477,15 +518,17 @@ After applying, you can verify the route is active by going to **Status → Rout
 - **Keys**: The obfuscation key must be the same on both client and server sides.
 - **Firewall**: OpenWrt should automatically handle firewall rules, but verify UDP port is open if issues occur.
 - **Performance**: On low-end routers, consider reducing `max_clients` and disabling verbose logging.
-- **Updates**: Configuration is preserved during package updates.
+- **Updates**: `/etc/config/wg-obfuscator` is a conffile, so your settings are preserved during package updates.
+- **Generated config**: `/var/etc/wg-obfuscator.conf` is regenerated from UCI on every start and lives on tmpfs, so it is lost on reboot by design. Never edit it, edit UCI instead.
 - **WireGuard Endpoint**: Don't forget to change WireGuard's `Endpoint` setting to point to the obfuscator's IP:port (e.g., `127.0.0.1:13255` for local obfuscator), not the VPN server directly.
 
 ## Package Information
 
-- **Main Package**: `wg-obfuscator` - Binary and UCI configuration
+- **Main Package**: `wg-obfuscator` - Binary, init script and UCI configuration
 - **LuCI Package**: `luci-app-wg-obfuscator` - Web interface (optional)
+- **Translation Package**: `luci-i18n-wg-obfuscator-ru` - Russian translation (optional)
 - **Architecture**: Built for specific OpenWrt targets (arm, mips, x86, etc.)
-- **Dependencies**: Minimal (libc, zlib)
+- **Dependencies**: libc only for the daemon; the LuCI app pulls in `luci-base`, `luci-compat` and `luci-lua-runtime`
 - **Size**: ~500KB (main), ~10KB (LuCI)
 
 ## Support

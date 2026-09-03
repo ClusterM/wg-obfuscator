@@ -27,6 +27,8 @@ print_error() {
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_NAME="luci-app-wg-obfuscator"
+# luci.mk splits translations into their own package
+I18N_NAME="luci-i18n-wg-obfuscator-ru"
 
 print_status "Building $PACKAGE_NAME OpenWrt package..."
 
@@ -41,6 +43,13 @@ fi
 if [ ! -f "$OPENWRT_BUILD_DIR/rules.mk" ]; then
     print_error "OpenWrt build system not found at $OPENWRT_BUILD_DIR"
     print_error "Please set OPENWRT_BUILD_DIR to a valid OpenWrt SDK directory"
+    exit 1
+fi
+
+if [ ! -f "$OPENWRT_BUILD_DIR/feeds/luci/luci.mk" ]; then
+    print_error "LuCI feed not found at $OPENWRT_BUILD_DIR/feeds/luci"
+    print_error "Install it first:"
+    print_error "  cd $OPENWRT_BUILD_DIR && ./scripts/feeds update -a && ./scripts/feeds install -a -p luci"
     exit 1
 fi
 
@@ -88,20 +97,23 @@ if [ ! -f .config ]; then
     exit 1
 fi
 
-# Enable package in config if not already enabled
+# Enable the app and its translation in config if not already enabled
 if ! grep -q "CONFIG_PACKAGE_$PACKAGE_NAME=y" .config 2>/dev/null; then
     print_status "Enabling package in .config..."
     echo "CONFIG_PACKAGE_$PACKAGE_NAME=y" >> .config
+    echo "CONFIG_PACKAGE_$I18N_NAME=y" >> .config
     make defconfig
 fi
 
 # Build package (install is not needed - package file is created during compile)
+set +e
 make package/$PACKAGE_NAME/{clean,compile} \
     CONFIG_PACKAGE_$PACKAGE_NAME=y \
+    CONFIG_PACKAGE_$I18N_NAME=y \
     V=s \
     2>&1 | tee /tmp/$PACKAGE_NAME-build.log | tail -20
-
-BUILD_STATUS=$?
+BUILD_STATUS=${PIPESTATUS[0]}
+set -e
 
 # Soft success signal from log (opkg .ipk or apk packaging)
 LOG_PACKAGED=0
@@ -111,7 +123,9 @@ fi
 
 # Accept both OpenWrt ≤24 (.ipk / opkg) and OpenWrt ≥25 (.apk / apk)
 if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || [ $LOG_PACKAGED -eq 1 ]; then
-    mapfile -t PKG_FILES < <(find bin/packages \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \) 2>/dev/null | sort)
+    mapfile -t PKG_FILES < <(find bin/packages \
+        \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \
+           -o -name "${I18N_NAME}*.ipk" -o -name "${I18N_NAME}*.apk" \) 2>/dev/null | sort)
     if [ ${#PKG_FILES[@]} -gt 0 ] && [ -n "${PKG_FILES[0]}" ]; then
         print_status "Package built successfully!"
         for PKG_FILE in "${PKG_FILES[@]}"; do

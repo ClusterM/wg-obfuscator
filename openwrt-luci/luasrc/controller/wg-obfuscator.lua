@@ -17,7 +17,7 @@ function action_status()
     local sys = require "luci.sys"
     local status = {
         running = (sys.call("pgrep -f '/usr/bin/wg-obfuscator' >/dev/null 2>&1") == 0),
-        config_exists = nixio.fs.access("/etc/wg-obfuscator/wg-obfuscator.conf")
+        config_exists = nixio.fs.access("/var/etc/wg-obfuscator.conf")
     }
     
     luci.http.prepare_content("application/json")
