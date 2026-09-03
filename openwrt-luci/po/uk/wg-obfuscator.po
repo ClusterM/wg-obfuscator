@@ -95,6 +95,10 @@ msgstr "Існує"
 msgid "Firewall Mark"
 msgstr "Позначка фаєрвола"
 
+#: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:230
+msgid "Firewall mark must be 0-65535, decimal or 0x hex"
+msgstr "Мітка фаєрвола має бути від 0 до 65535, десяткова або шістнадцяткова з 0x"
+
 #: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:220
 msgid ""
 "For servers only: accept clients that send plain (non-obfuscated) "

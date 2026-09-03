@@ -91,6 +91,10 @@ msgstr "存在"
 msgid "Firewall Mark"
 msgstr "防火墙标记"
 
+#: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:230
+msgid "Firewall mark must be 0-65535, decimal or 0x hex"
+msgstr "防火墙标记必须为 0-65535（十进制或 0x 十六进制）"
+
 #: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:220
 msgid ""
 "For servers only: accept clients that send plain (non-obfuscated) "

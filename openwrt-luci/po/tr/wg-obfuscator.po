@@ -95,6 +95,10 @@ msgstr "Mevcut"
 msgid "Firewall Mark"
 msgstr "Güvenlik Duvarı İşareti"
 
+#: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:230
+msgid "Firewall mark must be 0-65535, decimal or 0x hex"
+msgstr "Güvenlik duvarı işareti 0-65535 arasında olmalıdır, ondalık veya 0x onaltılık"
+
 #: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:220
 msgid ""
 "For servers only: accept clients that send plain (non-obfuscated) "

@@ -40,6 +40,29 @@ is_number() {
     return 0
 }
 
+# Same input the daemon accepts for --fwmark: decimal or a 0x-prefixed hex
+# value, 0..65535. The kernel's SO_MARK is 32-bit; this program is not.
+# Prints the decimal form on stdout so the caller can compare without
+# feeding a hex string to [ -gt ].
+fwmark_to_dec() {
+    local raw="$1"
+    local digits
+
+    case "$raw" in
+        0[xX]*)
+            digits=${raw#0[xX]}
+            case "$digits" in
+                ''|*[!0-9a-fA-F]*) return 1 ;;
+            esac
+            ;;
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+
+    printf '%d' "$raw"
+}
+
 # Function to validate port number
 validate_port() {
     local port="$1"
@@ -154,15 +177,19 @@ generate_instance_config() {
     fi
 
     local fwmark=$(get_uci_value "$section" "fwmark" "0")
-    if ! is_number "$fwmark" || [ "$fwmark" -gt 65535 ]; then
+    local fwmark_n
+    fwmark_n=$(fwmark_to_dec "$fwmark") || fwmark_n=""
+    if [ -z "$fwmark_n" ] || [ "$fwmark_n" -gt 65535 ]; then
         echo "WARNING: Invalid fwmark value for section '$section', using default 0" >&2
         fwmark=0
+        fwmark_n=0
     fi
 
     local allow_clean=$(get_uci_value "$section" "allow_clean" "0")
     local log_file=$(get_uci_value "$section" "log_file" "")
     local log_timestamps=$(get_uci_value "$section" "log_timestamps" "AUTO")
 
+    emitted=$((emitted + 1))
     echo "[$section]"
 
     if [ "$source_if" != "0.0.0.0" ]; then
@@ -193,7 +220,7 @@ generate_instance_config() {
 
     echo "max-dummy = $max_dummy"
 
-    if [ "$fwmark" != "0" ]; then
+    if [ "$fwmark_n" -ne 0 ]; then
         echo "fwmark = $fwmark"
     fi
 
@@ -232,6 +259,9 @@ fi
 # leave a half-written config behind nor hand a stale mode to the new file.
 CONFIG_TMP="${CONFIG_FILE}.tmp"
 status=0
+# The four-line header is always written, so [ -s ] cannot tell a run with
+# no enabled instances from a real config.
+emitted=0
 
 # Generate configuration file
 {
@@ -249,7 +279,7 @@ status=0
     done
 } > "$CONFIG_TMP"
 
-if [ "$status" -ne 0 ] || [ ! -s "$CONFIG_TMP" ]; then
+if [ "$status" -ne 0 ] || [ "$emitted" -eq 0 ]; then
     rm -f "$CONFIG_TMP"
     echo "Failed to generate configuration file" >&2
     exit 1

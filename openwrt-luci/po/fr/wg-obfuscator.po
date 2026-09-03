@@ -95,6 +95,10 @@ msgstr "Présente"
 msgid "Firewall Mark"
 msgstr "Marque de pare-feu"
 
+#: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:230
+msgid "Firewall mark must be 0-65535, decimal or 0x hex"
+msgstr "La marque de pare-feu doit être comprise entre 0 et 65535, décimal ou hexadécimal 0x"
+
 #: applications/luci-app-wg-obfuscator/htdocs/luci-static/resources/view/wg-obfuscator/settings.js:220
 msgid ""
 "For servers only: accept clients that send plain (non-obfuscated) "

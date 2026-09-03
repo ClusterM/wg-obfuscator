@@ -149,7 +149,7 @@ uci commit wg-obfuscator
 | `in_timeout` | Same as idle_timeout, but only counts data received from the target (0 = disabled) | `0` | `60` |
 | `resolve_interval` | Re-resolve target and static-binding hostnames every N seconds (0 = only at start / on reload; non-zero also retries a failed startup resolve) | `0` | `60` |
 | `max_dummy` | Max dummy data length | `4` | `0`-`255` |
-| `fwmark` | Mark (`SO_MARK`) applied to the packets the obfuscator sends (0 = disabled) | `0` | `57005` |
+| `fwmark` | Mark (`SO_MARK`) applied to the packets the obfuscator sends (0 = disabled). Decimal or `0x`-prefixed hex, 0-65535 | `0` | `0xdead` |
 | `allow_clean` | For servers: accept non-obfuscated clients and forward their traffic as is (not compatible with static bindings) | `0` | `1` |
 | `static_bindings` | Static bindings (two-way mode) | - | `1.2.3.4:12883:6670` |
 | `log_file` | Write the log to this file instead of the system log | - | `/tmp/wg-obfuscator.log` |

@@ -219,8 +219,25 @@ return view.extend({
 
 		o = s.option(form.Value, 'fwmark', _('Firewall Mark'),
 			_('Mark (SO_MARK) applied to the packets the obfuscator sends, 0 = disabled. Useful together with a routing rule that keeps traffic to the VPN server outside of the tunnel.'));
-		o.datatype = 'range(0,65535)';
+		o.placeholder = '0xdead';
 		o.default = '0';
+		o.validate = function (section_id, value) {
+			if (!value)
+				return true;
+
+			// Same range the daemon accepts: decimal or 0x-prefixed hex, 16 bit.
+			if (!/^(0x[0-9a-fA-F]+|[0-9]+)$/.test(value))
+				return _('Firewall mark must be 0-65535, decimal or 0x hex');
+
+			const parsed = value.slice(0, 2).toLowerCase() === '0x'
+				? parseInt(value, 16)
+				: parseInt(value, 10);
+
+			if (parsed > 65535)
+				return _('Firewall mark must be 0-65535, decimal or 0x hex');
+
+			return true;
+		};
 
 		o = s.option(form.Flag, 'allow_clean', _('Allow Non-Obfuscated Clients'),
 			_('For servers only: accept clients that send plain (non-obfuscated) WireGuard traffic and forward it as is, in both directions. Disables automatic obfuscation direction detection, so do not enable it on the client side. Not compatible with static bindings.'));
