@@ -191,14 +191,19 @@ jobs:
           cp "$GITHUB_WORKSPACE"/*.c "$GITHUB_WORKSPACE"/*.h "$SRC_COPY/"
           echo "SRC_COPY=$SRC_COPY" >> $GITHUB_ENV
 
-          make package/wg-obfuscator/{clean,prepare,compile} \
-            USE_SOURCE_DIR="$SRC_COPY" \
+          # The LuCI app has to be built first: it depends on wg-obfuscator, so
+          # its compile pulls the daemon in as well, and USE_SOURCE_DIR cannot
+          # be passed here because it is a global override that would also
+          # redirect the LuCI build directory at the C sources. Building the
+          # daemon afterwards leaves the local tree as what was packaged.
+          make package/luci-app-wg-obfuscator/{clean,compile} \
             V=s -j$(nproc) || {
               find logs -name "*.log" -type f 2>/dev/null | head -5 | xargs tail -50 2>/dev/null || true
               exit 1
             }
 
-          make package/luci-app-wg-obfuscator/{clean,compile} \
+          make package/wg-obfuscator/{clean,prepare,compile} \
+            USE_SOURCE_DIR="$SRC_COPY" \
             V=s -j$(nproc) || {
               find logs -name "*.log" -type f 2>/dev/null | head -5 | xargs tail -50 2>/dev/null || true
               exit 1
@@ -207,10 +212,13 @@ jobs:
       - name: Verify the local source tree was compiled
         run: |
           cd "${OPENWRT_DIR}"
-          BUILD=$(find build_dir -maxdepth 2 -name "wg-obfuscator-*" | head -1)
+          # Pin the lookup to the packaged version so a build directory left
+          # over from another version cannot be mistaken for this one
+          VERSION=$(sed -n 's/^PKG_VERSION:=//p' "$GITHUB_WORKSPACE/openwrt-main/Makefile")
+          BUILD=$(find build_dir -maxdepth 2 -name "wg-obfuscator-$VERSION" | head -1)
 
           if [ -z "$BUILD" ]; then
-            echo "::error::wg-obfuscator build directory not found"
+            echo "::error::wg-obfuscator-$VERSION build directory not found"
             exit 1
           fi
 
@@ -230,21 +238,39 @@ jobs:
           cd "${OPENWRT_DIR}"
           status=0
 
-          # The staging tree is laid out identically for both ipk and apk
+          # 23.05 stages a package under ipkg-<arch>/<pkg> and keeps that tree
+          # around, while 24.10 and later use .pkgdir/<pkg> and drop ipkg-* once
+          # the archive is built, so accept either. The daemon is built out of
+          # the USE_SOURCE_DIR copy, which sits outside build_dir behind a
+          # symlink find will not descend into, hence the second search root.
+          staging_dirs() {
+            find build_dir "$SRC_COPY" -type d \
+              \( -path "*/.pkgdir/$1" -o -path "*/ipkg-*/$1" \) 2>/dev/null
+          }
+
           check_files() {
             local pkg="$1"; shift
-            local idir
-            idir=$(find build_dir -type d -path "*/ipkg-*/$pkg" | head -1)
+            local dirs d f found
 
-            if [ -z "$idir" ]; then
+            dirs=$(staging_dirs "$pkg")
+
+            if [ -z "$dirs" ]; then
               echo "::error::staging directory for $pkg not found"
               status=1
               return
             fi
 
-            echo "=== $pkg ($idir) ==="
+            echo "=== $pkg ==="
             for f in "$@"; do
-              if [ -e "$idir/$f" ]; then
+              found=0
+              for d in $dirs; do
+                if [ -e "$d/$f" ]; then
+                  found=1
+                  break
+                fi
+              done
+
+              if [ "$found" = 1 ]; then
                 echo "  ok      $f"
               else
                 echo "::error::$pkg is missing $f"
