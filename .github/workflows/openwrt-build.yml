@@ -120,19 +120,27 @@ jobs:
             exit 1
           fi
 
-      - name: Build packages
+      - name: Stage packages into the build tree
         run: |
           cd "${OPENWRT_DIR}"
 
-          mkdir -p package/network package/luci
+          mkdir -p package/network
           ln -sf "$GITHUB_WORKSPACE/openwrt-main" package/network/wg-obfuscator
-          ln -sf "$GITHUB_WORKSPACE/openwrt-luci" package/luci/luci-app-wg-obfuscator
+
+          # The LuCI Makefile is the one submitted to the feed: it pulls in
+          # ../../luci.mk and lets luci.mk derive LUCI_NAME from the directory
+          # name, neither of which holds for a symlink pointing out of the tree.
+          FEED_APP="feeds/luci/applications/luci-app-wg-obfuscator"
+          rm -rf "$FEED_APP"
+          mkdir -p "$FEED_APP"
+          tar -cf - -C "$GITHUB_WORKSPACE/openwrt-luci" --exclude=build.sh . \
+            | tar -xf - -C "$FEED_APP"
+
+          mkdir -p package/luci
+          ln -sf "$(realpath "$FEED_APP")" package/luci/luci-app-wg-obfuscator
 
           chmod +x "$GITHUB_WORKSPACE/openwrt-main/files/wg-obfuscator.init"
           chmod +x "$GITHUB_WORKSPACE/openwrt-main/files/wg-obfuscator-config.sh"
-
-          # Build the checked out tree, not the revision pinned in the Makefile
-          export WG_OBFUSCATOR_SRC="$GITHUB_WORKSPACE"
 
           {
             echo "CONFIG_PACKAGE_wg-obfuscator=y"
@@ -141,7 +149,40 @@ jobs:
           } >> .config
           make defconfig
 
+      - name: Verify the pinned revision and its hash
+        # The source tarball is the same for every target, so check it once
+        if: matrix.release == '25.12.5' && matrix.target[0] == 'x86_64'
+        run: |
+          cd "${OPENWRT_DIR}"
+
+          # Clones the revision the Makefile pins, repacks it the way the
+          # OpenWrt source mirror does and verifies PKG_MIRROR_HASH against the
+          # result. A stale or missing hash fails the download outright, which
+          # is also how the feed CI would reject the package.
+          make package/wg-obfuscator/download V=s || {
+            echo "::error::the pinned revision does not match PKG_MIRROR_HASH"
+            exit 1
+          }
+
+          echo "PKG_MIRROR_HASH matches the pinned revision"
+
+      - name: Build packages
+        run: |
+          cd "${OPENWRT_DIR}"
+
+          # USE_SOURCE_DIR is the stock way to build a local tree, so the
+          # Makefile can stay exactly as the feed expects it. It gets a copy
+          # rather than the checkout itself because OpenWrt symlinks the build
+          # directory at it and leaves object files behind.
+          SRC_COPY="${RUNNER_TEMP}/wg-obfuscator-src"
+          rm -rf "$SRC_COPY"
+          mkdir -p "$SRC_COPY"
+          cp "$GITHUB_WORKSPACE"/Makefile "$GITHUB_WORKSPACE"/LICENSE "$SRC_COPY/"
+          cp "$GITHUB_WORKSPACE"/*.c "$GITHUB_WORKSPACE"/*.h "$SRC_COPY/"
+          echo "SRC_COPY=$SRC_COPY" >> $GITHUB_ENV
+
           make package/wg-obfuscator/{clean,prepare,compile} \
+            USE_SOURCE_DIR="$SRC_COPY" \
             V=s -j$(nproc) || {
               find logs -name "*.log" -type f 2>/dev/null | head -5 | xargs tail -50 2>/dev/null || true
               exit 1
@@ -156,16 +197,22 @@ jobs:
       - name: Verify the local source tree was compiled
         run: |
           cd "${OPENWRT_DIR}"
-          SRC=$(find build_dir -type f -name wg-obfuscator.c | head -1)
+          BUILD=$(find build_dir -maxdepth 2 -name "wg-obfuscator-*" | head -1)
 
-          if [ -z "$SRC" ]; then
-            echo "::error::wg-obfuscator.c not found in build_dir"
+          if [ -z "$BUILD" ]; then
+            echo "::error::wg-obfuscator build directory not found"
             exit 1
           fi
 
-          # Guards against the package silently falling back to the pinned
-          # upstream revision instead of building this checkout.
-          diff -q "$GITHUB_WORKSPACE/wg-obfuscator.c" "$SRC"
+          # USE_SOURCE_DIR turns the build directory into a symlink at the copy
+          # of this checkout. Anything else means the package fell back to the
+          # revision pinned in the Makefile.
+          if [ ! -L "$BUILD" ] || [ "$(readlink -f "$BUILD")" != "$(readlink -f "$SRC_COPY")" ]; then
+            echo "::error::$BUILD is not the local source tree"
+            exit 1
+          fi
+
+          diff -q "$GITHUB_WORKSPACE/wg-obfuscator.c" "$BUILD/wg-obfuscator.c"
           echo "Compiled sources match the checkout"
 
       - name: Verify package contents
@@ -246,6 +293,7 @@ jobs:
           for script in \
             openwrt-main/files/wg-obfuscator-config.sh \
             openwrt-main/files/wg-obfuscator.init \
+            openwrt-main/test-version.sh \
             openwrt-main/build.sh \
             openwrt-luci/build.sh
           do
@@ -324,8 +372,18 @@ jobs:
           grep -qE 'LDFLAGS=.*-pthread' openwrt-main/Makefile || {
             echo "::error::openwrt-main/Makefile drops -pthread from LDFLAGS"; status=1; }
 
-          grep -q 'feeds/luci/luci.mk' openwrt-luci/Makefile || {
-            echo "::error::openwrt-luci/Makefile does not include luci.mk"; status=1; }
+          # Both Makefiles have to stay in the exact shape the official feeds
+          # expect, so that submitting them is a plain copy.
+          grep -qF 'include ../../luci.mk' openwrt-luci/Makefile || {
+            echo "::error::openwrt-luci/Makefile must include ../../luci.mk like every package in the LuCI feed"; status=1; }
+
+          grep -qE '^PKG_MIRROR_HASH:=[0-9a-f]{64}$' openwrt-main/Makefile || {
+            echo "::error::openwrt-main/Makefile needs a real PKG_MIRROR_HASH"; status=1; }
+
+          if grep -q 'WG_OBFUSCATOR_SRC' openwrt-main/Makefile; then
+            echo "::error::openwrt-main/Makefile carries a local source override, use USE_SOURCE_DIR instead"
+            status=1
+          fi
 
           exit $status
 
@@ -336,6 +394,7 @@ jobs:
           for script in \
             openwrt-main/files/wg-obfuscator-config.sh \
             openwrt-main/files/wg-obfuscator.init \
+            openwrt-main/test-version.sh \
             openwrt-main/build.sh \
             openwrt-luci/build.sh
           do

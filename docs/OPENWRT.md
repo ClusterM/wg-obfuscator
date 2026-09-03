@@ -371,15 +371,29 @@ The scripts will:
 - Enable packages in `.config` if needed
 - Build the packages
 
-`openwrt-main/build.sh` exports `WG_OBFUSCATOR_SRC` so that the daemon is
-compiled from the checkout you are standing in. Without that variable the
-package Makefile falls back to the revision pinned in `PKG_SOURCE_VERSION` and
-downloads it from GitHub, which is what a feed submission needs but is rarely
-what you want when testing local changes.
+Both Makefiles are kept exactly in the shape the official OpenWrt feeds expect,
+so by default the daemon is compiled from the revision pinned in
+`PKG_SOURCE_VERSION` and downloaded from GitHub — not from your working tree.
+To compile local changes instead, pass `--local-src`:
+
+```bash
+./openwrt-main/build.sh --local-src
+```
+
+That uses OpenWrt's own `USE_SOURCE_DIR` mechanism, which keeps the override out
+of the Makefile. The package version still comes from `PKG_VERSION`, so a
+locally built package is not distinguishable by version from the pinned one.
+
+`openwrt-luci/build.sh` copies the app into `feeds/luci/applications/` before
+building, because the LuCI Makefile pulls in `../../luci.mk` and `luci.mk`
+derives the package name from the directory name. Re-run the script after
+editing files in `openwrt-luci/`; a symlink would not work here.
 
 #### Step 6: Install Built Packages
 
-After a successful build, package files are under `bin/packages/*/base/` (and sometimes other feed dirs):
+After a successful build, the daemon lands in `bin/packages/<arch>/base/`, while
+the architecture-independent LuCI packages land in
+`bin/targets/<target>/<subtarget>/packages/`:
 - OpenWrt ≤24: `*.ipk`
 - OpenWrt ≥25: `*.apk`
 
@@ -391,10 +405,12 @@ Three packages are produced: `wg-obfuscator` (the daemon),
 
 ```bash
 # Find built packages (.ipk and/or .apk)
-find bin/packages \( -name "*.ipk" -o -name "*.apk" \) | grep wg-obfuscator
+find bin \( -name "*wg-obfuscator*.ipk" -o -name "*wg-obfuscator*.apk" \)
 
-# Copy to router (adjust paths and router IP)
-scp bin/packages/*/*/*wg-obfuscator*.{ipk,apk} root@192.168.1.1:/tmp/
+# Copy to router (adjust the router IP; -O is needed because OpenWrt has no
+# sftp-server, so scp has to fall back to the legacy protocol)
+scp -O $(find bin \( -name "*wg-obfuscator*.ipk" -o -name "*wg-obfuscator*.apk" \)) \
+    root@192.168.1.1:/tmp/
 
 # Install on router (via SSH)
 ssh root@192.168.1.1

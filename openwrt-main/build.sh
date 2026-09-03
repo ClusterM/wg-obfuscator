@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build script for wg-obfuscator OpenWrt package
-# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
 # Licensed under GPLv3
 
 set -e
@@ -24,16 +24,38 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+usage() {
+    cat <<EOF
+Usage: $0 [--local-src]
+
+By default the package is built exactly as an OpenWrt feed would build it, from
+the upstream revision pinned in the Makefile.
+
+  --local-src   Build the checkout this script lives in instead of the pinned
+                revision. Uses the stock USE_SOURCE_DIR mechanism, so the
+                Makefile itself stays feed-clean.
+
+Environment:
+  OPENWRT_BUILD_DIR   Path to a configured OpenWrt SDK or buildroot (required)
+EOF
+}
+
 # Get the script and project directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 PACKAGE_NAME="wg-obfuscator"
 
-# Build the checkout this script lives in rather than the revision pinned in
-# the package Makefile, so local changes end up in the package.
-export WG_OBFUSCATOR_SRC="$(dirname "$SCRIPT_DIR")"
+LOCAL_SRC=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --local-src) LOCAL_SRC=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) print_error "Unknown argument: $1"; usage; exit 1 ;;
+    esac
+    shift
+done
 
 print_status "Building $PACKAGE_NAME OpenWrt package..."
-print_status "Source tree: $WG_OBFUSCATOR_SRC"
 
 # Check if OpenWrt build system is available
 if [ -z "$OPENWRT_BUILD_DIR" ]; then
@@ -72,8 +94,25 @@ print_status "  → $PACKAGE_DIR -> $SCRIPT_DIR"
 # Make scripts executable
 chmod +x "$SCRIPT_DIR/files/wg-obfuscator.init"
 chmod +x "$SCRIPT_DIR/files/wg-obfuscator-config.sh"
+chmod +x "$SCRIPT_DIR/test-version.sh"
 
 print_status "Symlink created successfully"
+
+# USE_SOURCE_DIR makes OpenWrt symlink the build directory at the given tree, so
+# it gets a copy of the checkout rather than the checkout itself - otherwise
+# cross-compiled objects would land next to (and collide with) host builds.
+MAKE_ARGS=()
+if [ $LOCAL_SRC -eq 1 ]; then
+    SRC_COPY="${TMPDIR:-/tmp}/$PACKAGE_NAME-local-src-$(id -u)"
+    print_status "Building local source tree: $PROJECT_DIR"
+    rm -rf "$SRC_COPY"
+    mkdir -p "$SRC_COPY"
+    cp "$PROJECT_DIR"/Makefile "$PROJECT_DIR"/LICENSE "$SRC_COPY/"
+    cp "$PROJECT_DIR"/*.c "$PROJECT_DIR"/*.h "$SRC_COPY/"
+    MAKE_ARGS+=("USE_SOURCE_DIR=$SRC_COPY")
+else
+    print_status "Building pinned upstream revision from the package Makefile"
+fi
 
 # Build the package
 print_status "Building package..."
@@ -108,6 +147,7 @@ fi
 set +e
 make package/$PACKAGE_NAME/{clean,download,prepare,compile} \
     CONFIG_PACKAGE_$PACKAGE_NAME=y \
+    "${MAKE_ARGS[@]}" \
     V=s \
     2>&1 | tee /tmp/$PACKAGE_NAME-build.log | tail -20
 BUILD_STATUS=${PIPESTATUS[0]}
@@ -121,7 +161,7 @@ fi
 
 # Accept both OpenWrt ≤24 (.ipk / opkg) and OpenWrt ≥25 (.apk / apk)
 if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || [ $LOG_PACKAGED -eq 1 ]; then
-    mapfile -t PKG_FILES < <(find bin/packages \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \) 2>/dev/null | sort)
+    mapfile -t PKG_FILES < <(find bin \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \) 2>/dev/null | sort)
     if [ ${#PKG_FILES[@]} -gt 0 ] && [ -n "${PKG_FILES[0]}" ]; then
         print_status "Package built successfully!"
         for PKG_FILE in "${PKG_FILES[@]}"; do

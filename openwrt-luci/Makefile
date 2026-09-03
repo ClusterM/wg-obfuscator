@@ -7,26 +7,15 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=luci-app-wg-obfuscator
+LUCI_TITLE:=LuCI support for WireGuard Obfuscator
+LUCI_DESCRIPTION:=Web interface to configure and control wg-obfuscator, the WireGuard traffic obfuscator.
+LUCI_DEPENDS:=+luci-base +luci-compat +wg-obfuscator
+
 PKG_VERSION:=1.6
 PKG_RELEASE:=1
-
 PKG_LICENSE:=GPL-3.0-only
+PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
 
-# CURDIR resolves to the physical directory (openwrt-luci) rather than to the
-# symlink the OpenWrt tree uses, so the name luci.mk derives everything else
-# from has to be set explicitly.
-LUCI_NAME:=luci-app-wg-obfuscator
-LUCI_TITLE:=LuCI interface for WireGuard Obfuscator
-LUCI_DESCRIPTION:=LuCI web interface for WireGuard Obfuscator configuration and management.
-# luci.mk appends +luci-lua-runtime on its own because this package ships luasrc
-LUCI_DEPENDS:=+wg-obfuscator +luci-base +luci-compat
-LUCI_PKGARCH:=all
-LUCI_URL:=https://github.com/ClusterM/wg-obfuscator
-LUCI_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
-
-# This package lives outside of the LuCI feed, so luci.mk comes from the
-# installed feed instead of a relative path.
-include $(TOPDIR)/feeds/luci/luci.mk
+include ../../luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature

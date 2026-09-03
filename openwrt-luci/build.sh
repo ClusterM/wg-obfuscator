@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build script for luci-app-wg-obfuscator OpenWrt package
-# Copyright (C) 2024-2025 Alexey Cluster <cluster@cluster.wtf>
+# Copyright (C) 2024-2026 Alexey Cluster <cluster@cluster.wtf>
 # Licensed under GPLv3
 
 set -e
@@ -53,10 +53,18 @@ if [ ! -f "$OPENWRT_BUILD_DIR/feeds/luci/luci.mk" ]; then
     exit 1
 fi
 
-# Package directory in OpenWrt build system
+# The Makefile is the one submitted to the LuCI feed, so it pulls in luci.mk as
+# ../../luci.mk and luci.mk derives LUCI_NAME from the directory name. Both only
+# hold inside the feed, hence a copy into applications/ rather than a symlink
+# from package/ straight to this checkout.
+FEED_APP_DIR="$OPENWRT_BUILD_DIR/feeds/luci/applications/$PACKAGE_NAME"
 PACKAGE_DIR="$OPENWRT_BUILD_DIR/package/luci/$PACKAGE_NAME"
 
-print_status "Setting up package directory..."
+print_status "Staging package into the LuCI feed..."
+rm -rf "$FEED_APP_DIR"
+mkdir -p "$FEED_APP_DIR"
+(cd "$SCRIPT_DIR" && tar -cf - --exclude=build.sh .) | (cd "$FEED_APP_DIR" && tar -xf -)
+print_status "  → $FEED_APP_DIR"
 
 # Remove old symlink/directory if it exists
 if [ -L "$PACKAGE_DIR" ]; then
@@ -65,15 +73,11 @@ elif [ -d "$PACKAGE_DIR" ]; then
     rm -rf "$PACKAGE_DIR"
 fi
 
-# Create parent directory
 mkdir -p "$(dirname "$PACKAGE_DIR")"
 
-# Create symlink to our package directory
 print_status "Creating symlink..."
-ln -sf "$SCRIPT_DIR" "$PACKAGE_DIR"
-print_status "  → $PACKAGE_DIR -> $SCRIPT_DIR"
-
-print_status "Symlink created successfully"
+ln -sf "$FEED_APP_DIR" "$PACKAGE_DIR"
+print_status "  → $PACKAGE_DIR -> $FEED_APP_DIR"
 
 # Build the package
 print_status "Building package..."
@@ -123,7 +127,9 @@ fi
 
 # Accept both OpenWrt ≤24 (.ipk / opkg) and OpenWrt ≥25 (.apk / apk)
 if [ $BUILD_STATUS -eq 0 ] || [ $BUILD_STATUS -eq 2 ] || [ $LOG_PACKAGED -eq 1 ]; then
-    mapfile -t PKG_FILES < <(find bin/packages \
+    # PKGARCH:=all lands in bin/targets/<target>/<subtarget>/packages rather
+    # than in bin/packages/<arch>, so search the whole output tree.
+    mapfile -t PKG_FILES < <(find bin \
         \( -name "${PACKAGE_NAME}*.ipk" -o -name "${PACKAGE_NAME}*.apk" \
            -o -name "${I18N_NAME}*.ipk" -o -name "${I18N_NAME}*.apk" \) 2>/dev/null | sort)
     if [ ${#PKG_FILES[@]} -gt 0 ] && [ -n "${PKG_FILES[0]}" ]; then

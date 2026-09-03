@@ -11,20 +11,10 @@ PKG_NAME:=wg-obfuscator
 PKG_VERSION:=1.6
 PKG_RELEASE:=1
 
-# Point WG_OBFUSCATOR_SRC at a source checkout to build that tree instead of
-# the pinned upstream revision. build.sh and the CI workflow set it so that
-# local changes are actually compiled.
-WG_OBFUSCATOR_SRC:=$(strip $(WG_OBFUSCATOR_SRC))
-
-ifeq ($(WG_OBFUSCATOR_SRC),)
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/ClusterM/wg-obfuscator.git
-PKG_SOURCE_DATE:=2026-08-18
-PKG_SOURCE_VERSION:=6440304054a27158b6d373545925880f0e51bafb
-# Feed submission requires a real hash here; regenerate it on a configured
-# build tree with: make package/wg-obfuscator/check FIXUP=1
-PKG_MIRROR_HASH:=skip
-endif
+PKG_SOURCE_VERSION:=v$(PKG_VERSION)
+PKG_MIRROR_HASH:=f674e335d34ddf362bb9b3b2df350b9676e329ae64da85e23669e0d35a6f3094
 
 PKG_MAINTAINER:=Alexey Cluster <cluster@cluster.wtf>
 PKG_LICENSE:=GPL-3.0-only
@@ -37,31 +27,28 @@ include $(INCLUDE_DIR)/package.mk
 define Package/wg-obfuscator
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=WireGuard Obfuscator
+  SUBMENU:=VPN
+  TITLE:=WireGuard traffic obfuscator
   URL:=https://github.com/ClusterM/wg-obfuscator
 endef
 
 define Package/wg-obfuscator/description
-  WireGuard Obfuscator is a tool designed to disguise WireGuard traffic as random data or a different protocol, making it much harder for DPI (Deep Packet Inspection) systems to detect and block.
+  wg-obfuscator disguises WireGuard traffic as random data or as another
+  protocol, which makes it much harder for DPI (Deep Packet Inspection)
+  systems to detect and block it. It acts as a UDP proxy in front of a
+  WireGuard peer and has to run on both ends of the tunnel with the same
+  obfuscation key.
 endef
 
 define Package/wg-obfuscator/conffiles
 /etc/config/wg-obfuscator
 endef
 
-ifneq ($(WG_OBFUSCATOR_SRC),)
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) $(WG_OBFUSCATOR_SRC)/Makefile $(WG_OBFUSCATOR_SRC)/LICENSE $(PKG_BUILD_DIR)/
-	$(CP) $(WG_OBFUSCATOR_SRC)/*.c $(WG_OBFUSCATOR_SRC)/*.h $(PKG_BUILD_DIR)/
-endef
-endif
-
 define Build/Configure
 endef
 
 # The upstream Makefile appends -pthread to CFLAGS/LDFLAGS, but command line
-# variables override that, so it has to be passed explicitly.
+# variables take precedence over that, so it has to be passed explicitly.
 define Build/Compile
 	$(MAKE) -C $(PKG_BUILD_DIR) \
 		CC="$(TARGET_CC)" \
