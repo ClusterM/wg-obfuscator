@@ -26,6 +26,7 @@ Table of Contents:
   - [macOS](#macos)
   - [Android](#android)
   - [Running Docker container on Linux](#running-docker-container-on-linux)
+  - [WireGuard Obfuscator Easy](#wireguard-obfuscator-easy)
   - [OpenWrt](#openwrt)
   - [MikroTik Routers](#mikrotik-routers)
 - [Caveats and recommendations](#caveats-and-recommendations)
@@ -63,6 +64,8 @@ Originally built as a quick personal solution, this project has grown into a ful
   No large external libraries or frameworks are required.
 * **Android client**  
   A very simple Android port of the obfuscator is available: https://github.com/ClusterM/wg-obfuscator-android/ - it allows you to obfuscate WireGuard traffic on Android devices, including phones, tablets, and Android TVs.
+* **Easy web UI**  
+  If you want a ready-made WireGuard server with obfuscation and a web panel instead of configuring this tool by hand, see [WireGuard Obfuscator Easy](https://github.com/ClusterM/wg-obfuscator-easy).
 
 
 ## Basic Concept
@@ -597,6 +600,10 @@ docker run -d \
   clustermeerkat/wg-obfuscator:latest
 ```
 
+### WireGuard Obfuscator Easy
+
+If you need a full WireGuard server with obfuscation and a web management interface rather than the standalone obfuscator, use [WireGuard Obfuscator Easy](https://github.com/ClusterM/wg-obfuscator-easy). It is a Docker-only panel that creates clients, generates configs and QR codes, and runs this obfuscator for you.
+
 ### OpenWrt
 
 WireGuard Obfuscator is available as native OpenWrt packages with full UCI integration and optional LuCI web interface.
@@ -660,6 +667,8 @@ https://github.com/ClusterM/wg-obfuscator/releases
   Download it only if you want to test new features or bug fixes that are not yet released. Can be buggy or unstable, use at your own risk!
 * Android port:  
   https://github.com/ClusterM/wg-obfuscator-android
+* WireGuard Obfuscator Easy (web UI + WireGuard server in Docker):  
+  https://github.com/ClusterM/wg-obfuscator-easy
 
 
 ## Credits
