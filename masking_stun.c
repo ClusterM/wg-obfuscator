@@ -126,7 +126,10 @@ static int stun_wrap(uint8_t **buf_ptr, size_t data_len) {
     // The caller guarantees the payload already fits into the main buffer (it was
     // received/encoded within BUFFER_SIZE), so the wrapped packet cannot overflow
     // the tail of full_buffer. The attribute length field is also 16-bit only.
-    if (data_len > BUFFER_SIZE || data_len > 0xFFFF) {
+    // Note: BUFFER_SIZE (65535) equals the maximum value of a 16-bit unsigned
+    // integer (0xFFFF), so this single check covers both the buffer limit and
+    // the STUN attribute length field limit.
+    if (data_len > BUFFER_SIZE) {
         log(LL_WARN, "Can't wrap data in STUN, data too large (%zu bytes)", data_len);
         return -ENOMEM;
     }
