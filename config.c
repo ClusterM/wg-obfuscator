@@ -194,12 +194,13 @@ static void read_config_file(const char *filename, obfuscator_config_t *config)
             *comment_index = 0;
         }
         // Skip empty lines or with spaces only
-        if (strspn(line, " \t\r\n") == strlen(line)) {
+        size_t line_len = strlen(line);
+        if (strspn(line, " \t\r\n") == line_len) {
             continue;
         }
 
         // It can be new section
-        if (line[0] == '[' && line[strlen(line) - 1] == ']') {
+        if (line_len > 0 && line[0] == '[' && line[line_len - 1] == ']') {
             if (!first_section) {
                 // new config, need to fork the process
                 pid_t pid = fork();
