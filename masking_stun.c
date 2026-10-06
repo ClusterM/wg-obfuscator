@@ -121,17 +121,7 @@ static int stun_build_binding_success(uint8_t *out,
 }
 
 static int stun_wrap(uint8_t **buf_ptr, size_t data_len) {
-    const size_t header_size = 20;      // STUN header
-    const size_t attr_header = 4;       // type + length
-    size_t total_add = header_size + attr_header;
     size_t mlen = 0;
-
-    // The header is prepended into the prebuffer (pointer shift, no payload copy),
-    // so it must fit into PREBUFFER_SIZE.
-    if (total_add > PREBUFFER_SIZE) {
-        log(LL_WARN, "Can't wrap data in STUN, header is too large (%zu bytes)", total_add);
-        return -ENOMEM;
-    }
 
     // The caller guarantees the payload already fits into the main buffer (it was
     // received/encoded within BUFFER_SIZE), so the wrapped packet cannot overflow
@@ -141,8 +131,8 @@ static int stun_wrap(uint8_t **buf_ptr, size_t data_len) {
         return -ENOMEM;
     }
 
-    // Move the buffer pointer to avoid moving the data
-    *buf_ptr -= total_add;
+    // Header is prepended into the prebuffer (checked at compile time via _Static_assert).
+    *buf_ptr -= STUN_WRAP_OVERHEAD;
     uint8_t *buf = *buf_ptr;
 
     uint8_t txid[12];
@@ -154,7 +144,7 @@ static int stun_wrap(uint8_t **buf_ptr, size_t data_len) {
     buf[mlen + 2] = data_len >> 8;
     buf[mlen + 3] = data_len & 0xFF;
 
-    return total_add + data_len;
+    return STUN_WRAP_OVERHEAD + data_len;
 }
 
 static int stun_unwrap(uint8_t **buf_ptr, size_t len) {
