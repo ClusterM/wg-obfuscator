@@ -671,21 +671,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Check the target host and port
-    if (!config.forward_host_port_set) {
-        log(LL_ERROR, "'target' is not set in the configuration file");
-        exit(EXIT_FAILURE);
-    }
-
     // Check the XOR key
     if (!config.xor_key_set) {
         log(LL_ERROR, "'key' is not set in the configuration file");
-        exit(EXIT_FAILURE);
-    } 
-
-    // Check the listening port
-    if (!config.listen_port_set) {
-        log(LL_ERROR, "'source-lport' is not set");
         exit(EXIT_FAILURE);
     }
  
