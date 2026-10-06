@@ -671,8 +671,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Check the XOR key
-    if (!config.xor_key_set) {
+    // Check the key
+    key_length = strlen(config.xor_key);
+    if (!config.xor_key_set || key_length == 0) {
         log(LL_ERROR, "'key' is not set in the configuration file");
         exit(EXIT_FAILURE);
     }
@@ -695,13 +696,6 @@ int main(int argc, char *argv[]) {
             log(LL_ERROR, "Invalid target port: %s", port_delimiter + 1);
             exit(EXIT_FAILURE);
         }
-    }
-
-    // Check the key
-    key_length = strlen(config.xor_key);
-    if (!config.xor_key_set || key_length == 0) {
-        log(LL_ERROR, "Key is not set");
-        exit(EXIT_FAILURE);
     }
 
     // 'allow-clean' is incompatible with static bindings: for a static binding
@@ -801,7 +795,7 @@ int main(int argc, char *argv[]) {
         FAILURE();
     }
     log(LL_DEBUG, "Resolved target hostname '%s' to %s", target_host, inet_ntoa(forward_addr.sin_addr));
-    if (target_port <= 0 || target_port > 65535) {
+    if (target_port > 65535) {
         log(LL_ERROR, "Invalid target port: %d", target_port);
         FAILURE();
     }
