@@ -947,8 +947,8 @@ int main(int argc, char *argv[]) {
             pollfds[nfds].events = POLLIN;
             nfds++;
         }
-        client_entry_t *entry, *tmp;
-        HASH_ITER(hh, conn_table, entry, tmp) {
+        client_entry_t *entry, *tmp_entry;
+        HASH_ITER(hh, conn_table, entry, tmp_entry) {
             if (nfds >= config.max_clients + 2) {
                 log(LL_DEBUG, "Too many clients, cannot add more");
                 break;
@@ -1296,9 +1296,9 @@ int main(int argc, char *argv[]) {
         } // for (int e = 0; e < events_n; e++)
 
         if (now - last_cleanup_time >= ITERATE_INTERVAL) {
-            client_entry_t *current_entry, *tmp;
+            client_entry_t *current_entry, *tmp_current_entry;
             // Iterate over all client entries
-            HASH_ITER(hh, conn_table, current_entry, tmp) {
+            HASH_ITER(hh, conn_table, current_entry, tmp_current_entry) {
                 // Check if the entry is idle for too long
                 uint8_t idle = now - current_entry->last_activity_time >= config.idle_timeout;
                 uint8_t incoming_timeout = config.in_timeout > 0 && now - current_entry->last_incoming_time >= config.in_timeout;
