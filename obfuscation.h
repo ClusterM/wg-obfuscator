@@ -75,25 +75,23 @@ static inline int encode(uint8_t *buffer, int length, char *key, int key_length,
         if (length < MAX_DUMMY_LENGTH_TOTAL) {
             uint16_t dummy_length = 0;
             uint16_t max_dummy_length = MAX_DUMMY_LENGTH_TOTAL - length;
-            if (length < MAX_DUMMY_LENGTH_TOTAL) {
-                switch (packet_type) {
-                    case WG_TYPE_HANDSHAKE:
-                    case WG_TYPE_HANDSHAKE_RESP:
-                        // length to MAX_DUMMY_LENGTH_HANDSHAKE
-                        dummy_length = rand() % MIN(max_dummy_length, MAX_DUMMY_LENGTH_HANDSHAKE);
-                        break;
-                    case WG_TYPE_COOKIE:
-                    case WG_TYPE_DATA:
-                        // length to MAX_DUMMY_LENGTH_HANDSHAKE
-                        if (max_dummy_length_data) {
-                            dummy_length = rand() % MIN(max_dummy_length, max_dummy_length_data);
-                        }
-                        break;
-                    default:
-                        //assert(0);
-                        break;
-                }
-            }
+            switch (packet_type) {
+                case WG_TYPE_HANDSHAKE:
+                case WG_TYPE_HANDSHAKE_RESP:
+                    // length to MAX_DUMMY_LENGTH_HANDSHAKE
+                    dummy_length = rand() % MIN(max_dummy_length, MAX_DUMMY_LENGTH_HANDSHAKE);
+                    break;
+                case WG_TYPE_COOKIE:
+                case WG_TYPE_DATA:
+                    // length to MAX_DUMMY_LENGTH_HANDSHAKE
+                    if (max_dummy_length_data) {
+                        dummy_length = rand() % MIN(max_dummy_length, max_dummy_length_data);
+                    }
+                    break;
+                default:
+                    //assert(0);
+                    break;
+            }                        
             buffer[2] = dummy_length & 0xFF; // Set the dummy length in the packet
             buffer[3] = dummy_length >> 8; // Set the dummy length in
             if (dummy_length > 0) {
