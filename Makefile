@@ -8,10 +8,10 @@ RELEASE ?= 0
 RM    = rm -f
 CC    = gcc
 ifdef DEBUG
-  CFLAGS   = -g -O0 -Wall -DDEBUG
+  CFLAGS   = -std=gnu11 -g -O0 -Wall -DDEBUG
   LDFLAGS +=
 else
-  CFLAGS   = -O2 -Wall
+  CFLAGS   = -std=gnu11 -O2 -Wall
   LDFLAGS += -s
 endif
 OBJS = wg-obfuscator.o config.o masking.o masking_stun.o obfuscation.o logging.o

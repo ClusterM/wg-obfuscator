@@ -5,7 +5,7 @@
 #include "masking.h"
 #include "masking_handlers.h"
 
-static _Thread_local struct {
+static __thread struct {
     int listen_sock;
     struct sockaddr_in *sender_addr;
     int server_sock;
